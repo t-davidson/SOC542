@@ -39,7 +39,7 @@ Inside the chunk's header, give it a title that describes what's going on. In th
 
 After the title, we have options. Note that the `echo = FALSE` parameter was added to `pressure` to prevent printing of the R code that generated the plot. Clicking the gear in the top right of the chunk gives you the options for it. You can rename the chunk and tell it what output to use. 
 
-For this class, we'll be using RMarkdown for our homework assignments, so we want to see the code that you used. So tell it to "Show code and output" or simply change the `echo=FALSE` to `echo=TRUE` in the chunk's header. 
+For this class, we'll be using RMarkdown for the homework assignments, so we want to see the code that we use. Click that gear and tell it to "Show code and output" or simply change the `echo=FALSE` to `echo=TRUE` in the chunk's header. 
 
 ## So what is R Markdown?
 
@@ -64,9 +64,9 @@ If your project is not somewhere permanent, move it now and rerun the above chun
 
 ### R Script vs RMarkdown
 
-Last semester, we used R Script (aka .R files) to do our work. This semester, we'll be using RMarkdown (aka .Rmd files). R Script is great for running analysis, but deprioritizes text. (Remember how we'd have to comment out any notes we had?)  
+Last semester, we used R Script (aka .R files) to do our work. This semester, we'll be using RMarkdown (aka .Rmd files). R Script is great for running analysis, but deprioritizes text. (Remember how we'd have to comment out any notes we had?) 
 
-RMarkdown works the opposite: Text is it's primary function, and you have to tell it when to run code. This is great for reports where you want to add your analysis, results, and graphs without having to copy and paste. 
+RMarkdown works the opposite: Text is its primary function, and you have to tell it when to run code. This is great for reports where you want to add your analysis, results, and graphs without having to copy and paste. 
 
 
 ## R Basics Review
@@ -153,6 +153,6 @@ GitHub, then, is a place to store our code and all its previous versions. And li
 
 We'll now walk through the process of installing Git and linking our Github to our RStudio project. The best resource for this is Jenny Bryan's Happy Git with R: https://happygitwithr.com/index.html 
 
-Chapters 4, 6, 7, 9-13, and 17 are the key sections here, and we'll walk through it together. 
+Chapters 4, 6, 7, 9-13, and 17 are the key sections here. We're going to start this together, and continue one-on-one this week.
 
 
