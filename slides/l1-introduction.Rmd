@@ -3,7 +3,7 @@ title: "SOC542 Statistical Methods in Sociology II"
 subtitle: "Introduction and Review"
 author: Dr. Thomas Davidson
 institute: Rutgers University
-date: January 24, 2021
+date: January 24, 2022
 urlcolor: blue
 output:
     beamer_presentation:
@@ -211,8 +211,8 @@ print(t(M))
 - Distributions are defined by parameters that modify their shape and scale.
     - A Bernoulli distribution has a single parameter, $p$
     - A binomial distribution has two parameters, $n$ and $p$
-    - A normal distribution has two parameters, a mean $\mu$ and a standard deviation of $\sigma^2$
-        - Often we refer to this using the shorthand $N(\mu, \sigma^2)$
+    - A normal distribution has two parameters, a mean $\mu$ and a standard deviation of $\sigma$
+        - Often we refer to this using the shorthand $N(\mu, \sigma)$
 
 # Statistics review
 ## Probability distributions in R
@@ -232,7 +232,7 @@ print(x)
 
 # Statistics review
 ## Probability distributions in R
-A normal distribution, often referred to as a Gaussian, is a continuous distribution with two parameters. The standard normal distribution has a mean $\mu = 0$ and standard deviation $\sigma^2 = 1$
+A normal distribution, often referred to as a Gaussian, is a continuous distribution with two parameters. The standard normal distribution has a mean $\mu = 0$ and standard deviation $\sigma = 1$
 ```{r, echo=TRUE}
 x <- rnorm(1, mean = 0, sd = 1)
 print(x)
@@ -313,7 +313,7 @@ $$\sigma_{\bar{x}}^2 = \frac{1}{n-1}\Sigma(x_i-\bar{x})^2$$
 
 # Statistics review
 ## Standard deviation
-- Variance is difficult to interpret. The standard deviation is a scaled measure of variance. It is often denoted using $\sigma$. In the population it is equal to
+- Variance is difficult to interpret. The standard deviation is a scaled measure of variance. It is typically denoted using $\sigma$. In the population it is equal to
 
 $$\sigma_x = \sqrt{\sigma^2_x} = \sqrt{\frac{1}{N}\Sigma(x_i-\mu)^2}$$
 
@@ -642,7 +642,7 @@ $$cov(x,y) = \frac{1}{n-1}\Sigma(x_i-\bar{x})(y_i-\bar{y})$$
 
 $$\rho(x,y) = \frac{\frac{1}{n-1}\Sigma(x_i-\bar{x})(y_i-\bar{y})}{\sigma_x\sigma_y} =  \frac{cov(x,y)}{\sigma_x\sigma_y}$$
 
-- The letter $\rho$ is typically used to refer to correlation. The correlation coefficient variances between -1 and 1.
+- The letter $\rho$ is typically used to refer to correlation. The correlation coefficient ranges from -1 to 1.
 
 <!--
 - The standard error of $\rho$ is approximately
