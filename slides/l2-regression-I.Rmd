@@ -178,16 +178,6 @@ ggplot(data = df, aes(x = x, y = y)) + geom_point(alpha = 0.2) + theme_minimal()
 - The population regression line $y = \beta_0 + \beta_1x + u$ is defined by two parameters, the slope and intercept.
     - $\beta_0$ and $\beta_1$ are known as \textbf{coefficients}.
 
-<!--
-# Statistics review
-The line of best fit is defined by the linear relationship between $x$ and $y$. We can use the `lm` function to find the intercept $\beta_0$ and slope $\beta_1$.
-```{r, echo=FALSE, mysize=TRUE, size='\\footnotesize'}
-best.fit <- lm("y ~ x", data = df)
-round(best.fit$coefficients[1], 3)
-round(best.fit$coefficients[2], 3)
-```
--->
-
 # Plotting the regression line
 ```{r, echo=FALSE, mysize=TRUE, size='\\footnotesize'}
 S <- round(cor(df$x,df$y)*(sd(df$y)/sd(df$x)), 3)
@@ -218,10 +208,10 @@ ggplot(data = data.frame(x = -1:2, y = -1:2), aes(x=x, y=y)) + geom_point(alpha=
 # Interpreting the slope
 - The slope defines the relationship between change in $x$ and $y$, where $\Delta$ is used to denote change:
 
-$$\beta_1x = \frac{\Delta x}{\Delta y}$$
+$$\beta_1 = \frac{\Delta y}{\Delta x}$$
 
 - $\beta_1$ denotes the expected *change* in $y$ following a 1-unit change in $x$
-    - e.g. What effect does an additional year of education have one lifetime income?
+    - e.g. What effect does an additional year of education have on lifetime income?
 - If $\beta_1 < 0$ then the relationship is negative ($y$ decreases as $x$ increases)
 
 
@@ -322,8 +312,6 @@ $$\hat{\beta_1} = \frac{\sum_{i=1}^n(x_i-\bar{x})(y_i-\bar{y})}{\sum_{i=1}^n(x_i
 
 $$\beta_0 = \bar{y} - \beta_1\bar{x}$$
 
-<!--- Slope can also be written in terms of correlation $\beta_1 = cor(x,y)\frac{\sigma(y)}{\sigma(x)}$ -->
-
 # Predicted values and residuals
 - $x$ and $y$ are vectors where $x_i$ and $y_i$ correspond to the $i^{th}$ elements of each vector.
 - We can use the regression equation to calculate the \textbf{predicted value} of $y_i$ as a linear function of $x_i$:
@@ -358,7 +346,7 @@ ggplot(data = df, aes(x = x, y = y)) + geom_point(alpha = 0.3) + theme_minimal()
 
 $$SSR = \sum_{i=1}^n (y_i-\hat{y_i})^2 = \sum_{i=1}^n\hat{u_i}^2$$
 
-# $\hat{x}$ is the least squares estimator of $\mu_x$
+# $\bar{x}$ is the least squares estimator of $\mu_x$
 - Consider a random variable $x$. For each value of $x$, $x_i - \alpha$ is the prediction error.
 
 $$\sum_{i=1}^n (x_i-\alpha{})^2$$
@@ -366,7 +354,7 @@ $$\sum_{i=1}^n (x_i-\alpha{})^2$$
 
 - The sample average $\bar{x}$ is the estimator $\alpha$ that minimizes the \textbf{sum of squared errors (SSE)}.
 
-# $\hat{x}$ is the least squares estimator of $\mu_x$
+# $\bar{x}$ is the least squares estimator of $\mu_x$
 Let's generate a random variable and calculate the SSE using $\alpha = \bar{x}$
 ```{r, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
 x <- rnorm(n=100, mean = 5, sd = 1)
@@ -375,7 +363,7 @@ print(xbar)
 print(sum((x-xbar)^2))
 ```
 
-# $\hat{x}$ is the least squares estimator of $\mu_x$
+# $\bar{x}$ is the least squares estimator of $\mu_x$
 Now let's compare the results when alternative values of $\alpha$ are used.
 ```{r, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
 SSE <- function(x, alpha) {
@@ -397,8 +385,6 @@ for (alpha in 3:7) {
 - For a single sample, $\bar{y}$ is the least squares \textbf{estimator} of $\mu_y$.
 - For two variables, $\hat{y}$ is the least squares \textbf{estimator} of $y$ because it minimizes the \textbf{sum of the squared residuals (SSR)}:
 
-<!-- Confirm this. Possible HW question is to generalize above sim to two variables-->
-
 $$SSR = \sum_{i=1}^n (y_i-\hat{y_i})^2 = \sum_{i=1}^n\hat{u}^2$$
 
 - By substitution,
@@ -406,15 +392,16 @@ $$SSR = \sum_{i=1}^n (y_i-\hat{y_i})^2 = \sum_{i=1}^n\hat{u}^2$$
 $$SSR = \sum_{i=1}^n (y_i-\hat{\beta_0} - \hat{\beta_1}x_i)^2 $$
 
 # Minimizing the sum of the squared residuals
-Let's simulate the residuals using some other possible coefficients.
+Let's simulate the residuals using some other possible coefficients, $\beta_1$.
 ```{r, echo= TRUE}
 coefs <- c(S-0.3, S-0.2, S-0.1, S, S+0.1, S+0.2, S+0.3)
 
 i <- 1
 results <- c()
-for (s in coefs) {
-    u <- df$y - I - s*df$x
-    ssr <- round(sum(u^2), 2)
+for (beta1 in coefs) {
+    beta0 <- mean(df$y) - beta1*mean(df$x) # define intercept
+    u <- df$y - beta0 - beta1*df$x # calculate residuals
+    ssr <- round(sum(u^2), 2) # calculate ssr
     results[i] <- ssr
     i <- i + 1
 }
@@ -443,8 +430,6 @@ $$R^2 = 1 - \frac{SSR}{TSS}$$
 $$MSE = \frac{1}{n}\sum_{i=1}^n(y_i-\hat{y_i})^2$$
 
 - MSE is often used to evaluate the predictive performance of statistical models with continuous outcomes.
-
-<!-- Discuss SER, see S&W p. 122 -->
 
 # OLS assumptions
 - $x$ and $y$ are independently and identically distributed (IID).
@@ -488,15 +473,6 @@ ggplot(data = df, aes(x = x, y = resids)) + geom_point(alpha = 0.4) + theme_mini
 - \textbf{conditionally Unbiased} implies $E[\hat{\beta_1}] = \beta_1$. 
     - The expectation of the estimated coefficient $\hat{\beta_1}$ is equal to the population parameter $\beta_1$ after conditioning on $x$.
 
-<!--
-$$\tilde{\beta_1} = \sum_{i=1}^n\alpha_iy_i$$
-where the weights $\alpha_i$ are a function of $x_i$.
-
-- An estimator $\tilde{\beta_1}$ is conditionally unbiased if $E[\tilde{\beta_1}| x_1, x_2,..., x_n] = \beta_1$.
-
-TODO: Return to this. See if there is a better way to explain it in the context of sampling distributions.
--->
-
 # Summary
 - OLS regression is used when we assume $y$ can be modeled as a linear combination of parameters.
 - We assume a population model, $y = \beta_0 + \beta_1x + u$.
@@ -534,8 +510,5 @@ sigma(model)
 sigma(model2)
 ```
 
-<!-- NOTE: sd(model2$residuals) provides a slightly different result to sigma(model2). Why?. See S&S on residual standard error. I think sigma is an estimate of the sampling distribution rather than the sample standard deviation.--->
-
 # Next week
 - Introduction to Bayesian statistics
-
