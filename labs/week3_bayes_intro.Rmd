@@ -1,0 +1,126 @@
+---
+title: "Week 3 - Bayesian Regression"
+author: "Fred Traylor, Lab TA"
+date: "2/4/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(rstanarm)
+```
+
+
+```{r}
+data(kidiq)
+ggplot(kidiq,
+       aes(x = mom_iq,
+           y = kid_score)) +
+  geom_point() 
+  
+```
+
+
+```{r ols-model}
+
+model_ols <- lm(kid_score ~ mom_iq, data = kidiq)
+summary(model_ols)
+
+```
+
+
+```{r no-prior}
+bayes_noprior <- stan_glm(kid_score ~ mom_iq, data = kidiq,
+                        family = gaussian(link = "identity"), 
+                        seed = 12345,  # Seed makes it reproducible
+                        refresh = 0)   # this keeps it from printing the output while it runs
+print(bayes_noprior)
+
+```
+
+Without specifying priors (AKA, with a null or uniform prior) the Bayes model provides the same result as the OLS model. Of course, though, that doesn't mean there aren't any priors included in the model. We can run `prior_summary()` to find out what it thought our priors were. 
+
+```{r no-proir-summary}
+prior_summary(bayes_noprior)
+
+```
+
+In the coefficients section, we can see that it provided a default prior of $\beta_1 = N(0,1)$. In other words, it specified for us that the distribution was centered at zero and had a spread (or scale) of 2.5 
+
+## Weak Priors
+
+Let's rerun this same model, but this time specify our priors. We'll estimate that there is about a 1:1 ratio of mother IQ and child's score, so we'll say the prior is 1; but we're not super sure about that, so we'll give it a wide spread of 4. 
+
+```{r weak-prior}
+bayes_weak_prior <- stan_glm(kid_score ~ mom_iq, data = kidiq,
+                             family = gaussian(link = "identity"),
+                             prior = normal(location = 1,   # location = mean
+                                            scale = 4),     # scale = sd (not quite, but a good way to think about it)
+                             # prior_intercept = normal(0, 1),
+                             prior_PD = TRUE,
+                             seed = 12345,  # Seed makes it reproducible
+                             refresh = 0)   # this keeps it from printing the output while it runs
+print(bayes_weak_prior)
+prior_summary(bayes_weak_prior)
+
+
+```
+
+
+## Strong Priors
+
+Let's run this again, but with a much smaller spread. 
+
+```{r strong-prior}
+bayes_strong_prior <- stan_glm(kid_score ~ mom_iq, data = kidiq,
+                               family = gaussian(link = "identity"),
+                               prior = normal(location = 1, 
+                                              scale = 1),     
+                             # prior_intercept = normal(0, 1),
+                             prior_PD = TRUE,
+                             seed = 12345, 
+                             refresh = 0)
+print(bayes_strong_prior)
+prior_summary(bayes_strong_prior)
+
+```
+
+
+
+```{r model-comparisons}
+ggplot(kidiq,
+       aes(x = mom_iq,
+           y = kid_score)) +
+  geom_point() +
+  geom_abline(aes(slope = bayes_noprior[["coefficients"]][["mom_iq"]],
+              intercept = bayes_noprior[["coefficients"]][["(Intercept)"]],
+              color = "No Prior"), size = 2, alpha = .75) +
+  geom_abline(aes(slope = bayes_weak_prior[["coefficients"]][["mom_iq"]],
+              intercept = bayes_weak_prior[["coefficients"]][["(Intercept)"]],
+              color = "Weak Prior"), size = 2, alpha = .75) +
+  geom_abline(aes(slope = bayes_strong_prior[["coefficients"]][["mom_iq"]],
+              intercept = bayes_strong_prior[["coefficients"]][["(Intercept)"]],
+              color = "Strong Prior"), size = 2, alpha = .75) +
+  theme_light()
+
+
+  
+```
+
+
+
+
+# Post-Estimation Visualization 
+
+
+```{r post-model-viz}
+
+library(tidybayes)
+bayes_strong_prior %>% 
+  gather_draws(mom_iq, `(Intercept)`) %>% 
+  median_qi() %>% 
+  ggplot(aes(y = .variable, x = .value, xmin = .lower, xmax = .upper)) +
+  stat_halfeye()
+```
+
