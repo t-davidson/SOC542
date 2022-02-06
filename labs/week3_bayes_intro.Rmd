@@ -29,12 +29,12 @@ summary(model_ols)
 ```
 
 
-# Bayesian regression with `rstanarm`
-We will use `rstanarm` to estimate a series of regression models using the Bayesian approach and will consider how the choice of prior affects the results. 
+# Bayesian regression with `stan_glm`
+We will use the `stan_glm` function from `rstanarm` to estimate a series of regression models using the Bayesian approach and will consider how the choice of prior affects the results. 
 
-Let's start with a uniform prior. This assumes we are completely ignorant about the parameters of the model.
+The `family` argument in the code below specifies the type of model. In this case, `gaussian(link = "identity")` corresponds to an OLS model. We will see how this argument is used to specify different kinds of models later in the course.
 
-The `family` argument specifies the type of model. In this case, `gaussian(link = "identity")` corresponds to an OLS model. We will see how this argument is used to specify different kinds of models later in the course.
+Let's start with a uniform or "flat" prior. This assumes we are completely ignorant about the parameters of the model. We can specify this by setting `prior` and `prior_intercept = NULL`. There is also a prior on `sigma` but we will not modify it for now.
 
 Running this will print information showing the output of the Hamiltonian Monte Carlo estimation procedure. In this case, we use a single chain with 2000 iterations. The first 1000 are used to optimize the model, the second 1000 to get estimates from the posterior.
 ```{r no-prior}
@@ -47,15 +47,16 @@ bayes_uniform <- stan_glm(kid_score ~ mom_iq, data = kidiq,
                         iter = 2000,
                         warmup = 1000)  # Seed makes it reproducible
 ```
-We can view the results using the summary function.
+
+We can view a short summary of the results by printing the model object.
 ```{r unform-prior-summary}
-summary(bayes_uniform)
+print(bayes_uniform)
 ```
 
 
 We can view information about the priors we used by running the `prior_summary` command.
 ```{r uniform-summary}
-print(bayes_uniform)
+prior_summary(bayes_uniform)
 ```
 
 We can compare the coefficients of this model to the OLS. We see that the estimates are very close.
@@ -64,11 +65,22 @@ coefficients(bayes_uniform)
 coefficients(model_ols)
 ```
 
+## Viewing the MCMC chains
+To understand the estimation procedure we can view the trace plot. This shows how the estimate of the parameters in the model shifted during the estimation process. These plots and various related statistics are often used to diagnose potential issues that can arise in the estimation process. The plot shows the estimated value of the slope at each iteration in the MCMC process.
+
+Unlike the example in lecture with two chains, here we just use a single chain. The models below all use the default 4 chains (see McElreath C9 for discussion of why we might want to vary the number of chains).
+
+This plot also communicates some of the uncertainty surrounding the parameter $\beta_1$. We can see that the estimate seems to bounce around an average value. 
+
+Note: `rstanarm` discards the "warmup" samples used to calibrate the HMC algorithm. We therefore see that the chain has already converged towards the final value.
+```{r trace}
+plot(bayes_uniform, "trace", pars = "mom_iq") + labs(y= TeX("$\\beta_1$"), x = "Iteration")
+```
+
 ## Weakly Informative Priors
+Let's rerun this same model but with some slightly more informative priors. Let's assume that we expect the coefficient for `mom_iq` to have a Normal distribution with mean 0 and standard deviation 1. In this case, we will ignore the intercept and let `rstanarm` select a default prior. We'll also keep the default arguments for the number of chains and iterations.
 
-Let's rerun this same model but with some slightly more informative priors. Let's assume that we expect the coefficient for mom_iq to have a Normal distribution with mean 0 and standard deviation 1. In this case, we will ignore the intercept and let `rstanarm` select a default prior.
-
-In this case, we also include the argument `refresh = 0` to avoid printing out all of the estimation information.
+The argument `refresh = 0` is added to avoid printing out all of the estimation information we saw in the last example.
 ```{r weak-prior}
 bayes_weak_prior <- stan_glm(kid_score ~ mom_iq, data = kidiq,
                              family = gaussian(link = "identity"),
@@ -85,10 +97,9 @@ coefficients(model_ols)
 coefficients(bayes_uniform)
 coefficients(bayes_weak_prior)
 ```
-The estimate for the coefficient has now declined a little in magnitude and is closer to the OLS intercept.
 
 ## Strong priors
-Let's see what happens if the priors are even stronger. Let's assume we a strong positive relationship between child and mother's IQ. We can encode this by adjusting the prior on the coefficient.
+Let's see what happens if the priors are even stronger. Let's encode a prior that assumes a strong positive relationship between child and mother's IQ. Think for a moment about the implications of such an assuption. We can encode this by adjusting the prior on the coefficient. 
 ```{r strong-prior}
 bayes_strong_prior <- stan_glm(kid_score ~ mom_iq, data = kidiq,
                                family = gaussian(link = "identity"),
@@ -98,7 +109,7 @@ bayes_strong_prior <- stan_glm(kid_score ~ mom_iq, data = kidiq,
                              refresh = 0)
 print(bayes_strong_prior)
 ```
-In this case the data were still strong enough to overwhelm a strong prior.
+
 
 # Comparing the models
 Let's compare the three models.
