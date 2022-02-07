@@ -29,6 +29,7 @@ ggplot(kidiq,
            y = kid_score)) +
   geom_point() 
 ```
+
 # OLS model
 Let's start by estimating a simple OLS model.
 
