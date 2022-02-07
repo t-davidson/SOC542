@@ -103,7 +103,7 @@ print(bayes_weak_prior)
 ```
 
 Now let's compare the coefficients across the three models.
-```{r weak-prior}
+```{r weak-prior-coef}
 coefficients(model_ols)
 coefficients(bayes_uniform)
 coefficients(bayes_weak_prior)
@@ -197,6 +197,7 @@ d %>%
   theme_tidybayes() +
   labs(y = "Model",
        x = "Coefficient Estimate") +
+  theme_light() + 
   theme(legend.position = "none")
   
 ```
@@ -212,7 +213,7 @@ d %>%
     x = .value, 
     group = model, 
     fill = model)) + 
-    geom_pointrange(aes(
+  geom_pointrange(aes(
     y = "OLS",
     x = ols_coef,
     xmin = ols_coef - 1.96 * ols_se,
@@ -221,6 +222,7 @@ d %>%
   scale_fill_viridis_d() +
   labs(y = "Model",
        x = "Coefficient Estimate") +
+  theme_light() + 
   theme(legend.position = "none")
 ```
 
@@ -233,7 +235,7 @@ pp_check(bayes_weak_prior)
 ```
 
 Let's compare the mean and standard deviation for samples and the data to get a better look at this. 
-```{r posterior-check}
+```{r posterior-check-scatter}
 pp_check(bayes_weak_prior, plotfun = "stat_2d", stat = c("mean", "sd"))
 ```
 
