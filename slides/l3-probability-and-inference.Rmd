@@ -1,0 +1,836 @@
+---
+title: "SOC542 Statistical Methods in Sociology II" 
+subtitle: "Probability and Bayesian Inference"
+author: Thomas Davidson
+institute: Rutgers University
+date: February 7, 2022
+urlcolor: blue
+output:
+    beamer_presentation:
+      theme: "Szeged"
+      colortheme: "beaver"
+      fonttheme: "structurebold"
+      toc: false
+      incremental: false
+      fig_width: 3.5
+      fig_height: 2.5
+header-includes:
+  - \usepackage{hyperref}
+  - \usepackage{multicol}
+  - \usepackage{caption}
+  - \captionsetup[figure]{font=scriptsize}
+  - \captionsetup[figure]{labelformat=empty}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(dev = 'pdf')
+library("knitr")
+library("formatR")
+
+opts_chunk$set(tidy.opts=list(width.cutoff=80),tidy=TRUE)
+opts_chunk$set(tidy = FALSE)
+
+knitr::knit_hooks$set(mysize = function(before, options, envir) {
+  if (before) 
+    return(options$size)
+})
+set.seed(08901)
+
+library(ggplot2)
+library(tidyverse)
+library(latex2exp)
+library(kableExtra)
+```
+
+# Plan
+- Probability review
+- Bayes' theorem and its applications
+- Comparing Bayesian and Frequentist approaches
+- Bayesian estimation
+- Lab: Bayesian regression in R
+
+# Probability review
+## Simple probability
+- $P(A)$ refers to the probability of an event $A$
+    - e.g. $P(A) = 0.5$ when referring to the probability of receiving a heads on a fair coin toss.
+    - e.g. $P(B) = \frac{1}{6}$ is the probability of rolling six with a fair die.
+- In each case, we have a *random process* with a set of possible outcomes (e.g. heads or tails) referred to as the *sample space*.
+
+# Probability review
+## Simple probability
+- What is the probability of tossing a coin twice and getting two heads?
+
+# Probability review
+## Simple probability
+- What is the probability of tossing a coin twice and getting two heads?
+    - $P(A)P(A) = P(A)*P(A) = 0.5*0.5 = 0.25$
+    
+# Probability review
+## Simple probability
+- What is the probability of tossing a coin twice and getting two heads?
+    - $P(A)P(A) = P(A)*P(A) = 0.5*0.5 = 0.25$
+- What is the probability of a sequence of $N$ heads?
+
+# Probability review
+## Simple probability
+- What is the probability of tossing a coin twice and getting two heads?
+    - $P(A)P(A) = P(A)*P(A) = 0.5*0.5 = 0.25$
+- What is the probability of a sequence of $N$ heads?
+    - $P(A)^N$
+    
+# Probability review
+## Simple probability
+- What is the probability of tossing a coin twice and getting two heads?
+    - $P(A)P(A) = P(A)*P(A) = 0.5*0.5 = 0.25$
+- What is the probability of a sequence of $N$ heads?
+    - $P(A)^N$
+- In this case, $P(A)$ becomes vanishingly small as $n \rightarrow \infty$
+    - $0.5^{10} = 0.00098 = \frac{1}{1024}$
+    
+# Probability review
+## Simple probability 
+- We can easily use simulations to verify our calculation. In this case, I use the `rbinom` function to simulate 1024 sequences of 10 tosses of a fair coin. 
+
+```{r, echo = TRUE}
+sims <- rbinom(1024, 10, 0.5)
+print(length(sims[sims >= 10]))
+```
+
+# Probability review
+## Independence
+-  Assume we roll a single die and flip a single coin. What is the probability of rolling a six and getting a tails?
+
+# Probability review
+## Independence
+-  Assume we roll a single die and flip a single coin. What is the probability of rolling a six and getting a tails?
+
+$$P(A,B) = P(A)P(B) = \frac{1}{2}*\frac{1}{6} = \frac{1}{12} $$
+    
+# Probability review
+## Independence
+-  Assume we roll a single die and flip a single coin. What is the probability of rolling a six and getting a tails?
+
+
+$$P(A,B) = P(A)P(B) = \frac{1}{2}*\frac{1}{6} = \frac{1}{12}$$
+
+- The two events are independent of one another, so the *joint probability* is simply the product of the probabilities of the two events.
+
+# Probability review
+## Conditional probability and independence
+- $P(A)$ and $P(B)$ are independent *if and only if* $P(A|B) = P(A)$.
+    - e.g. The number we rolled on the die has no effect on the outcome of the coin toss.
+
+# Probability review
+## Conditional probability and independence
+- Consider a deck of 52 standard playing cards. What is the probability of randomly drawing an Ace?\footnote{\tiny This example is taken from Cunningham 2021, p. 17. It is an example of sampling without replacement.}
+
+# Probability review
+## Conditional probability and independence
+- Consider a deck of 52 standard playing cards. What is the probability of randomly drawing an Ace?
+
+$$P(Ace) = 4/52 = 1/13$$
+
+- Let's assume we pick an Ace and put it to the side. What's the probability we get another Ace?
+
+# Probability review
+## Conditional probability and independence
+- Consider a deck of 52 standard playing cards. What is the probability of randomly drawing an Ace?
+
+$$P(Ace) = \frac{4}{52} = \frac{1}{13}$$
+
+- Let's assume we pick an Ace and put it to the side. What's the probability we get another Ace?
+- Wrong answer: $P(Ace_2) = \frac{4}{52} = \frac{1}{13}$.
+
+
+# Probability review
+## Conditional probability and independence
+- Consider a deck of 52 standard playing cards. What is the probability of randomly drawing an Ace?
+
+$$P(Ace) = \frac{4}{52} = \frac{1}{13}$$
+
+- Let's assume we pick an Ace and put it to the side. What's the probability we get another Ace?
+- Wrong answer: $P(Ace_2) = \frac{4}{52} = \frac{1}{13}$.
+- Correct answer: $P(Ace_{2}) = P(Ace_{2}|Ace_{1}) = 3/51 = 0.059$.
+- This is an example of *conditional probability* since $P(Ace_{2}|Ace_{1}) \neq P(Ace_1)$.
+
+# Probability review
+## Conditional probability and independence 
+- We can express a conditional probability as:
+
+$$P(A|B) = \frac{P(B,A)}{P(B)}$$
+
+- The probability of $A$ conditional on $B$ is the \textbf{joint probability} of $A$ and $B$, divided by the \textbf{marginal probability} of $B$.
+- The denominator the sum of over possible joint probabilities of $B$ and $A$, $\sum_{A^*}P(B, A^*).$
+    - The $*$ denotes that $A^*$ may take multiple values.
+
+# Probability review
+## Conditional probability and independence 
+- If two events are independent, then $P(A|B) = P(A)$.
+- To reject independence, we need to show that $P(A,B) \neq P(A)P(B)$
+
+    
+# Probability review
+## Bayes' theorem
+
+$$P(A|B) = \frac{P(B|A)P(A)}{P(B)}$$
+
+# Probability review
+## Bayes' theorem
+- What's the probability it is going to rain given that we can see clouds?
+
+$$P(Rain|Cloud) = \frac{P(Cloud|Rain)P(Rain)}{P(Cloud)}$$
+
+# Probability review
+## Bayes' theorem
+- Let's say we live in England...
+    - $P(Cloud) = 0.7$
+    - $P(Rain) = 0.3$
+    - $P(Cloud|Rain) = 1$
+
+$$P(Rain|Cloud) = \frac{P(Cloud|Rain)P(Rain)}{P(Cloud)} = \frac{1*0.3}{0.7} = \frac{0.3}{0.7} \approx 0.429$$
+
+
+# Probability review
+## Deriving Bayes' theorem
+- Start with the definition of conditional probability:
+$$P(A|B) = \frac{P(B,A)}{P(B)}$$
+
+
+- Multiply each side by $P(B)$:
+$$P(A|B)P(B) = P(B,A)$$
+
+- Analogously, if we start with $P(B|A)$ we can get:
+
+$$P(B|A)P(A) = P(B,A)$$
+
+
+# Probability review
+## Deriving Bayes' theorem
+- The previous example shows that the following quantities are equal:
+
+$$P(A|B)P(B) = P(B|A)P(A)$$
+
+- Divide both sides by $P(B)$ to get Bayes' theorem:
+
+$$P(A|B) = \frac{P(B|A)P(A)}{P(B)}$$
+
+# Bayes' theorem
+## COVID-19 tests
+
+$$P(A|B) = \frac{P(B|A)P(A)}{P(B)}$$
+    
+$$P(C19|+) = \frac{P(+|C19)P(C19)}{P(+)}$$
+    
+# Bayes' theorem
+## COVID-19 tests
+
+$$P(C19|+) = \frac{P(+|C19)P(C19)}{P(+)}$$
+
+- $P(C19|+)$: Probability you have COVID-19 given that you test positive.
+- $P(+|C19)$: Probability you test positive given that you have COVID-19.
+- $P(C19)$: Probability you have COVID-19 given population infection rates.
+- $P(+)$: Probability a test returns a positive result.
+
+# Bayes' theorem
+## COVID-19 tests
+- Assume there is a 1\% chance you have COVID-19.
+- Assume a test has a false negative rate of 2\%.
+    - 98\% of the time it correctly diagnoses COVID-19, 2\% of the time it fails to detect it.
+- Assume the same test has a false positive rate of 5\%
+    - 95\% of the time it correctly rejects COVID-19 when a person is negative, 5\% of the time it falsely diagnoses COVID-19.
+- What is the probability you really have COVID-19 following a positive test?
+
+# Bayes' theorem
+## COVID-19 tests: P(+|C19)
+$$P(C19|+) = \frac{P(+|C19)P(C19)}{P(+)}$$
+
+
+- If we assume a false negative rate of 2\%. Then the probability of a positive test given COVID-19 is $P(+|C19) = 1-0.02 = 0.98$.
+
+
+# Bayes' theorem
+## COVID-19 tests: P(C19)
+$$P(C19|+) = \frac{P(+|C19)P(C19)}{P(+)}$$
+
+
+- Assume 1\% of the population has COVID-19, then $P(C19) = 0.01$.
+
+
+# Bayes' theorem
+## COVID-19 tests: P(+)
+- To calculate the proportion of positive tests we need to count all the positive tests.
+- We can thus reformulate Bayes rule as
+
+
+$$\frac{P(B|A)P(A)}{P(B|A)P(A) + P(B|A*)P(A*)}$$
+
+
+$$\frac{P(+|C19)P(C19)}{P(+|C19)P(C19) + P(+|C19-)P(C19-)}$$
+
+# Bayes' theorem
+## COVID-19 tests: P(+)
+$$P(C19|+) = \frac{P(+|C19)P(C19)}{P(+)}$$
+
+
+- We already know the first part of the denominator, $P(+|C19)P(C19) = 0.98 * 0.01$.
+- If the test has a false positive rate of 5\%, $P(+|C19-) = 0.05*(1-0.01)$
+- Thus, we take the sum of these probabilities to get the marginal probability of a positive test: $P(+) = (0.98*0.01) + (0.05*(1-0.01))$
+
+
+# Bayes' theorem
+## COVID-19 tests: Calculating P(C19|+)
+- If we plug the numbers into Bayes' theorem we get
+
+
+$$P(C19|+) = \frac{0.98*0.01}{0.98*0.01 + 0.05*0.99}$$
+
+
+- We can use R to do the calculation for us
+```{r, echo = TRUE}
+(0.98*0.01) / ((0.98*0.01) + (0.05*(1-0.01)))
+```
+
+# Bayes' theorem
+## Terminology
+
+\textbf{Posterior} $\propto$  \textbf{Likelihood} x \textbf{Prior}
+ 
+
+- In the previous example,
+    - $P(C19|+)$ is the \textbf{posterior}.
+    - $P(+|C19)$ is the \textbf{likelihood of the data}.
+    - $P(C19)$ is the \textbf{prior}.
+- The denominator $P(+)$ is ensures the result is a probability. It is often described as the \textbf{evidence} or the \textbf{marginal likelihood}.
+
+# Bayes' theorem
+## COVID-19 tests: Tabular explanation
+- The four cells in the middle of the table represent the *joint probabilities* of two events.
+- The row and column totals represent the *marginal probabilities* of each event.
+- $\theta$ is used to denote the parameters we are estimating.
+```{r}
+data <- tibble(
+    "Test result" = c("+", "-", "Marginal C19"),
+               "$\\theta = C19+$" = c("P(+|C19)P(C19)", "P(-|C19)P(C19)", "P(C19+)"),
+               "$\\theta = C19-$" = c("P(+|C19-)P(C19-)", "P(-|C19-)P(C19-)", "P(C19-)"),
+               "Marginal (Test)" = c("$\\sum_{\\theta}P(+|\\theta)P(\\theta)$", "$\\sum_{\\theta}P(-|\\theta)P(\\theta)$", "1.0"))
+kable(data, "latex", escape = FALSE) %>%
+  kable_styling(font_size = 10)
+```
+
+
+# Bayes' theorem
+## COVID-19 tests: Tabular explanation
+- To calculate $P(C19|+)$ we can take the *joint probability* of C19 and a positive test and divide it by the *marginal probability* of a positive test.
+- We can get the relevant values directly from the table: $0.98*0.01 / 0.06$.
+```{r}
+data <- tibble(
+    "Test result" = c("+", "-", "Marginal C19"),
+               "$\\theta = C19+$" = c("0.98*0.01", "(1-0.98)*0.01", "0.01"),
+               "$\\theta = C19-$" = c("0.05*(1-0.01)", "(1-0.05)*(1-0.01)", "(1-0.01)"),
+               "Marginal (Test)" = c("0.06", "0.94", "1.0"))
+kable(data, "latex", escape = FALSE) %>%
+  kable_styling(font_size = 10)
+```
+    
+# Bayes' theorem
+## Changing our priors
+- Let's change our prior to assume 10\% COVID-19 prevalence in the population (perhaps this is a more reasonable assumption at the moment...)
+```{r, echo = TRUE}
+(0.98*0.1) / ( (0.98*0.1) + (0.05*0.9) )
+```
+- Now we get a much higher posterior probability.
+- We could easily alter the calculation by incorporating other prior information, e.g. symptoms, exposure
+
+# Bayesian inference as counting
+## McElreath's marble counting example
+- Consider a bag containing four marbles
+- The marbles can be white or blue
+- We draw a sample of marbles from the bag (with replacement)
+
+# Bayesian inference as counting
+## Conjecture: Five possibilities
+```{r}
+d <-
+  tibble(p1 = 0,
+         p2 = rep(1:0, times = c(1, 3)),
+         p3 = rep(1:0, times = c(2, 2)),
+         p4 = rep(1:0, times = c(3, 1)),
+         p5 = 1)
+
+d %>% 
+  set_names(1:5) %>% 
+  mutate(x = 1:4) %>% 
+  pivot_longer(-x, names_to = "possibility") %>% 
+  mutate(value = value %>% as.character()) %>% 
+    
+  ggplot(aes(x = x, y = possibility, fill = value)) +
+  geom_point(shape = 21, size = 10) +
+  scale_fill_manual(values = c("white", "navy")) +
+  scale_x_discrete(NULL, breaks = NULL) + theme_minimal() +
+  theme(legend.position = "none") 
+# Example modified from Kurz: https://bookdown.org/content/4857/small-worlds-and-large-worlds.html
+```
+
+# Bayesian inference as counting
+## A sample from the bag produces
+```{r}
+s <-
+  tibble(p1 = c(1,0,1))
+
+s %>% 
+  set_names(1) %>% 
+  mutate(x = 1:3) %>% 
+  pivot_longer(-x, names_to = "Observation") %>% 
+  mutate(value = value %>% as.character()) %>% 
+    
+  ggplot(aes(x = x, y = Observation, fill = value)) +
+  geom_point(shape = 21, size = 10) +
+  scale_fill_manual(values = c("white", "navy")) +
+  scale_x_discrete(NULL, breaks = NULL) + theme_minimal() +
+  theme(legend.position = "none") 
+# Example modified from Kurz: https://bookdown.org/content/4857/small-worlds-and-large-worlds.html
+```
+
+# Bayesian inference as counting
+## Sampling and possibilities
+<!-- How many ways can we get this sample if we have 3 white and 1 blue? -->
+```{r, out.width="70%",out.height="60%", fig.align="center"}
+include_graphics('../img/forking_paths.png')
+```
+\tiny McElreath 2020, Fig. 2.2 (p. 22)
+
+# Bayesian inference as counting
+## Counting the possibilities
+```{r, out.width="70%",out.height="60%", fig.align="center"}
+data <- tibble(Conjecture = c("[W,W,W,W]",
+                              "[B,W,W,W]",
+                              "[B,B,W,W]",
+                              "[B,B,B,W]",
+                              "[B,B,B,B]"),
+               "Ways to produce [B,W,B]" = c("0 x 4 x 0 = 0",
+                        "1 x 3 x 1 = 3",
+                        "2 x 2 x 2 = 8",
+                        "3 x 1 x 3 = 9",
+                        "4 x 0 x 4 = 0"))
+kable(data)
+```
+
+
+<!--
+Emphasize how we have analyzed the data generating process. The goal of inference is to use statistical models to recreate the underlying process generating models (but include the famous Box quote.)
+-->
+
+# Bayesian inference as counting
+## From counts to probability
+```{r, out.width="70%",out.height="60%", fig.align="center"}
+ways <- c(0, 3, 8, 9, 0)
+
+data <- tibble(Conjecture = c("[W,W,W,W]",
+                              "[B,W,W,W]",
+                              "[B,B,W,W]",
+                              "[B,B,B,W]",
+                              "[B,B,B,B]"),
+               "Propoportion B" = c(0, 0.25, 0.5, 0.75, 1),
+               "Ways [B,W,B]" = ways,
+               "Plausibility" = ways/sum(ways))
+kable(data)
+```
+
+# Bayesian inference as counting
+## Summary
+- We enumerated the set of plausible data generating processes *p*
+- We counted the ways we could produce the data given each value of *p*. This is known as the *likelihood*.
+- We normalized these counts to get *posterior* probabilities, which indicate the relative plausibility of each option $p$.
+- The most plausible value is the one that has the most ways of generating the data.
+
+# Bayesian inference as counting
+## Incorporating prior information
+- Now let's say we pick another marble and it's blue. We can use the prior information to update our counts.
+
+```{r, out.width="70%",out.height="60%", fig.align="center"}
+data <- tibble(Conjecture = c("[W,W,W,W]",
+                              "[B,W,W,W]",
+                              "[B,B,W,W]",
+                              "[B,B,B,W]",
+                              "[B,B,B,B]"),
+               "Ways to produce [B]" = c(0L, 1L, 2L, 3L, 4L),
+               "Prior counts" = c(0L,
+                        3L,
+                        8L,
+                        9L,
+                        0L),
+               "New counts" = c("0 x 0 = 0",
+                                "3 x 1 = 3",
+                                "8 x 2 = 16",
+                                "9 x 3 = 27",
+                                "0 x 4 = 0")
+               )
+kable(data)
+```
+
+# Bayesian inference as counting
+## Bayes' theorem and data analysis
+- In a general sense, we can think about Bayesian inference as calculating the posterior distribution in the following way:
+
+$$Posterior = \frac{Probability\ of\ the\ data\ * Prior}{Average\ probability\ of\ the\ data}$$
+
+# Bayesian inference
+
+\textbf{"Bayesian inference is reallocation of credibility across possibilities"} - John Kruscke\footnote{\tiny Chapter 2 of Kruschke's 2015 book \textit{Doing Bayesian Data Analysis} provides an outline of his argument and is \href{https://scitechconnect.elsevier.com/wp-content/uploads/2015/05/DBA-Chapter-2.pdf}{available online}.}
+
+
+
+# Bayesian inference for a continuous parameter
+## Estimating the marriage rate
+- Assume a demographer is interested in estimating the marriage rate in the populuation.
+- The demographer starts out with a "flat" prior
+    - The marriage rate could be anywhere from 0 (nobody is married) to 1 (everybody is married).
+- The demographer samples people at random and asks them their marital status.
+```{r}
+library(tidyverse)
+# Using a non-random sample taken by our hypothetical demographer
+obs <- tibble(person = c("M", "M", "S", "M", "S",  "S", "S", "M", "M"))
+
+d <- obs %>% mutate(n_trials = 1:9,
+                    n_married = cumsum(person == "M"))
+
+sequence_length <- 50 # Defines the way the results are plotted
+
+results <- d %>% 
+  expand(nesting(n_trials, person, n_married), 
+         p_married = seq(from = 0, to = 1, length.out = sequence_length)) %>% 
+  group_by(p_married) %>% 
+  mutate(lagged_n_trials  = lag(n_trials, k = 1),
+         lagged_n_married = lag(n_married, k = 1)) %>% 
+  ungroup() %>% 
+  mutate(prior      = ifelse(n_trials == 1, .5,
+                             dbinom(x    = lagged_n_married, 
+                                    size = lagged_n_trials, 
+                                    prob = p_married)),
+         likelihood = dbinom(x    = n_married, 
+                             size = n_trials, 
+                             prob = p_married),
+         strip      = str_c("n = ", n_trials)) %>% 
+  # the next three lines allow us to normalize the prior and the likelihood, 
+  # putting them both in a probability metric 
+  group_by(n_trials) %>% 
+  mutate(prior      = prior / sum(prior),
+         likelihood = likelihood / sum(likelihood))  
+
+# Based on Solomon Kurz's implementation of McElreath's globe tossing example, see https://bookdown.org/content/4857/small-worlds-and-large-worlds.html
+```
+
+# Assume zero knowledge with a flat (uniform) prior
+```{r}
+# Start with a flat prior where every value is equally plausible
+ggplot(results %>% filter(n_trials == 1), aes(x = p_married)) +
+  geom_line(aes(y = prior), 
+            linetype = 2) +
+  scale_x_continuous("proportion married", breaks = c(0, .5, 1)) +
+  scale_y_continuous("plausibility", breaks = NULL) + theme_minimal() +
+  theme(panel.grid = element_blank())
+```
+
+# First observation: Married
+```{r}
+# Next, add in the first likelihood
+ggplot(results %>% filter(n_trials == 1), aes(x = p_married)) +
+  geom_line(aes(y = prior), 
+            linetype = 2) +
+  geom_line(aes(y = likelihood)) +
+  scale_x_continuous("proportion married", breaks = c(0, .5, 1)) +
+  scale_y_continuous("plausibility", breaks = NULL) + theme_minimal() +
+  theme(panel.grid = element_blank())
+```
+
+# Second observation: Married
+```{r}
+# Using the previous posterior as the new prior, calculate the new likelihood
+ggplot(results %>% filter(n_trials == 2), aes(x = p_married)) +
+  geom_line(aes(y = prior), 
+            linetype = 2) +
+  geom_line(aes(y = likelihood)) +
+  scale_x_continuous("proportion married", breaks = c(0, .5, 1)) +
+  scale_y_continuous("plausibility", breaks = NULL) + theme_minimal() +
+  theme(panel.grid = element_blank())
+```
+
+# Third observation: Single
+```{r}
+ggplot(results %>% filter(n_trials == 3), aes(x = p_married)) +
+  geom_line(aes(y = prior), 
+            linetype = 2) +
+  geom_line(aes(y = likelihood)) +
+  scale_x_continuous("proportion married", breaks = c(0, .5, 1)) +
+  scale_y_continuous("plausibility", breaks = NULL) + theme_minimal() +
+  theme(panel.grid = element_blank())
+```
+
+# Fourth observation: Married
+```{r}
+ggplot(results %>% filter(n_trials == 4), aes(x = p_married)) +
+  geom_line(aes(y = prior), 
+            linetype = 2) +
+  geom_line(aes(y = likelihood)) +
+  scale_x_continuous("proportion married", breaks = c(0, .5, 1)) +
+  scale_y_continuous("plausibility", breaks = NULL) + theme_minimal() +
+  theme(panel.grid = element_blank())
+```
+
+# Fifth observation: Single
+```{r}
+# Next, add in the first likelihood
+ggplot(results %>% filter(n_trials == 5), aes(x = p_married)) +
+  geom_line(aes(y = prior), 
+            linetype = 2) +
+  geom_line(aes(y = likelihood)) +
+  scale_x_continuous("proportion married", breaks = c(0, .5, 1)) +
+  scale_y_continuous("plausibility", breaks = NULL) + theme_minimal() +
+  theme(panel.grid = element_blank())
+```
+
+# Sixth observation: Single
+```{r}
+# Next, add in the first likelihood
+ggplot(results %>% filter(n_trials == 6), aes(x = p_married)) +
+  geom_line(aes(y = prior), 
+            linetype = 2) +
+  geom_line(aes(y = likelihood)) +
+  scale_x_continuous("proportion married", breaks = c(0, .5, 1)) +
+  scale_y_continuous("plausibility", breaks = NULL) + theme_minimal() +
+  theme(panel.grid = element_blank())
+```
+
+# Seventh observation: Single
+```{r}
+# Next, add in the first likelihood
+ggplot(results %>% filter(n_trials == 7), aes(x = p_married)) +
+  geom_line(aes(y = prior), 
+            linetype = 2) +
+  geom_line(aes(y = likelihood)) +
+  scale_x_continuous("proportion married", breaks = c(0, .5, 1)) +
+  scale_y_continuous("plausibility", breaks = NULL) + theme_minimal() +
+  theme(panel.grid = element_blank())
+```
+
+# Eighth observation: Married
+```{r}
+# Next, add in the first likelihood
+ggplot(results %>% filter(n_trials == 8), aes(x = p_married)) +
+  geom_line(aes(y = prior), 
+            linetype = 2) +
+  geom_line(aes(y = likelihood)) +
+  scale_x_continuous("proportion married", breaks = c(0, .5, 1)) +
+  scale_y_continuous("plausibility", breaks = NULL) + theme_minimal() +
+  theme(panel.grid = element_blank())
+```
+
+# Nineth observation: Single
+```{r}
+# Next, add in the first likelihood
+ggplot(results %>% filter(n_trials == 9), aes(x = p_married)) +
+  geom_line(aes(y = prior), 
+            linetype = 2) +
+  geom_line(aes(y = likelihood)) +
+  scale_x_continuous("proportion married", breaks = c(0, .5, 1)) +
+  scale_y_continuous("plausibility", breaks = NULL) + theme_minimal() +
+  theme(panel.grid = element_blank())
+```
+
+# Overview
+```{r}
+ggplot(results, aes(x = p_married)) +
+  geom_line(aes(y = prior), 
+            linetype = 2) +
+  geom_line(aes(y = likelihood)) +
+  scale_x_continuous("proportion married", breaks = c(0, .5, 1)) +
+  scale_y_continuous("plausibility", breaks = NULL) + theme_bw() +
+  theme(panel.grid = element_blank()) +
+  facet_wrap(~ strip, scales = "free_y")
+```
+
+# Bayesian Updating
+- This example demonstrates the concept of \textbf{Bayesian updating}
+    - We use new information to update our beliefs
+- Each time we update we use the previous \textbf{posterior} as the new \textbf{prior}!
+
+# Bayesian Updating
+- This example demonstrates the concept of \textbf{Bayesian updating}
+    - We use new information to update our beliefs
+- Each time we update we use the previous \textbf{posterior} as the new \textbf{prior}!
+- Most of the time we use all our data at once to get the final posterior rather than iteratively updating.
+
+# Bayesian Updating
+- This example demonstrates the concept of \textbf{Bayesian updating}
+    - We use new information to update our beliefs
+- Each time we update we use the previous \textbf{posterior} as the new \textbf{prior}!
+- Most of the time we use all our data at once to get the final posterior rather than iteratively updating.
+- Bayesian updating is order invariant: we will get the same result regardless of the way observations are ordered.
+
+# Formalizing a model
+- The previous calculations are an example of the *binomial distribution*
+    - Recall the distribution has two parameters *N* and *p*
+- The goal of this analysis is to produce an estimate of the parameter $p$.
+- We can thus write down a model to describe our analysis of marriage:
+
+$$Marriage\ \sim Binomial(N,p)$$
+$$p \sim Uniform(0,1)$$
+
+- The goal of this analysis is to produce an estimate of the parameter $p$. In this case, we started with a flat, uniform prior.
+
+# Comparing Bayesian and Frequentist approaches
+## Thomas Bayes (1701-1761)
+```{r bayes, out.width="70%",out.height="70%", fig.align="center"}
+include_graphics('../img/Thomas_Bayes.png')
+```
+\tiny Source: \href{https://en.wikipedia.org/wiki/Thomas_Bayes}{Wikipedia}.
+
+# Comparing Bayesian and Frequentist approaches
+## Pierre-Simon Laplace (1749-1827)
+```{r laplace, out.width="70%",out.height="70%", fig.align="center"}
+include_graphics('../img/laplace.jpg')
+```
+\tiny Source: \href{https://en.wikipedia.org/wiki/Pierre-Simon_Laplace}{Wikipedia}.
+
+
+# Comparing Bayesian and Frequentist approaches
+## Ronald Fisher (1890-1962)
+```{r fisher, out.width="70%",out.height="70%", fig.align="center"}
+include_graphics('../img/fisher.jpg')
+```
+\tiny Source: \href{https://en.wikipedia.org/wiki/Ronald_Fisher}{Wikipedia}.
+
+# Comparing Bayesian and Frequentist approaches
+## Historical developments
+- Frequentist (or "Fisherian") statistics dominated for most of the 20th century.
+- Bayesian inference critiqued as too subjective and difficult to implement for complex problems.
+- Reversal over the past couple of decades as critiques of Bayesian approach debunked, cheap compute power makes it tractable, and key tenets of Frequentist statistics are questioned (e.g. controversy over p-hacking\footnote{\tiny See Imbens 2021 reading from Week 1.}).
+- The Bayesian approach is now mainstream in statistics and much of the natural sciences, but the social sciences have been slower to adopt.\footnote{\tiny See Scott and Bartlett 2019.}
+
+# Comparing Bayesian and Frequentist approaches
+## Theoretical foundations
+- Frequentist
+    - Long-run probabilities
+    - Sampling distributions
+- Bayesian 
+    - Probability theory
+
+# Comparing Bayesian and Frequentist approaches
+## Sample size
+- Frequentist
+    - Properties of estimators depend on minimal sample size
+- Bayesian
+    - No minimum sample size
+    - But larger samples allow for more precise estimates
+
+# Comparing Bayesian and Frequentist approaches
+## Point estimates
+- Frequentist
+    - Models produce point estimates
+- Bayesian
+    - No singular point estimates
+        - Many different summaries of the posterior distribution are possible (e.g. mean, median, mode)
+    
+# Comparing Bayesian and Frequentist approaches
+## P-values
+- Frequentist
+    - p-values used to communicate statistical significance
+- Bayesian
+    - Critique: p-values are based on arbitrary distributional assumptions
+    - Uncertainty is captured by entire posterior distribution
+    - *Bayes' Factor* is a Bayesian version of a p-value\footnote{\tiny See Kruschke and Liddell 2018.}
+
+# Comparing Bayesian and Frequentist approaches
+## Confidence intervals
+- Frequentist
+    - Confidence intervals defined using test statistics and conventions
+    - Assumption that a parameter is fixed and that interval is derived from a sample
+- Bayesian
+    - Critique: Frequentist conventions are arbitrary
+    - Assumption that a parameter has a distribution
+    - *Credible intervals* or *compatibility intervals* can be used to summarize the posterior distribution
+    
+# Comparing Bayesian and Frequentist approaches
+## Confidence intervals: Interpretation of a 95\% interval
+- Frequentist
+    - Over many repeat samples, 95\% of calculated confidence intervals would contain the true value of the parameter
+- Bayesian (assume an interval over 95\% of the posterior distribution)
+    - There is a 95% probability that the estimated parameter lies within the defined range, given the model and the data.
+    - "What the interval indicates is a range of parameter values compatible with the model and the data." McElreath, p. 54.
+    
+# Computation and Bayesian Estimation
+## Bayesian Estimation
+- Three methods for estimating the posterior distribution
+    - Analytical calculations
+    - Grid and quadratic approximation
+    - Markov Chain Monte Carlo
+    
+# Computation and Bayesian Estimation
+## Analytical calculations
+- For simple problems we can use calculus to provide an analytical solution for the posterior distribution
+- But this approach does not scale well beyond simple problems like the marriage example
+    
+# Computation and Bayesian Estimation
+## Grid and quadratic approximation
+- Grid approximation (see McElreath 2.4.3)
+    - We can approximate continuous spaces by using grids
+        - But the method also scales very poorly to complex examples
+- Quadratic approximation (see McElreath 2.4.4)
+    - A more robust approach that involves using distributions to approximate the posterior
+    - Flexible for many regression problems but also has trouble scaling
+
+# Computation and Bayesian Estimation
+## Markov Chain Monte Carlo (MCMC)
+- Use simulation to draw samples from the posterior distribution
+    - A computationally intensive approach
+    - Samples provide an approximation for complex spaces
+    - More efficient for complex models than quadratic approximation
+- MCMC has led to major advances in Bayesian methods since the 1990s (see McElreath 2.4.5).
+
+<!--Consider drawing an example of a simple Markov Chain on the blackboard.-->
+
+# Computation and Bayesian Estimation
+## Samples from a Markov Chain
+```{r traceplot, echo = FALSE, fig.align="center"}
+library(rstanarm)
+m <- stan_glm(kid_score ~ mom_iq, data = kidiq, refresh = 0, chains = 2)
+plot(m, "trace", pars = "mom_iq") + labs(y= TeX("$\\hat{\\beta_1}$"), x = "Iteration")
+```
+
+# Computation and Bayesian Estimation
+## `Stan` and Hamiltonian Monte Carlo
+- `Stan` is a programming language developed for statistical computing
+- It implements \textbf{Hamiltonian Monte Carlo (HMC)} sampling
+    - A variant of MCMC methods based on Hamiltonian physics
+    - Approximates the posterior by "flicking" a particle and observing its movement
+- HMC is highly effective at solving even complex problems\footnote{\tiny See McElreath Chapter 9 and \href{http://arxiv.org/abs/1701.02434}{Betancourt 2018} for a more advanced conceptual overview.}
+    - It provides lots of useful diagnostics making it easier to debug than early MCMC approaches
+    - Greater flexibility as it not require *conjugacy*
+
+# Bayesian Regression
+- Regression coefficients are the *unknown* parameters that we want to estimate given a model and the observed data.
+- We can formalize these assumptions by writing down a model that looks something like this:
+
+$$y_i \sim Normal(\mu_i, \sigma)$$ 
+$$\mu_i = \beta_0 + \beta_1x_i$$ 
+$$\beta_0 \sim Normal(0,10)$$ 
+$$\beta_1 \sim Normal(0,1)$$ 
+$$\sigma  \sim Uniform(0,1)$$
+
+
+# Bayesian Regression
+- In this case, we make the *assumption* that $y_i$ is normally distributed and that we can express its mean in terms of $x$ (recall that $E[y|x] = \beta_0 + \beta_1x_i$)
+- Each *parameter* in the model has a *prior* distribution. We specify these before we have seen any data
+- After estimating a model using the data we get the *posterior* distribution for each parameter
+
+# Bayesian Regression
+- We will be using `stan_glm` to estimate these kinds of models using HMC
+- The *posterior distributions* of the parameters are then analyzed to make inferences about the relationship between *x* and *y*
+- We can also use the posterior to generate new data consistent with the model
+
+# Final remarks
+
+\textbf{"All models are wrong, but some are useful"} - George Box\footnote{\tiny This aphorism is attributed to statistician George Box. See \href{https://en.wikipedia.org/wiki/All_models_are_wrong}{Wikipedia} for further discussion.}
