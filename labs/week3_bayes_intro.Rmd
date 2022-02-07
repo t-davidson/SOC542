@@ -186,8 +186,9 @@ d %>%
   stat_halfeye(aes(
     y = model, 
     x = .value, 
-    group = model, 
-    fill = model)) +
+    group = model,
+    fill = model, 
+    alpha = .75)) +
   geom_pointrange(aes(
     y = "OLS",
     x = ols_coef,
@@ -199,7 +200,8 @@ d %>%
   labs(y = "Model",
        x = "Coefficient Estimate") +
   theme_light() + 
-  theme(legend.position = "none")
+  theme(legend.position = "none",
+        panel.grid.major.y = element_blank())
   
 ```
 
@@ -224,7 +226,8 @@ d %>%
   labs(y = "Model",
        x = "Coefficient Estimate") +
   theme_light() + 
-  theme(legend.position = "none")
+  theme(legend.position = "none",
+        panel.grid.major.y = element_blank())
 ```
 
 # Posterior predictive checks
