@@ -27,7 +27,7 @@ data(kidiq)
 ggplot(kidiq,
        aes(x = mom_iq,
            y = kid_score)) +
-  geom_point() 
+  geom_point()
 ```
 
 # OLS model
@@ -40,7 +40,7 @@ summary(model_ols)
 
 
 # Bayesian regression with `stan_glm`
-We will use the `stan_glm` function from `rstanarm` to estimate a series of regression models using the Bayesian approach and will consider how the choice of prior affects the results. 
+We will use the `stan_glm` function from `rstanarm` to estimate a series of regression models using the Bayesian approach and will consider how the choice of prior affects the results.
 
 The `family` argument in the code below specifies the type of model. In this case, `gaussian(link = "identity")` corresponds to an OLS model. We will see how this argument is used to specify different kinds of models later in the course.
 
@@ -49,7 +49,7 @@ Let's start with a uniform or "flat" prior. This assumes we are completely ignor
 Running this will print information showing the output of the Hamiltonian Monte Carlo estimation procedure. In this case, we use a single chain with 2000 iterations. The first 1000 are used to optimize the model, the second 1000 to get estimates from the posterior.
 ```{r no-prior}
 bayes_uniform <- stan_glm(kid_score ~ mom_iq, data = kidiq,
-                        family = gaussian(link = "identity"), 
+                        family = gaussian(link = "identity"),
                         prior = NULL,
                         prior_intercept = NULL,
                         seed = 12345,  # Seed makes it reproducible
@@ -80,12 +80,12 @@ To understand the estimation procedure we can view the trace plot. This shows ho
 
 Unlike the example in lecture with two chains, here we just use a single chain. The models below all use the default 4 chains (see McElreath C9 for discussion of why we might want to vary the number of chains).
 
-This plot also communicates some of the uncertainty surrounding the parameter $\beta_1$. We can see that the estimate seems to bounce around an average value. 
+This plot also communicates some of the uncertainty surrounding the parameter $\beta_1$. We can see that the estimate seems to bounce around an average value.
 
 Note: `rstanarm` discards the "warmup" samples used to calibrate the HMC algorithm. We therefore see that the chain has already converged towards the final value.
 ```{r trace}
-plot(bayes_uniform, "trace", pars = "mom_iq") + 
-  labs(y = TeX("$\\beta_1$"), 
+plot(bayes_uniform, "trace", pars = "mom_iq") +
+  labs(y = TeX("$\\beta_1$"),
        x = "Iteration")
 ```
 
@@ -111,13 +111,13 @@ coefficients(bayes_weak_prior)
 ```
 
 ## Strong priors
-Let's see what happens if the priors are even stronger. Let's encode a prior that assumes a strong positive relationship between child and mother's IQ. Think for a moment about the implications of such an assumption. We can encode this by adjusting the prior on the coefficient. 
+Let's see what happens if the priors are even stronger. Let's encode a prior that assumes a strong positive relationship between child and mother's IQ. Think for a moment about the implications of such an assumption. We can encode this by adjusting the prior on the coefficient.
 ```{r strong-prior}
 bayes_strong_prior <- stan_glm(kid_score ~ mom_iq, data = kidiq,
                                family = gaussian(link = "identity"),
                                prior = normal(location = 10,
                                             scale = 1),
-                               seed = 12345, 
+                               seed = 12345,
                                refresh = 0)
 print(bayes_strong_prior)
 ```
@@ -147,28 +147,33 @@ ggplot(kidiq,
   theme_light()
 ```
 
+<<<<<<< HEAD
 # Post-Estimation Visualization 
 We can visualize the uncertainty around estimates from the Bayesian models by analyzing the posterior distribution. The `gather_draws` function is used to produce a table showing the estimates of the coefficient for mom_iq produced by the MCMC estimation procedure. 
+=======
+# Post-Estimation Visualization
+We can visualize the uncertainity around estimates from the Bayesian models by analyzing the posterior distribution. The `gather_draws` function is used to produce a table showing the estimates of the coefficient for mom_iq produced by the MCMC estimation procedure.
+>>>>>>> ba4c0a11d83da03c55c679317d454a764c7e2a55
 
 The `tidybayes` package has lots of useful functions for plotting these results. In this case, we can see the entire posterior distribution, along with a summary. The point indicates the *median* of the posterior distribution and the bars the 66% and 95% *highest posterior density intervals*.
 ```{r post-model-viz1}
-d1 <- bayes_uniform %>% 
+d1 <- bayes_uniform %>%
   gather_draws(mom_iq)
 head(d1)
 
 d1 %>%
   ggplot(aes(y = .variable, x = .value)) +
   stat_halfeye() +
-  theme_tidybayes() + 
-  labs(x = "Coefficient", y = "Variable")
+  theme_tidybayes() +
+  labs(x = "Coefficient", y = "Posterior density")
 ```
 
 We can calculate the same summaries for the other models and plot them together.
 ```{r post-model-viz2}
-d2 <- bayes_strong_prior %>% 
+d2 <- bayes_strong_prior %>%
   gather_draws(mom_iq)
 
-d3 <- bayes_weak_prior %>% 
+d3 <- bayes_weak_prior %>%
   gather_draws(mom_iq)
 
 d1$model <- "Uniform"
@@ -184,10 +189,10 @@ ols_se <- o[[2, "std.error"]]
 d %>%
   ggplot() +
   stat_halfeye(aes(
-    y = model, 
-    x = .value, 
+    y = model,
+    x = .value,
     group = model,
-    fill = model, 
+    fill = model,
     alpha = .75)) +
   geom_pointrange(aes(
     y = "OLS",
@@ -195,14 +200,14 @@ d %>%
     xmin = ols_coef - 1.96 * ols_se,
     xmax = ols_coef + 1.96 * ols_se,
     )) +
-  scale_fill_viridis_d() + 
+  scale_fill_viridis_d() +
   theme_tidybayes() +
   labs(y = "Model",
        x = "Coefficient Estimate") +
-  theme_light() + 
+  theme_light() +
   theme(legend.position = "none",
         panel.grid.major.y = element_blank())
-  
+
 ```
 
 Although the results are slightly different, this demonstrates how the data can overwhelm the prior quite easily. You might want to repeat this exercise with a smaller sample of the data to see how priors make more difference in small samples.
@@ -213,9 +218,9 @@ d %>%
   ggplot() +
   stat_gradientinterval(aes(
     y = model,
-    x = .value, 
-    group = model, 
-    fill = model)) + 
+    x = .value,
+    group = model,
+    fill = model)) +
   geom_pointrange(aes(
     y = "OLS",
     x = ols_coef,
@@ -225,33 +230,33 @@ d %>%
   scale_fill_viridis_d() +
   labs(y = "Model",
        x = "Coefficient Estimate") +
-  theme_light() + 
+  theme_light() +
   theme(legend.position = "none",
         panel.grid.major.y = element_blank())
 ```
 
 # Posterior predictive checks
-One way to evaluate the performance of our models is simulate data from the posterior distribution and to compare it to the original data. This is called *posterior predictive* check. 
+One way to evaluate the performance of our models is simulate data from the posterior distribution and to compare it to the original data. This is called *posterior predictive* check.
 
 The dark line shows the distribution of the outcome, child's IQ. The blue lines show 100 simulated draws from the posterior distribution. We can see a couple of useful takeaways here. First, the shape of the outcome is asymmetrical. Second, we can see that the density of the draws is a little to the left of the peak of the outcome.
 ```{r posterior-check}
 pp_check(bayes_weak_prior)
 ```
 
-Let's compare the mean and standard deviation for samples and the data to get a better look at this. 
+Let's compare the mean and standard deviation for samples and the data to get a better look at this.
 ```{r posterior-check-scatter}
 pp_check(bayes_weak_prior, plotfun = "stat_2d", stat = c("mean", "sd"))
 ```
 
 # Prior predictive simulations
-One of the ways we can understand our priors is to use a *prior predictive simulation*. This allows us to see simulated data from our model before it has seen any data. We can easily do this by setting `prior_PD = TRUE`. 
+One of the ways we can understand our priors is to use a *prior predictive simulation*. This allows us to see simulated data from our model before it has seen any data. We can easily do this by setting `prior_PD = TRUE`.
 ```{r prior-predictive}
 bayes_weak_pp <- stan_glm(kid_score ~ mom_iq, data = kidiq,
                                family = gaussian(link = "identity"),
                                prior = normal(location = 0,
                                             scale = 1),
                              prior_PD = TRUE,
-                             seed = 12345, 
+                             seed = 12345,
                              refresh = 0)
 print(bayes_weak_pp)
 
