@@ -148,7 +148,7 @@ ggplot(kidiq,
 ```
 
 # Post-Estimation Visualization 
-We can visualize the uncertainity around estimates from the Bayesian models by analyzing the posterior distribution. The `gather_draws` function is used to produce a table showing the estimates of the coefficient for mom_iq produced by the MCMC estimation procedure. 
+We can visualize the uncertainty around estimates from the Bayesian models by analyzing the posterior distribution. The `gather_draws` function is used to produce a table showing the estimates of the coefficient for mom_iq produced by the MCMC estimation procedure. 
 
 The `tidybayes` package has lots of useful functions for plotting these results. In this case, we can see the entire posterior distribution, along with a summary. The point indicates the *median* of the posterior distribution and the bars the 66% and 95% *highest posterior density intervals*.
 ```{r post-model-viz1}

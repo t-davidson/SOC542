@@ -1,0 +1,289 @@
+---
+title: "Week 4 - Multiple Regression"
+author: "Fred Traylor, Lab TA"
+date: "2/14/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# options(scipen = 999)
+
+library(tidyverse)
+library(rstanarm)
+library(tidybayes)
+
+library(modelsummary)
+library(broom.mixed)
+options(modelsummary_get = "broom") 
+
+if(!require(usdata))          # If usdata package isn't installed...
+  install.packages("usdata")
+library(usdata)
+
+```
+
+
+
+#  Data
+
+We know that The United States of America has 50 states, but did you know that within those states are 3,142 counties? Because there are so many of them, and their jurisdictions are so small, counties provide great ways to measure social indicators on a local scale. 
+
+For today's lab, we're going to use county-level data from the American Community Survey, a nationally-representative survey of Americans. Our data come pre-aggregated at the county-level courtesy of the `usdata` package (install above if needed). For more information about the dataset, use the `?county_2019` command in the console. 
+
+Today, we're going to be seeing which variables are associated with the median income of a county. Specifically, we'll be using the average family size, the percent of households with a computer, and the percent of adults over age 25 with a high school degree. Let's select just our four variables of interest and shorted household income to be in thousands of dollars to aid in interpretation. 
+```{r data-table}
+counties <- usdata::county_2019 %>% 
+  mutate(hhinc_med_thou = median_household_income / 1000) %>% 
+  select(hhinc_med_thou, avg_family_size, hs_grad, household_has_computer) 
+
+```
+
+
+To get a look at what our data looks like, let's make a series of scatterplots such that each of our independent variables has it's own graph with the dependent variable. We can also use the `geom_smooth()` function to show a bivariate regression line for them. 
+```{r data-viz}
+
+counties %>% 
+  pivot_longer(cols = c(avg_family_size, hs_grad, household_has_computer),
+               names_to = "Predictor",
+               values_to = "pred_value") %>% 
+ggplot(.,
+       aes(x = pred_value,
+                 y = hhinc_med_thou)) +
+  geom_point() +
+  geom_smooth(method = "lm", formula = 'y ~ x') +
+  facet_grid(~Predictor,
+             scales = "free_x") +
+  theme_light() + 
+  labs(y = "Median Household Income (Thousands, 2019 USD)",
+       x = "")
+```
+
+
+# The Frequentist Approach
+
+Last week, we looked at create regression models where one independent variables acted upon one dependent variable. These models looked like: $$y = a + b(x) + \epsilon$$
+
+When we have two (or more) independent variables, we simply "add" them onto the model. With this, we can go from a bivariate model to a multivariate one. These equations take the form of: $$y = a + b_1(x_1) + b_2(x_2) + ... + b_k(x_k) + \epsilon$$ for $k$ number of independent variables. 
+
+Let's start by modeling the bivariate relationship between median household income and the percentage of each house in the county that has a computer. Then, let's add on the percent of adults over age 24 with a high school diploma and the average number of people in a family. 
+
+Lastly, we'll throw these into the `modelsummary()` function (from the package of the same name) to compare them side-by-side. (Feel free to ignore some of the arguments in the function; we'll get to those later)
+```{r freq-model}
+ols_bivar <- lm(hhinc_med_thou ~ household_has_computer, 
+           data = counties)
+ols_multi <- lm(hhinc_med_thou ~ avg_family_size + hs_grad + household_has_computer, 
+           data = counties)
+modelsummary(list(ols_bivar, ols_multi),
+             statistic = "s.e. = {std.error}; t = {statistic}",
+             gof_omit = "IC|Log|Adj|alg|pss")
+```
+
+
+## Visualizing Frequentist Coefficients
+
+We can also plot these two models using `ggplot2`. Using the `tidy()` function in the `broom` package, we can quickly turn our two models into dataframes. We can then combine them together into one big frame. 
+
+```{r freq-viz-table}
+ols_mod1 <- broom::tidy(ols_bivar, conf.int = T) %>% mutate(model = "OLS Bivariate")
+ols_mod2 <- broom::tidy(ols_multi, conf.int = T) %>% mutate(model = "OLS Multivariate")
+ols_ints <- bind_rows(ols_mod1, ols_mod2) %>% filter(term != "(Intercept)")
+head(ols_ints)
+
+```
+
+Looking at the table above, we can see that the `tidy()` function created a row for each variable that lists the estimate, standard error, t-statistic, and p-value. We then told it to give us the confidence interval (defaulting to 95%), and add a column specifying the model name. We then combined the two dataframes and removed the intercepts. 
+
+Now that our models are in a dataframe, we can simply plot them using `ggplot`. 
+
+```{r freq-viz}
+ggplot() + 
+  geom_pointrange(
+    data = ols_ints,
+    aes(
+      y = model,
+      x = estimate,
+      xmin = conf.low,
+      xmax = conf.high)
+    ) + 
+  geom_vline(data = filter(ols_ints, term =="hs_grad"), # This is just so it only shows on hs_grad
+             aes(xintercept = 0),
+                 linetype = "dotted", size = 1.5, alpha = .5) +
+  facet_grid(~ term,
+             scales = "free") + 
+  theme_light() +
+  labs(y = "Model",
+       x = "Coefficient Estimate",
+       title = "US Counties' Median Household Income (in Thousand USD)",
+       caption = "Data: 2019 American Communities Survey") +
+  theme(legend.position = "none",
+        plot.title = element_text(hjust = .5))
+
+```
+
+
+
+# The Bayesian Approach
+
+Let's now recreate our multivariate model with a bayesian approach. Let's first go in without any prior knowledge of the distribution. 
+
+## Flat Priors
+```{r bayes-flat-model}
+bayes_flat_mod <- stan_glm(hhinc_med_thou ~ avg_family_size + hs_grad + household_has_computer, 
+                     data = counties,
+                     family = gaussian(link = "identity"),
+                     prior = NULL,
+                     prior_intercept = NULL,
+                     seed = 12345, 
+                     chains = 4,
+                     refresh = 0,
+                     iter = 2000,  
+                     warmup = 1000)
+print(bayes_flat_mod, digits = 2, detail = T) 
+```
+
+
+## Specified Priors
+Let's also create a model with specified priors. 
+
+Because we have more than one independent variable, we need to save our priors in a list to add to the model. 
+```{r bayes-prior-model}
+
+coefpriors <- normal(location = c(0,0,0),
+                   scale = c(1,1,1))
+
+bayes_prior_mod <- stan_glm(hhinc_med_thou ~ avg_family_size + hs_grad + household_has_computer,
+                        data = counties,
+                        family = gaussian(link = "identity"),
+                     prior = coefpriors,
+                     prior_intercept = NULL,
+                     seed = 12345, 
+                     chains = 4,
+                     refresh = 0,
+                     iter = 2000,  
+                     warmup = 1000)
+print(bayes_prior_mod, digits = 2, detail = T) 
+```
+
+
+Since we specified priors in this model, let's make sure they came through correctly.
+
+```{r bayes-prior-sum}
+prior_summary(bayes_prior_mod)
+```
+
+
+We can also visualize our model like we did last week. First, we `gather_draws()` and specifying which variables we would like. In this case, we don't want the intercept, so we write everything *but* that. 
+
+```{r bayes-gather-draws-prior}
+draws_prior <- bayes_prior_mod %>% 
+  gather_draws(avg_family_size, hs_grad, household_has_computer) %>% 
+  mutate(model = "Bayes Prior")
+head(draws_prior)
+```
+
+We can then send this into `ggplot` to create a graph that shows our estimates and their uncertainty. Note that the three variables get their own graphs, along the lines of what we did at the very beginning with the scatter plot. If you look back at our model output, you'll see that average family size's coefficient is much larger than the other two variables. Faceting the variables into their own graphs allows for the variance in each one to be seen. 
+
+
+```{r bayes-viz}
+
+draws_prior %>% 
+  ggplot(aes(y = .variable, x = .value)) +
+  stat_halfeye() +
+  theme_light() + 
+  labs(x = "Coefficient", y = "Variable") +
+  facet_grid(~ .variable, 
+             scales = "free")
+
+```
+
+
+# Model Comparison
+
+## Model Comparison  Table 
+
+Finally, let's compare all four of our models we made today. We can use the `modelsummary()` function from earlier to put them all into a table. Before we do this, though, let's put them all into a list, and rename and order our predictors.
+
+We put the four models into a list just to make it easier to read our final `modelsummary()` function's arguments. This also gives us a chance to assign names to our models that will show up at the top of the regression output table. 
+
+And then we can create a vector that specifies the names we had in our original models and what we should like them to be called in the output table. This also gives us a chance to reorder the coefficients, so I've moved the intercept term to the bottom, where we would normally see it in a regression table in a published article. 
+
+In the `modelsummary()` function, we first include the list of our models. We could stop there and be fine. However, let's add in our coefficient names into the `coef_map` argument. Let's also omit any "goodness-of-fit" (or "`gof`") statistics aside from the number of observations (for all models) and the  $r^2$ and $F$ statistics (for OLS models). Lastly, let's throw on a title for our table. 
+```{r compare-table, message=FALSE}
+
+
+model_list <- list("OLS Bivariate" = ols_bivar, 
+                   "OLS Multivariate" = ols_multi, 
+                   "Bayes - Flat Prior" = bayes_flat_mod, 
+                   "Bayes - Specified Prior" = bayes_prior_mod)
+
+coef_names <- c("avg_family_size" = "Avg Family Size",
+                "hs_grad" = "% Adults HS Grad",
+                "household_has_computer" = "% HH's w/Computer",
+                '(Intercept)' = 'Constant')
+
+
+modelsummary(model_list,
+             coef_map = coef_names,
+             gof_omit = "IC|Log|Adj|alg|pss", 
+             title = "Table X: Regression Model Output") 
+
+```
+
+
+## Model Comparison Graph 
+
+We can also do the same on our other models and plot them together. Just like before, we need to `gather_draws` from the posterior distribution of our second bayesian model. 
+
+```{r}
+draws_flat <- bayes_flat_mod %>% 
+  gather_draws(avg_family_size, hs_grad, household_has_computer) %>% 
+  mutate(model = "Bayes Flat")
+
+
+all_draws <- bind_rows(draws_flat, draws_prior) %>% 
+  rename(estimate = .value,
+         term = .variable)
+
+ggplot() +
+  stat_halfeye(
+    data = all_draws,
+    aes(
+      x = estimate, 
+      y = model, 
+      fill = model,
+      alpha = .7)) +
+  geom_pointrange(
+    data = ols_ints,
+    aes(
+      y = model,
+      x = estimate,
+      xmin = conf.low,
+      xmax = conf.high,
+      fill = model
+      )
+    ) + 
+  geom_vline(data = filter(all_draws, term =="hs_grad"), # This is just so it only shows on hs_grad 
+             aes(xintercept = 0),
+                 linetype = "dotted", size = 1.5, alpha = .5) +
+  facet_grid(~ term,
+             scales = "free") + 
+  theme_light() +
+  scale_fill_viridis_d() + 
+  labs(y = "Model",
+       x = "Coefficient Estimate",
+       title = "US Counties' Median Household Income (in Thousand USD)",
+       # subtitle = "",
+       caption = "Data: 2019 American Communities Survey") +
+  theme(legend.position = "none",
+        plot.title = element_text(hjust = .5))
+
+
+
+```
+
+
+
+
