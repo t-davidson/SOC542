@@ -23,6 +23,7 @@ if(!require(usdata))          # If usdata package isn't installed...
   install.packages("usdata")
 library(usdata)
 
+seed <- 12345
 ```
 
 
@@ -38,7 +39,6 @@ Today, we're going to be seeing which variables are associated with the median i
 counties <- usdata::county_2019 %>% 
   mutate(hhinc_med_thou = median_household_income / 1000) %>% 
   select(hhinc_med_thou, avg_family_size, hs_grad, household_has_computer) 
-
 ```
 
 
@@ -52,8 +52,8 @@ counties %>%
 ggplot(.,
        aes(x = pred_value,
                  y = hhinc_med_thou)) +
-  geom_point() +
-  geom_smooth(method = "lm", formula = 'y ~ x') +
+  geom_point(alpha=0.3) +
+  geom_smooth(method = "lm", formula = 'y ~ x', se = FALSE) +
   facet_grid(~Predictor,
              scales = "free_x") +
   theme_light() + 
@@ -64,9 +64,9 @@ ggplot(.,
 
 # The Frequentist Approach
 
-Last week, we looked at create regression models where one independent variables acted upon one dependent variable. These models looked like: $$y = a + b(x) + \epsilon$$
+Last week, we looked at create regression models where one independent variables acted upon one dependent variable. These models looked like: $$y = \alpha + \beta x + \epsilon$$
 
-When we have two (or more) independent variables, we simply "add" them onto the model. With this, we can go from a bivariate model to a multivariate one. These equations take the form of: $$y = a + b_1(x_1) + b_2(x_2) + ... + b_k(x_k) + \epsilon$$ for $k$ number of independent variables. 
+When we have two (or more) independent variables, we simply "add" them to the model formula. With this, we can go from a bivariate model to a multivariate one. These equations take the form of: $$y = \alpha + \beta_1 x_1 + \beta_2 x_2 + ... + \beta_k x_k + \epsilon$$ for $k$ number of independent variables. 
 
 Let's start by modeling the bivariate relationship between median household income and the percentage of each house in the county that has a computer. Then, let's add on the percent of adults over age 24 with a high school diploma and the average number of people in a family. 
 
@@ -91,7 +91,6 @@ ols_mod1 <- broom::tidy(ols_bivar, conf.int = T) %>% mutate(model = "OLS Bivaria
 ols_mod2 <- broom::tidy(ols_multi, conf.int = T) %>% mutate(model = "OLS Multivariate")
 ols_ints <- bind_rows(ols_mod1, ols_mod2) %>% filter(term != "(Intercept)")
 head(ols_ints)
-
 ```
 
 Looking at the table above, we can see that the `tidy()` function created a row for each variable that lists the estimate, standard error, t-statistic, and p-value. We then told it to give us the confidence interval (defaulting to 95%), and add a column specifying the model name. We then combined the two dataframes and removed the intercepts. 
@@ -120,14 +119,13 @@ ggplot() +
        caption = "Data: 2019 American Communities Survey") +
   theme(legend.position = "none",
         plot.title = element_text(hjust = .5))
-
 ```
 
 
 
 # The Bayesian Approach
 
-Let's now recreate our multivariate model with a bayesian approach. Let's first go in without any prior knowledge of the distribution. 
+Let's now recreate our multivariate model with a Bayesian approach. Let's first go in without any prior knowledge of the distribution. 
 
 ## Flat Priors
 ```{r bayes-flat-model}
@@ -136,12 +134,12 @@ bayes_flat_mod <- stan_glm(hhinc_med_thou ~ avg_family_size + hs_grad + househol
                      family = gaussian(link = "identity"),
                      prior = NULL,
                      prior_intercept = NULL,
-                     seed = 12345, 
-                     chains = 4,
+                     seed = seed, 
+                     chains = 1,
                      refresh = 0,
                      iter = 2000,  
                      warmup = 1000)
-print(bayes_flat_mod, digits = 2, detail = T) 
+print(bayes_flat_mod, digits = 2, detail = T)
 ```
 
 
@@ -159,8 +157,8 @@ bayes_prior_mod <- stan_glm(hhinc_med_thou ~ avg_family_size + hs_grad + househo
                         family = gaussian(link = "identity"),
                      prior = coefpriors,
                      prior_intercept = NULL,
-                     seed = 12345, 
-                     chains = 4,
+                     seed = seed, 
+                     chains = 1,
                      refresh = 0,
                      iter = 2000,  
                      warmup = 1000)
@@ -188,7 +186,6 @@ We can then send this into `ggplot` to create a graph that shows our estimates a
 
 
 ```{r bayes-viz}
-
 draws_prior %>% 
   ggplot(aes(y = .variable, x = .value)) +
   stat_halfeye() +
@@ -196,14 +193,13 @@ draws_prior %>%
   labs(x = "Coefficient", y = "Variable") +
   facet_grid(~ .variable, 
              scales = "free")
-
 ```
 
 
 # Model Comparison
 
 ## Model Comparison  Table 
-
+s
 Finally, let's compare all four of our models we made today. We can use the `modelsummary()` function from earlier to put them all into a table. Before we do this, though, let's put them all into a list, and rename and order our predictors.
 
 We put the four models into a list just to make it easier to read our final `modelsummary()` function's arguments. This also gives us a chance to assign names to our models that will show up at the top of the regression output table. 
@@ -212,8 +208,6 @@ And then we can create a vector that specifies the names we had in our original 
 
 In the `modelsummary()` function, we first include the list of our models. We could stop there and be fine. However, let's add in our coefficient names into the `coef_map` argument. Let's also omit any "goodness-of-fit" (or "`gof`") statistics aside from the number of observations (for all models) and the  $r^2$ and $F$ statistics (for OLS models). Lastly, let's throw on a title for our table. 
 ```{r compare-table, message=FALSE}
-
-
 model_list <- list("OLS Bivariate" = ols_bivar, 
                    "OLS Multivariate" = ols_multi, 
                    "Bayes - Flat Prior" = bayes_flat_mod, 
