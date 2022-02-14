@@ -20,7 +20,7 @@ library(broom.mixed)
 options(modelsummary_get = "broom") 
 
 if(!require(usdata))          # If usdata package isn't installed...
-  install.packages("usdata")
+  install.packages("usdata")  # Install it 
 library(usdata)
 
 seed <- 12345
@@ -70,7 +70,7 @@ When we have two (or more) independent variables, we simply "add" them to the mo
 
 Let's start by modeling the bivariate relationship between median household income and the percentage of each house in the county that has a computer. Then, let's add on the percent of adults over age 24 with a high school diploma and the average number of people in a family. 
 
-Lastly, we'll throw these into the `modelsummary()` function (from the package of the same name) to compare them side-by-side. (Feel free to ignore some of the arguments in the function; we'll get to those later)
+Lastly, we'll throw these into the `modelsummary()` function (from the package of the same name) to compare them side-by-side. (Feel free to ignore some of the arguments in the function; we'll get to those later. And the ones we don't, don't matter right now.)
 ```{r freq-model}
 ols_bivar <- lm(hhinc_med_thou ~ household_has_computer, 
            data = counties)
@@ -155,8 +155,8 @@ coefpriors <- normal(location = c(0,0,0),
 bayes_prior_mod <- stan_glm(hhinc_med_thou ~ avg_family_size + hs_grad + household_has_computer,
                         data = counties,
                         family = gaussian(link = "identity"),
-                     prior = coefpriors,
-                     prior_intercept = NULL,
+                     # prior = coefpriors,
+                     # prior_intercept = NULL,
                      seed = seed, 
                      chains = 1,
                      refresh = 0,
@@ -195,11 +195,44 @@ draws_prior %>%
              scales = "free")
 ```
 
+## Bayesian R-Squared
+
+Because we estimated 1000 models in each of our Bayes estimates, we also have 1000 $R^2$'s. We can use the `bayes_R2()` function to get the $R^2$ for each model and then plot the densities to find where they end up. 
+
+```{r bayes-r2}
+
+bayes_prior_r2 <- bayes_R2(bayes_prior_mod) %>% 
+  as.data.frame() %>% mutate(model = "Priors")
+bayes_flat_r2 <- bayes_R2(bayes_flat_mod) %>% 
+  as.data.frame() %>% mutate(model = "Flat")
+
+bayes_rsquared <- rbind(bayes_flat_r2, bayes_prior_r2)
+colnames(bayes_rsquared) <- c("rsquared", "model")
+
+# Finding the mean and median r-squared for each model
+rsquared_sums <- bayes_rsquared %>% 
+  group_by(model) %>% 
+  summarize(mean = mean(rsquared),
+            median = median(rsquared))
+
+ggplot() +
+  stat_halfeye(data = bayes_rsquared,
+               mapping = aes(x = rsquared)) + 
+  geom_vline(data = rsquared_sums, mapping = aes(xintercept = mean,
+                                         color = "Mean"), size = 1.5, linetype = "dashed") + 
+  geom_vline(data = rsquared_sums, mapping = aes(xintercept = mean,
+                                         color = "Median"), size = 1.5, linetype = "dotted") +
+  facet_grid(model ~ .) +
+  theme_light()
+
+```
+
+
 
 # Model Comparison
 
 ## Model Comparison  Table 
-s
+
 Finally, let's compare all four of our models we made today. We can use the `modelsummary()` function from earlier to put them all into a table. Before we do this, though, let's put them all into a list, and rename and order our predictors.
 
 We put the four models into a list just to make it easier to read our final `modelsummary()` function's arguments. This also gives us a chance to assign names to our models that will show up at the top of the regression output table. 
@@ -231,7 +264,7 @@ modelsummary(model_list,
 
 We can also do the same on our other models and plot them together. Just like before, we need to `gather_draws` from the posterior distribution of our second bayesian model. 
 
-```{r}
+```{r compare-graph}
 draws_flat <- bayes_flat_mod %>% 
   gather_draws(avg_family_size, hs_grad, household_has_computer) %>% 
   mutate(model = "Bayes Flat")
