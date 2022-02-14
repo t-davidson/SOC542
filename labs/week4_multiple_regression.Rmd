@@ -34,12 +34,15 @@ We know that The United States of America has 50 states, but did you know that w
 
 For today's lab, we're going to use county-level data from the American Community Survey, a nationally-representative survey of Americans. Our data come pre-aggregated at the county-level courtesy of the `usdata` package (install above if needed). For more information about the dataset, use the `?county_2019` command in the console. 
 
-Today, we're going to be seeing which variables are associated with the median income of a county. Specifically, we'll be using the average family size, the percent of households with a computer, and the percent of adults over age 25 with a high school degree. Let's select just our four variables of interest and shorted household income to be in thousands of dollars to aid in interpretation. 
+Today, we're going to be seeing which variables are associated with the median income of a county. Specifically, we'll be using the average family size, the percent of households with a computer, and the percent of adults over age 25 with a high school degree. Let's select just our four variables of interest and shorted household income to be in thousands of dollars to aid in interpretation. We can also use the `datasummary_skim()` function to print summary statistics for our data.
 ```{r data-table}
 counties <- usdata::county_2019 %>% 
   mutate(hhinc_med_thou = median_household_income / 1000) %>% 
   rename(hh_comp = household_has_computer) %>% 
   select(hhinc_med_thou, avg_family_size, hs_grad, hh_comp) 
+
+datasummary_skim(counties,
+                 title = "Summary Statistics")
 ```
 
 
@@ -81,9 +84,17 @@ ols_bivar_fam <- lm(hhinc_med_thou ~ avg_family_size,
                      data = counties)
 ols_multi <- lm(hhinc_med_thou ~hh_comp + hs_grad + avg_family_size, 
                 data = counties)
-modelsummary(list(ols_bivar_comp, ols_bivar_educ, ols_bivar_fam, ols_multi),
-             statistic = "s.e. = {std.error}; t = {statistic}",
-             gof_omit = "IC|Log|alg|pss")
+
+model_list <- list("Computer Ownership" = ols_bivar_comp, 
+                   "HS Grad Rate" = ols_bivar_educ,
+                   "Average Family Size" = ols_bivar_fam,
+                   "Multivariate" = ols_multi)
+
+
+modelsummary(model_list,
+             statistic = c("s.e. = {std.error}", "t = {statistic}"),
+             gof_omit = "IC|Log|alg|pss",
+             title = "Frequentist Regression Output")
 ```
 
 
@@ -151,6 +162,13 @@ bayes_flat_mod <- stan_glm(hhinc_med_thou ~ avg_family_size + hs_grad + hh_comp,
 print(bayes_flat_mod, digits = 2, detail = T)
 ```
 
+Let's double-check to make sure we have flat priors included here.
+
+```{r bayes-flat-prior-sum}
+prior_summary(bayes_flat_mod)
+```
+
+
 
 ## Specified Priors
 Let's also create a model with specified priors. 
@@ -168,13 +186,6 @@ bayes_prior_mod <- stan_glm(hhinc_med_thou ~ avg_family_size + hs_grad + hh_comp
                      warmup = 1000)
 print(bayes_prior_mod, digits = 2, detail = T) 
 ```
-
-Let's double-check to make sure we have no priors included here.
-
-```{r bayes-flat-prior-sum}
-prior_summary(bayes_flat_mod)
-```
-
 
 Since we specified priors in this model, let's make sure they came through correctly.
 
@@ -212,9 +223,9 @@ Because we estimated 1000 models in each of our Bayes estimates, we also have 10
 ```{r bayes-r2}
 
 bayes_prior_r2 <- bayes_R2(bayes_prior_mod) %>% 
-  as.data.frame() %>% mutate(model = "Priors")
+  as.data.frame() %>% mutate(model = "Default Priors")
 bayes_flat_r2 <- bayes_R2(bayes_flat_mod) %>% 
-  as.data.frame() %>% mutate(model = "Flat")
+  as.data.frame() %>% mutate(model = "Flat Priors")
 
 bayes_rsquared <- rbind(bayes_flat_r2, bayes_prior_r2)
 colnames(bayes_rsquared) <- c("rsquared", "model")
@@ -253,15 +264,12 @@ And then we can create a vector that specifies the names we had in our original 
 
 In the `modelsummary()` function, we first include the list of our models. We could stop there and be fine. However, let's add in our coefficient names into the `coef_map` argument. Let's also omit any "goodness-of-fit" (or "`gof`") statistics aside from the number of observations (for all models) and the  $r^2$ and $F$ statistics (for OLS models). Lastly, let's throw on a title for our table. 
 ```{r compare-table, message=FALSE}
-model_list <- list("OLS Bivariate: Computer" = ols_bivar_comp, 
-                   "OLS Bivariate: Education" = ols_bivar_educ, 
-                   "OLS Bivariate: Family Size" = ols_bivar_fam, 
-                   "OLS Multivariate" = ols_multi, 
-                   "Bayes - Flat Prior" = bayes_flat_mod, 
-                   "Bayes - Specified Prior" = bayes_prior_mod)
+model_list <- list("OLS Multivariate" = ols_multi, 
+                   "Bayes: Flat Prior" = bayes_flat_mod, 
+                   "Bayes: Specified Prior" = bayes_prior_mod)
 
-coef_names <- c("hh_comp" = "% HH's w/Computer",
-                "hs_grad" = "% Adults HS Grad",
+coef_names <- c("hh_comp" = "% HH's w/Comp.",
+                "hs_grad" = "% HS Grad",
                 "avg_family_size" = "Avg Family Size",
                 "(Intercept)" = "Constant")
 
@@ -269,7 +277,7 @@ coef_names <- c("hh_comp" = "% HH's w/Computer",
 modelsummary(model_list,
              coef_map = coef_names,
              gof_omit = "IC|Log|alg|pss", 
-             title = "Table X: Regression Model Output") 
+             title = "Frequentist vs Bayesian Regression Model Output") 
 
 ```
 
@@ -297,7 +305,7 @@ ggplot() +
       fill = model,
       alpha = .7)) +
   geom_pointrange(
-    data = ols_sum_ints,
+    data = filter(ols_sum_ints, model =="OLS Multivariate"),
     aes(
       y = model,
       x = estimate,
