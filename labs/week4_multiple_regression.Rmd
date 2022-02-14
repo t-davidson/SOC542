@@ -38,7 +38,8 @@ Today, we're going to be seeing which variables are associated with the median i
 ```{r data-table}
 counties <- usdata::county_2019 %>% 
   mutate(hhinc_med_thou = median_household_income / 1000) %>% 
-  select(hhinc_med_thou, avg_family_size, hs_grad, household_has_computer) 
+  rename(hh_comp = hh_comp) %>% 
+  select(hhinc_med_thou, avg_family_size, hs_grad, hh_comp) 
 ```
 
 
@@ -46,7 +47,7 @@ To get a look at what our data looks like, let's make a series of scatterplots s
 ```{r data-viz}
 
 counties %>% 
-  pivot_longer(cols = c(avg_family_size, hs_grad, household_has_computer),
+  pivot_longer(cols = c(avg_family_size, hs_grad, hh_comp),
                names_to = "Predictor",
                values_to = "pred_value") %>% 
 ggplot(.,
@@ -72,13 +73,17 @@ Let's start by modeling the bivariate relationship between median household inco
 
 Lastly, we'll throw these into the `modelsummary()` function (from the package of the same name) to compare them side-by-side. (Feel free to ignore some of the arguments in the function; we'll get to those later. And the ones we don't, don't matter right now.)
 ```{r freq-model}
-ols_bivar <- lm(hhinc_med_thou ~ household_has_computer, 
-           data = counties)
-ols_multi <- lm(hhinc_med_thou ~ avg_family_size + hs_grad + household_has_computer, 
-           data = counties)
-modelsummary(list(ols_bivar, ols_multi),
+ols_bivar_comp <- lm(hhinc_med_thou ~ hh_comp, 
+                     data = counties)
+ols_bivar_educ <- lm(hhinc_med_thou ~ hs_grad, 
+                     data = counties)
+ols_bivar_fam <- lm(hhinc_med_thou ~ avg_family_size, 
+                     data = counties)
+ols_multi <- lm(hhinc_med_thou ~hh_comp + hs_grad + avg_family_size, 
+                data = counties)
+modelsummary(list(ols_bivar_comp, ols_bivar_educ, ols_bivar_fam, ols_multi),
              statistic = "s.e. = {std.error}; t = {statistic}",
-             gof_omit = "IC|Log|Adj|alg|pss")
+             gof_omit = "IC|Log|alg|pss")
 ```
 
 
@@ -87,10 +92,13 @@ modelsummary(list(ols_bivar, ols_multi),
 We can also plot these two models using `ggplot2`. Using the `tidy()` function in the `broom` package, we can quickly turn our two models into dataframes. We can then combine them together into one big frame. 
 
 ```{r freq-viz-table}
-ols_mod1 <- broom::tidy(ols_bivar, conf.int = T) %>% mutate(model = "OLS Bivariate")
-ols_mod2 <- broom::tidy(ols_multi, conf.int = T) %>% mutate(model = "OLS Multivariate")
-ols_ints <- bind_rows(ols_mod1, ols_mod2) %>% filter(term != "(Intercept)")
-head(ols_ints)
+ols_sum_comp <- broom::tidy(ols_bivar_comp, conf.int = T) %>% mutate(model = "OLS Bivariate: Computer")
+ols_sum_educ <- broom::tidy(ols_bivar_educ, conf.int = T) %>% mutate(model = "OLS Bivariate: Education")
+ols_sum_fam <- broom::tidy(ols_bivar_fam, conf.int = T) %>% mutate(model = "OLS Bivariate: Family Size")
+ols_sum_multi <- broom::tidy(ols_multi, conf.int = T) %>% mutate(model = "OLS Multivariate")
+ols_sum_ints <- bind_rows(ols_sum_comp, ols_sum_educ, ols_sum_fam, ols_sum_multi) %>% 
+  filter(term != "(Intercept)")
+head(ols_sum_ints)
 ```
 
 Looking at the table above, we can see that the `tidy()` function created a row for each variable that lists the estimate, standard error, t-statistic, and p-value. We then told it to give us the confidence interval (defaulting to 95%), and add a column specifying the model name. We then combined the two dataframes and removed the intercepts. 
@@ -100,14 +108,14 @@ Now that our models are in a dataframe, we can simply plot them using `ggplot`.
 ```{r freq-viz}
 ggplot() + 
   geom_pointrange(
-    data = ols_ints,
+    data = ols_sum_ints,
     aes(
       y = model,
       x = estimate,
       xmin = conf.low,
       xmax = conf.high)
     ) + 
-  geom_vline(data = filter(ols_ints, term =="hs_grad"), # This is just so it only shows on hs_grad
+  geom_vline(data = filter(ols_sum_ints, term !="hh_comp"), # hh_comp's coef is not close to zero, so not including it here
              aes(xintercept = 0),
                  linetype = "dotted", size = 1.5, alpha = .5) +
   facet_grid(~ term,
@@ -129,11 +137,12 @@ Let's now recreate our multivariate model with a Bayesian approach. Let's first 
 
 ## Flat Priors
 ```{r bayes-flat-model}
-bayes_flat_mod <- stan_glm(hhinc_med_thou ~ avg_family_size + hs_grad + household_has_computer, 
+bayes_flat_mod <- stan_glm(hhinc_med_thou ~ avg_family_size + hs_grad + hh_comp, 
                      data = counties,
                      family = gaussian(link = "identity"),
                      prior = NULL,
                      prior_intercept = NULL,
+                     prior_aux = NULL,
                      seed = seed, 
                      chains = 1,
                      refresh = 0,
@@ -149,20 +158,21 @@ Let's also create a model with specified priors.
 Because we have more than one independent variable, we need to save our priors in a list to add to the model. 
 ```{r bayes-prior-model}
 
-coefpriors <- normal(location = c(0,0,0),
-                   scale = c(1,1,1))
-
-bayes_prior_mod <- stan_glm(hhinc_med_thou ~ avg_family_size + hs_grad + household_has_computer,
+bayes_prior_mod <- stan_glm(hhinc_med_thou ~ avg_family_size + hs_grad + hh_comp,
                         data = counties,
                         family = gaussian(link = "identity"),
-                     # prior = coefpriors,
-                     # prior_intercept = NULL,
                      seed = seed, 
                      chains = 1,
                      refresh = 0,
                      iter = 2000,  
                      warmup = 1000)
 print(bayes_prior_mod, digits = 2, detail = T) 
+```
+
+Let's double-check to make sure we have no priors included here.
+
+```{r bayes-flat-prior-sum}
+prior_summary(bayes_flat_mod)
 ```
 
 
@@ -177,7 +187,7 @@ We can also visualize our model like we did last week. First, we `gather_draws()
 
 ```{r bayes-gather-draws-prior}
 draws_prior <- bayes_prior_mod %>% 
-  gather_draws(avg_family_size, hs_grad, household_has_computer) %>% 
+  gather_draws(avg_family_size, hs_grad, hh_comp) %>% 
   mutate(model = "Bayes Prior")
 head(draws_prior)
 ```
@@ -223,7 +233,9 @@ ggplot() +
   geom_vline(data = rsquared_sums, mapping = aes(xintercept = mean,
                                          color = "Median"), size = 1.5, linetype = "dotted") +
   facet_grid(model ~ .) +
-  theme_light()
+  theme_light() +
+  labs(y = "Density",
+       x = "Estimated R-Squared")
 
 ```
 
@@ -241,20 +253,22 @@ And then we can create a vector that specifies the names we had in our original 
 
 In the `modelsummary()` function, we first include the list of our models. We could stop there and be fine. However, let's add in our coefficient names into the `coef_map` argument. Let's also omit any "goodness-of-fit" (or "`gof`") statistics aside from the number of observations (for all models) and the  $r^2$ and $F$ statistics (for OLS models). Lastly, let's throw on a title for our table. 
 ```{r compare-table, message=FALSE}
-model_list <- list("OLS Bivariate" = ols_bivar, 
+model_list <- list("OLS Bivariate: Computer" = ols_bivar_comp, 
+                   "OLS Bivariate: Education" = ols_bivar_educ, 
+                   "OLS Bivariate: Family Size" = ols_bivar_fam, 
                    "OLS Multivariate" = ols_multi, 
                    "Bayes - Flat Prior" = bayes_flat_mod, 
                    "Bayes - Specified Prior" = bayes_prior_mod)
 
-coef_names <- c("avg_family_size" = "Avg Family Size",
+coef_names <- c("hh_comp" = "% HH's w/Computer",
                 "hs_grad" = "% Adults HS Grad",
-                "household_has_computer" = "% HH's w/Computer",
-                '(Intercept)' = 'Constant')
+                "avg_family_size" = "Avg Family Size",
+                "(Intercept)" = "Constant")
 
 
 modelsummary(model_list,
              coef_map = coef_names,
-             gof_omit = "IC|Log|Adj|alg|pss", 
+             gof_omit = "IC|Log|alg|pss", 
              title = "Table X: Regression Model Output") 
 
 ```
@@ -266,7 +280,7 @@ We can also do the same on our other models and plot them together. Just like be
 
 ```{r compare-graph}
 draws_flat <- bayes_flat_mod %>% 
-  gather_draws(avg_family_size, hs_grad, household_has_computer) %>% 
+  gather_draws(avg_family_size, hs_grad, hh_comp) %>% 
   mutate(model = "Bayes Flat")
 
 
@@ -283,7 +297,7 @@ ggplot() +
       fill = model,
       alpha = .7)) +
   geom_pointrange(
-    data = ols_ints,
+    data = ols_sum_ints,
     aes(
       y = model,
       x = estimate,
