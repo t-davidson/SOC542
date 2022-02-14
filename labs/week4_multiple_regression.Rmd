@@ -273,10 +273,27 @@ coef_names <- c("hh_comp" = "% HH's w/Comp.",
                 "avg_family_size" = "Avg Family Size",
                 "(Intercept)" = "Constant")
 
+# Adding in Bayes R2 
+# Comment it out if it doesn't work for you
+bayesrows <- data.frame(
+  
+  c("Bayes R2 (Mean)", 
+    "Bayes R2 (Median)"),
+  
+  c("", ""), # OLS Model Blanks
+  
+  c(mean(bayes_R2(bayes_flat_mod)),
+    median(bayes_R2(bayes_flat_mod))),
+  
+  c(mean(bayes_R2(bayes_prior_mod)),
+    median(bayes_R2(bayes_prior_mod)))
+)
+
 
 modelsummary(model_list,
              coef_map = coef_names,
              gof_omit = "IC|Log|alg|pss", 
+             add_rows = bayesrows,
              title = "Frequentist vs Bayesian Regression Model Output") 
 
 ```
