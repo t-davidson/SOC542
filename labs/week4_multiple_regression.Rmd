@@ -38,7 +38,7 @@ Today, we're going to be seeing which variables are associated with the median i
 ```{r data-table}
 counties <- usdata::county_2019 %>% 
   mutate(hhinc_med_thou = median_household_income / 1000) %>% 
-  rename(hh_comp = hh_comp) %>% 
+  rename(hh_comp = household_has_computer) %>% 
   select(hhinc_med_thou, avg_family_size, hs_grad, hh_comp) 
 ```
 
