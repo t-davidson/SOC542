@@ -1,0 +1,425 @@
+---
+title: "Week 5 - Regression with Categorical and Nonlinear Variables"
+author: "Fred Traylor, Lab TA"
+date: "2/21/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen = 999)
+
+library(tidyverse)
+library(rstanarm)
+library(tidybayes)
+
+remotes::install_github("vincentarelbundock/modelsummary")
+
+if((packageVersion("modelsummary") != '0.9.5.9000'))  # Making sure we have the most recent version 
+  remotes::install_github("vincentarelbundock/modelsummary")
+
+library(modelsummary)
+library(broom.mixed)
+options(modelsummary_get = "broom") 
+
+
+seed <- 12345
+```
+
+
+
+# Return of the GSS
+
+
+## Data Loading 
+
+Let's bring back our old friend, the General Social Survey!
+
+You may be wondering why we waited so long to get to it this semester. The reason is because it doesn't have as many continuous variables as we would've liked, making it hard to illustrate concepts in linear regression. But, now that we know how to incorporate dummy, indicator, and non-linear variables, it can take its rightful place as the peak in our course data-verse. 
+
+We're going to work with the newest iteration of the dataset, the 2021 version. It's currently saved in the profile folder, under "lab-data." With R projects, we can save data in a folder and load it each time with only the reference to it's location within the folder. In other words, the code below will work for everyone, and you won't have to find your working directory and alter it. (A plus for reproducability!)
+
+```{r gss-load}
+gss2018 <- haven::read_dta("lab-data/GSS2018.dta")
+```
+
+## Data Management 
+
+Now, let's do some data management. 
+
+Today, we're going to investigate the effects that hours of work, occupational prestige, educational degree, sex, race, age,  and political party have on a person's earned income. 
+
+```{r data-manage}
+
+gss <- gss2018 %>% 
+  select(conrinc,                 # Target: Income  
+         hrs1, prestg10, degree,  # Career Prep
+         sex, race, age, partyid, # Other Demos
+         wtss                     # Weight
+  ) %>% 
+  haven::zap_labels() %>% 
+  mutate(
+    workhrs = case_when(
+      hrs1 == 89 ~ NaN,
+      TRUE ~ hrs1
+      ),
+    age = case_when(
+      age > 88 ~ NaN,
+      TRUE ~ age
+    ),
+    degree = factor(degree,
+                    levels = c(0,1,2,3,4),
+                    labels = c("Less_HS", "HS", "Assoc", "Bach", "Grad")
+                    ),
+    sex = factor(sex,
+                 levels = c(1,2),
+                 labels = c("Male", "Female")
+                 ),
+    race = case_when(
+      race == 1 ~ "White",
+      race == 2 ~ "Black",
+      race == 3 ~ "Other"
+      ),
+    partyid = case_when(
+      partyid %in% c(0:2) ~ "Dem",
+      partyid %in% c(4:6) ~ "Rep",
+      partyid %in% c(3,7) ~ "Other"
+      ),
+    weight = wtss
+    ) %>% 
+  select(-hrs1, -wtss) %>% 
+  drop_na()
+
+
+
+```
+
+
+
+## Data Summary
+
+Last week, we used the function `datasummary_skim()` to give us a descriptive statistics table for our continuous data. The same function does not work well with categorical variables. After all, how can you create a mean or a histogram for discrete data?
+
+This week, we're going to use a sibling function, `datasummary_balance()`. This function will give us the mean and standard deviation for our continuous data, and below it, give us the counts and percentages for our categorical data. The ability to include both was only added a few weeks ago, so we need to ensure we're running the most recent version of the `modelsummary` package (hence the installation on lines 20 and 21). 
+
+The formula is `datasummary_balance( ~ 1, ...)`. The "`~ 1`" tells it to create this double-table for all variables in the data. 
+
+```{r data-sum-table}
+
+datasummary_balance( ~ 1,
+                    title = "Sample Descriptive Statistics",
+                    notes = "Data: 2018 General Social Survey",
+                    data = gss)
+
+
+```
+
+
+If you'd like to reproduce the tables from last week and create a new table for categorical data, you can run the same code, including an argument specifying that the variables you want summarized are `type = "categorical"`. The default option is `type = numeric`, so you don't have to specify it if you don't want to, but it can be nice to include. 
+
+```{r data-sum-double-table}
+
+datasummary_skim(gss,
+                 # type = "numeric", 
+                 title = "Sample Descriptive Statistics: Continuous Variables",
+                 notes = "Data: 2018 General Social Survey")
+
+datasummary_skim(gss, 
+                 type = "categorical",
+                 title = "Sample Descriptive Statistics: Categorical Variables",
+                 notes = "Data: 2018 General Social Survey")
+
+```
+
+
+
+# Frequentist Regression
+
+## Model Creation
+Let's start with a simple model that only include three continuous variables and two categorical ones. Our model takes the form: $$\hat{income} = \alpha + \hat{\beta_{Age}} + \hat{\beta_{Work Hours}} + \hat{\beta_{Prestige}} + \hat{\beta_{Sex}} + \hat{\beta_{Race}} + \hat{\beta_{Party}} + \hat{\beta_{Degree}} + \upsilon$$
+
+
+```{r ols-base-model}
+ols1 <- lm(conrinc ~ age + prestg10 + workhrs + sex + race,
+                   data = gss)
+summary(ols1)
+
+```
+
+
+## Model Interpretation
+
+When interpreting, we can plug in the effects, just like from our models last week.
+
+Note, however, that each female, white, and black have their own coefficients. Instead of having a $\hat{\beta}$ for the categories of race or sex, we create a new one for each dummy: $$\hat{income} = \alpha + \hat{\beta_{Age}} + \hat{\beta_{Work Hours}} + \hat{\beta_{Prestige}} + \hat{\beta_{Female}} + \hat{\beta_{White}} + \hat{\beta_{Other}} + \upsilon$$
+
+For example, let's estimate a person's income, knowing that they were a 57 year-old white female with an occupational prestige of 70 and who worked 40 hours last week. We can simply input that information into the equation.
+
+So instead of multiplying `r ols1[["coefficients"]][["sexFemale"]]` by some abstract value of `sex`, we multiply it times 1 if the person is female, and by 0 if they are male. Essentially, we're adjusting the intercept term, not the slope. 
+
+And the same goes for race: We multiply `r ols1[["coefficients"]][["raceWhite"]]` times 1 if they are white, or by 0 if they are anything else, then  multiply` r ols1[["coefficients"]][["raceOther"]]` times 1 if they are "other", or by 0 if they are white or Black. 
+
+Or, even easier, we can input a dataframe with these variables and `predict()` the value using R. 
+
+
+```{r estim-byhand}
+
+newperson <- data.frame(age = 57,
+                        prestg10 = 70,
+                        workhrs = 40,
+                        sex = "Female",
+                        race = "White")
+predict(ols1, newperson)
+
+```
+
+
+## Data Transformation Effects
+
+### Dummies vs Categories
+
+Another way to think about the above interpretation is by creating a series of "dummy variables." These operate where each variable is split into a series of zero-one variables. For example, our variable `sex` has two levels, "male" and "female." Turning it into a dummy would then create a new variable `male` where males have the coding `1` and females have the coding `0`. The `fastdummies` package has a function `dummy_cols()` that makes this easy.
+
+Let's try this now, turning the variables `sex`, `race`, `partyid`, and `degree` into a series of dummies.
+
+
+```{r}
+
+gss <- gss %>% 
+  fastDummies::dummy_cols(select_columns = c("sex", "race", "partyid", "degree"))
+
+names(gss)
+
+```
+
+
+Now, let's try out running models with our new dummies. Note, too, that it doesn't matter which dummy we leave out as long as one of them is left out. Changing the dummy will only change the intercept, not the slope. 
+```{r ols-dummy-test}
+ols_nodummy <- lm(conrinc ~ age + prestg10 + workhrs + race + sex,
+                  data = gss)
+ols_dummy1 <- lm(conrinc ~ age + prestg10 + workhrs + 
+                   race_White + race_Other +
+                   sex_Female,
+                 data = gss)
+ols_dummy2 <- lm(conrinc ~ age + prestg10 + workhrs +  
+                   race_White + race_Other +
+                   sex_Male,
+                   data = gss)
+
+ols_dummy_coefs <- c("(Intercept)" = "Constant",
+                     "sexFemale" = "Female (No Dummy)", 
+                     "sex_Female" = "Female",
+                     "sex_Male" = "Male",
+                     "workexp" = "Yrs Work Exp",
+                     "raceWhite" = "Race: White (No Dummy)",
+                     "raceOther" = "Race: Other (No Dummy)",
+                     "race_White" = "Race: White",
+                     "race_Other" = "Race: Other",
+                     "age" = "Age",
+                     "prestg10" = "Occupational Prestige")
+
+modelsummary(list("No Dummies" = ols_nodummy, 
+                  "Dummy for Female" = ols_dummy1,
+                  "Dummy for Male" = ols_dummy2),
+             statistic = c("s.e. = {std.error}", "t = {statistic}"),
+             coef_map = ols_dummy_coefs,
+             gof_omit = "IC|Log|alg|pss",
+             title = "Frequentist Regression Output: Effect of Dummy Variable Choice"
+             )
+
+```
+As we can see from these results, there is no difference in whether you use your own dummies or use the defaults. Just note, however, that R will drop whatever the first category is. In the case of `sex`, the first one was `male`, since I coded it as a factor. In the case of `race`, however, it was simply a `character`-type variable, so the first category, and the one that was dropped, was `black`. Creating and using your own dummies gives you more control over this, but isn't necessary. 
+
+
+### Scaling and Non-Linearization 
+
+If we look at our income variable, our value is very skewed. Let's take the natural log of our variable so we arrive at something more normally distributed. 
+
+```{r plot-log}
+origincplot <- ggplot(gss) + geom_density(aes(conrinc))
+logincplot <- ggplot(gss) + geom_density(aes(log(conrinc)))
+cowplot::plot_grid(origincplot, logincplot)
+```
+
+We can also think of income in thousands of dollars instead of in total dollar amounts. Let's also estimate the number of year's a person has been working by subtracting 18 years from their age. 
+
+```{r data-man-trans}
+gss <- gss %>% 
+  mutate(logincome = log(conrinc),
+         thouinc = conrinc/1000,
+         workexp = age - 18)
+
+```
+
+Let's now test out whether these two data transformations affect our models. Below, I have a test for original vs divided vs logged income and also for age vs work experience. 
+
+```{r ols-transform-test}
+
+ols_inc_age <- lm(conrinc ~ age + prestg10 + workhrs + race + sex,
+                   data = gss)
+ols_thou_age <- lm(thouinc ~ age + prestg10 + workhrs + race + sex,
+                   data = gss)
+ols_log_age <- lm(logincome ~ age + prestg10 + workhrs + race + sex,
+                   data = gss)
+ols_log_exp <- lm(logincome ~ workexp + prestg10 + workhrs + race + sex,
+                   data = gss)
+
+ols_transform_mods <- list("Income ~ Age" = ols_inc_age,
+                           "Inc/1000 ~ Age" = ols_thou_age,
+                           "Log Inc ~ Age" = ols_log_age,
+                           "Log Inc ~ Experience" = ols_log_exp)
+
+ols_transform_coefs <- c("age" = "Age",
+                         "workexp" = "Yrs Work Exp",
+                         "prestg10" = "Prestige",
+                         "sexFemale" = "Female",
+                         "raceWhite" = "Race: White",
+                         "raceOther" = "Race: Other",
+                         "(Intercept)" = "Constant")
+
+modelsummary(ols_transform_mods,
+             statistic = c("s.e. = {std.error}", "t = {statistic}"),
+             coef_map = ols_transform_coefs,
+             gof_omit = "IC|Log|alg|pss",
+             title = "Frequentist Regression Output: Effect of Data Transformations",
+             notes = "Data: 2018 General Social Survey")
+
+```
+
+Looking at our table, we can see that transforming our income variable to a natural log increased our model's prediction power (via the $R^2$). Transforming it into thousands of dollars had no such effect.
+
+Meanwhile, the simple shift of $work experience = age - 18$ also had no real effect, so we can pick whichever we'd like. 
+
+With these in mind, we can tell that shifting or dividing a variable doesn't change the relationship; it only changes the amount. But changing the shape of the line (via taking the log) does change the relationship and therefore the income. 
+
+Let's go with `workexp` just for fun. 
+
+## Data Weights 
+
+Lastly, let's compare our models with and without weights on our data. Weighting the data assigns importance in the regression to different observations/individuals/respondents based on their probability of being selected in our sample. Rarely are there large effects, but you may be surprised. (Smaller effects point to better sampling of the population, while larger effects point to worse performance of the sampling procedure.)
+
+```{r weight-test}
+ols_final_noweight <- lm(logincome ~ workexp + prestg10 + workhrs + sex + race + partyid + partyid + degree,
+                   data = gss)
+ols_final_weight <- lm(logincome ~ workexp + prestg10 + workhrs + sex + race + partyid + partyid + degree,
+                   data = gss, weights = weight)
+
+ols_weight_mods <- list(ols_final_noweight, ols_final_weight)
+
+
+modelsummary(ols_weight_mods,
+             statistic = c("s.e. = {std.error}", "t = {statistic}"),
+             gof_omit = "IC|Log|alg|pss",
+             title = "Frequentist Regression Output: Effect of Data Weights")
+```
+
+We can also visualize these changes like before.
+
+``` {r weight-test-viz}
+
+ols_weight_ints <- broom::tidy(ols_final_weight, conf.int = T) %>% mutate(Model = "Weighted")
+ols_noweight_ints <- broom::tidy(ols_final_noweight, conf.int = T) %>% mutate(Model = "No Weights")
+ols_sum_ints <- bind_rows(ols_weight_ints, ols_noweight_ints) %>% 
+  filter(term != "(Intercept)")
+
+ggplot() + 
+  geom_pointrange(
+    data = ols_sum_ints,
+    aes(
+      y = Model,
+      x = estimate,
+      xmin = conf.low,
+      xmax = conf.high,
+      color = Model)
+    ) +
+  facet_grid(term~., switch = "y") +
+  labs(x = "Coefficient",
+       title = "OLS Regression Predicting Income (Logged)",
+       subtitle = "Comparison of Weighted vs Unweighted Data") + 
+  theme_minimal() + 
+  theme(legend.position = "bottom",
+        strip.text.y.left = element_text(angle = 0),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank())
+  
+
+
+```
+
+Note that the changes are very small, but still noticable for some variables. Regardless, it is good practice to weight our data so that our estimates from the sample more accurately reflect the population. 
+
+# Bayesian Regression
+
+Now that we have a final, weighted model, let's estimate it using `stan_glm()`. Fortunately, the code is the same as last week, but with the same equation as earlier today. That is, there is no difference in entering a regression model with categorical data or weights. Let's try one version with weights and one without, and we'll go with the default priors. 
+
+```{r bayes-mod}
+
+bayes_noweight <- stan_glm(logincome ~ workexp + prestg10 + workhrs + sex + race + partyid + degree,
+                            data = gss,
+                            family = gaussian(link = "identity"),
+                            seed = seed, 
+                            chains = 1,
+                            refresh = 0,
+                            iter = 2000,  
+                            warmup = 1000)
+bayes_weight <- stan_glm(logincome ~ workexp + prestg10 + workhrs + sex + race + partyid + degree,
+                            data = gss, weights = weight,
+                            family = gaussian(link = "identity"),
+                            seed = seed, 
+                            chains = 1,
+                            refresh = 0,
+                            iter = 2000,  
+                            warmup = 1000)
+
+```
+
+
+
+# Model Comparisons 
+
+Ultimately, we can produce a final table that compares our OLS and Bayesian estimates. Notice in the final command that, should you want to print the `modelsummary` table to a word document, you can uncomment that line and it will produce a .docx file for you in your working directory. However, this will then not produce it in your PDF file. 
+
+```{r comp-table}
+
+
+model_list <- list("OLS - Weighted" = ols_final_weight, 
+                   "Bayes - Unweighted" = bayes_noweight, 
+                   "Bayes - Weighted" = bayes_weight)
+
+coef_names <- c("age" = "Age",
+                "workexp" = "Yrs Work Exp",
+                "prestg10" = "Prestige",
+                "sexFemale" = "Female",
+                "raceWhite" = "Race: White",
+                "raceOther" = "Race: Other",
+                "(Intercept)" = "Constant")
+
+bayesrows <- data.frame(
+  
+  c("Bayes R2 (Mean)", 
+    "Bayes R2 (Median)"),
+  
+  c("", ""), # OLS Model Blanks
+  
+  c(mean(bayes_R2(bayes_noweight)),
+    median(bayes_R2(bayes_weight))),
+  
+  c(mean(bayes_R2(bayes_noweight)),
+    median(bayes_R2(bayes_weight)))
+)
+
+
+modelsummary(model_list,
+             coef_map = coef_names,
+             gof_omit = "IC|Log|alg|pss",
+             add_rows = bayesrows,
+             # output = "week5_final_table.docx",
+             title = "Frequentist vs Bayesian Regression Model Output")
+
+
+```
+
+
