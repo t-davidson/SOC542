@@ -310,6 +310,7 @@ $$P(C19|+) = \frac{0.98*0.01}{0.98*0.01 + 0.05*0.99}$$
 - The four cells in the middle of the table represent the *joint probabilities* of two events.
 - The row and column totals represent the *marginal probabilities* of each event.
 - $\theta$ is used to denote the parameters we are estimating.
+
 ```{r}
 data <- tibble(
     "Test result" = c("+", "-", "Marginal C19"),
@@ -325,6 +326,7 @@ kable(data, "latex", escape = FALSE) %>%
 ## COVID-19 tests: Tabular explanation
 - To calculate $P(C19|+)$ we can take the *joint probability* of C19 and a positive test and divide it by the *marginal probability* of a positive test.
 - We can get the relevant values directly from the table: $0.98*0.01 / 0.06$.
+
 ```{r}
 data <- tibble(
     "Test result" = c("+", "-", "Marginal C19"),

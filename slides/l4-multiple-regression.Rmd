@@ -237,21 +237,54 @@ $$\hat{y_i} = \hat{\beta_0} + \hat{\beta_1}x_{1i} + \hat{\beta_2}x_{2i} + ... + 
 - And the residuals are defined as $\hat{u_i} = y_i - \hat{y_i}$ for $i = 1, ..., n$.
 
 # Multiple regression
+## OLS in matrix form
+- We can write the equation for multiple regression more compactly using matrix notation. Here $X$ is an $n$ by $k$ matrix of predictors and $B$ is vector of coefficients with length $k$.
+
+
+$$y = \beta_0 + \beta X + u$$
+
+
+- Ordinary least squares estimates can be computed directly using matrix multiplication, where $X$ is a matrix of predictors and the first column is a vector of 1s and $y$ is the outcome.
+
+$$\hat{\beta} = X^TX^{-1}X^Ty$$
+
+# Multiple regression
+## OLS in matrix form
+```{r, echo=TRUE, mysize=TRUE, size='\\footnotesize'}
+Intercept <- rep(1,N)
+X <- cbind(Intercept,x,z)
+
+Betas <- solve(t(X) %*% X) %*% (t(X)  %*% y)
+print(t(Betas))
+
+m <- lm(y ~ x + x + z)
+print(m$coefficients)
+```
+\tiny `t()` is the transpose operation, `solve()` finds the inverse of a matrix, and `%*%` is the matrix multiplication operator.
+
+# Multiple regression
+## OLS in matrix form
+- This demonstrates how OLS estimates are derived directly from algebraic manipulation of the data.
+- OLS is a special case. Other approaches we will encounter in a few weeks require more complicated *maximum likelihood estimation*.
+- Bayesian regression with uniform priors will converge to the least squares solution, despite a radically different estimation procedure.
+
+# Multiple regression
 ## Model fit and the Standard Error of the Regression
 - The \textbf{Standard Error of the Regression (SER)} is an estimate of the standard deviation of the error term $u_i$. It captures the spread of $y$ around the regression line.
 - For a single regressor,
 
 
-$$SER = \sigma_{\hat{u}} = \frac{1}{n-2}\sum_{i=1}^n\hat{u_i}^2 = \frac{SSR}{n-2}$$
+$$SER = \sqrt{\sigma_{\hat{u}}} = \sqrt{\frac{1}{n-2}\sum_{i=1}^n\hat{u_i}^2} = \sqrt{\frac{SSR}{n-2}}$$
+<!--Check formula, YJ says there should be a square root if its the standard deviation of the error-->
 
-- We subtract 2 because both the slope and the intercept are estimated from the data.
-- In general, a smaller value indicates that the model fits the data better.
+- $n-2$ accounts for degrees of freedom used by slope and intercept.
+- A smaller SER indicates better fit.
 
 # Multiple regression
 ## Model fit and the Standard Error of the Regression
-- If we have multiple predictors we need to include a degrees of freedom adjustment:
+- If we have multiple predictors we need to include an degrees of freedom adjustment $k$, where $k$ is the number of predictors. The $-1$ accounts for the intercept.
 
-$$SER = \sigma_{\hat{u}} = \frac{1}{n-k-1}\sum_{i=1}^n\hat{u_i}^2 = \frac{SSR}{n-k-1}$$
+$$SER = \sqrt{\sigma_{\hat{u}}} = \sqrt{\frac{1}{n-k-1}\sum_{i=1}^n\hat{u_i}^2} = \sqrt{\frac{SSR}{n-k-1}}$$
 
 - The adjustment has a small effect when $n$ is large.
 
@@ -483,35 +516,10 @@ data2 %>%
 
 # Multiple regression
 ## Colliders
-- A more complicate issue occurs when $z$ is a common cause of $y$ and $x$.
-- In this case, controlling for $z$ can introduce bias.
-- Collider bias is rarely considered in sociological research but has recently been receiving more attention from methodologists \footnote{\tiny See McElreath Chapter 6; Cunningham Chapter 3; Morgan, Stephen L., and Christopher Winship. 2014. \textit{Counterfactuals and Causal Inference}. 2nd ed. Cambridge University Press.}.
+- A more complicate issue occurs when $z$ is *caused by* $y$ *and* $x$.
+- In this case, $z$ is considered a \textbf{collider} and controlling for $z$ can introduce bias.
+- Collider bias is rarely considered in sociological research but has recently been receiving more attention from methodologists. \footnote{\tiny See McElreath Chapter 6; Cunningham Chapter 3; Morgan, Stephen L., and Christopher Winship. 2014. \textit{Counterfactuals and Causal Inference}. 2nd ed. Cambridge University Press.}.
 
-# Multiple regression
-## OLS in matrix form
-- Ordinary least squares estimates can be computed directly using matrix multiplication, where $X$ is a matrix of predictors and the first column is a vector of 1s and $y$ is the outcome.
-
-$$\hat{\beta} = X^TX^{-1}X^Ty$$
-
-# Multiple regression
-## OLS in matrix form
-```{r, echo=TRUE, mysize=TRUE, size='\\footnotesize'}
-Intercept <- rep(1,N)
-X <- cbind(Intercept,x,x2,z)
-
-Betas <- solve(t(X) %*% X) %*% (t(X)  %*% y)
-print(t(Betas))
-
-m <- lm(y ~ x + x2 + z)
-print(m$coefficients)
-```
-\tiny `t()` is the transpose operation, `solve()` finds the inverse of a matrix, and `%*%` is the matrix multiplication operator.
-
-# Multiple regression
-## OLS in matrix form
-- This demonstrates how OLS estimates are derived directly from algebraic manipulation of the data.
-- OLS is a special case. Other approaches we will encounter in a few weeks require more complicated *maximum likelihood estimation*.
-- Bayesian regression with uniform priors will converge to the least squares solution, despite a radically different estimation procedure.
 
 # Next week
 ## Non-linear predictors
