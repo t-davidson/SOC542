@@ -153,16 +153,15 @@ summary(ols1)
 
 When interpreting, we can plug in the effects, just like from our models last week.
 
-Note, however, that each female, white, and black have their own coefficients. Instead of having a $\hat{\beta}$ for the categories of race or sex, we create a new one for each dummy: $$\hat{income} = \alpha + \hat{\beta_{Age}} + \hat{\beta_{Work Hours}} + \hat{\beta_{Prestige}} + \hat{\beta_{Female}} + \hat{\beta_{White}} + \hat{\beta_{Other}} + \upsilon$$
-
 For example, let's estimate a person's income, knowing that they were a 57 year-old white female with an occupational prestige of 70 and who worked 40 hours last week. We can simply input that information into the equation.
 
-So instead of multiplying `r ols1[["coefficients"]][["sexFemale"]]` by some abstract value of `sex`, we multiply it times 1 if the person is female, and by 0 if they are male. Essentially, we're adjusting the intercept term, not the slope. 
+Note, however, that each female, white, and black have their own coefficients. Instead of having a $\hat{\beta}$ for the categories of race or sex, we create a new one for each dummy: $$\hat{income} = \alpha + \hat{\beta_{Age}} + \hat{\beta_{Work Hours}} + \hat{\beta_{Prestige}} + \hat{\beta_{Female}} + \hat{\beta_{White}} + \hat{\beta_{Other}} + \upsilon$$
 
-And the same goes for race: We multiply `r ols1[["coefficients"]][["raceWhite"]]` times 1 if they are white, or by 0 if they are anything else, then  multiply` r ols1[["coefficients"]][["raceOther"]]` times 1 if they are "other", or by 0 if they are white or Black. 
+So instead of multiplying `r round(ols1[["coefficients"]][["sexFemale"]],2)` by some abstract value of `sex`, we multiply it times 1 if the person is female, and by 0 if they are male. Essentially, we're adjusting the intercept term, not the slope. 
 
-Or, even easier, we can input a dataframe with these variables and `predict()` the value using R. 
+And the same goes for race: We multiply `r round(ols1[["coefficients"]][["raceWhite"]],2)` times 1 if they are white, or by 0 if they are Black or another race, then  multiply `r round(ols1[["coefficients"]][["raceOther"]],2)` times 1 if they are "other", or by 0 if they are white or Black. 
 
+And, while possible to do by hand, it's even easier to input the new person's information into a dataframe with these variables and `predict()` the value using R. 
 
 ```{r estim-byhand}
 
@@ -185,7 +184,7 @@ Another way to think about the above interpretation is by creating a series of "
 Let's try this now, turning the variables `sex`, `race`, `partyid`, and `degree` into a series of dummies.
 
 
-```{r}
+```{r dummy-create}
 
 gss <- gss %>% 
   fastDummies::dummy_cols(select_columns = c("sex", "race", "partyid", "degree"))
@@ -230,49 +229,63 @@ modelsummary(list("No Dummies" = ols_nodummy,
              )
 
 ```
-As we can see from these results, there is no difference in whether you use your own dummies or use the defaults. Just note, however, that R will drop whatever the first category is. In the case of `sex`, the first one was `male`, since I coded it as a factor. In the case of `race`, however, it was simply a `character`-type variable, so the first category, and the one that was dropped, was `black`. Creating and using your own dummies gives you more control over this, but isn't necessary. 
+As we can see from these results, there is no difference in whether you use your own dummies or use the defaults. Just note, however, that R will drop whatever the first category is. In the case of `sex`, the first one was `male`, since I coded it as a `factor`. In the case of `race`, however, it was simply a `character`-type variable, so the first category, and the one that was dropped, was `black`. Creating and using your own dummies gives you more control over this, but isn't necessary. 
 
 
 ### Scaling and Non-Linearization 
 
-If we look at our income variable, our value is very skewed. Let's take the natural log of our variable so we arrive at something more normally distributed. 
+#### Income 
+If we look at our income variable, our value is very skewed. It's also in large dollar amounts that aren't easy to manage. Let's see what happens if we made two transformations. First, let's think of income in thousands of dollars instead of in total dollar amounts. Then, let's also take the natural log of our variable so we arrive at something more normally distributed. Finally, let's see what happens if we do both. 
+Taking the log of a term does two things. 
+
+1. Methodologically, it gives us a distribution that is more normally distributed, improving the overall fit.
+2. Theoretically, we use it when we think the effect is increasing at a decreasing rate OR decreasing at a decreasing rate. 
+
+(A true salsa dance of theory and methods! Hana/Norah/Luker would be proud.)
 
 ```{r plot-log}
 origincplot <- ggplot(gss) + geom_density(aes(conrinc))
+thouincplot <- ggplot(gss) + geom_density(aes(conrinc/1000))
 logincplot <- ggplot(gss) + geom_density(aes(log(conrinc)))
-cowplot::plot_grid(origincplot, logincplot)
+logthouincplot <- ggplot(gss) + geom_density(aes(log(conrinc/1000)))
+
+cowplot::plot_grid(origincplot, thouincplot, logincplot, logthouincplot)
 ```
 
-We can also think of income in thousands of dollars instead of in total dollar amounts. Let's also estimate the number of year's a person has been working by subtracting 18 years from their age. 
+Now, let's try a series of regressions to see what differences, if any, exist when we make these changes. 
 
-```{r data-man-trans}
+
+```{r ols-transform-inc}
 gss <- gss %>% 
   mutate(logincome = log(conrinc),
          thouinc = conrinc/1000,
-         workexp = age - 18)
+         logthouinc = log(conrinc/1000)
+         )
+
+gss %>% 
+  select(conrinc, logincome, thouinc, logthouinc) %>%
+  datasummary_skim(title = "Summary Statistics of Transformed Income Variables")
 
 ```
 
-Let's now test out whether these two data transformations affect our models. Below, I have a test for original vs divided vs logged income and also for age vs work experience. 
 
-```{r ols-transform-test}
+```{r ols-transform-inc-test}
 
-ols_inc_age <- lm(conrinc ~ age + prestg10 + workhrs + race + sex,
+ols_inc <- lm(conrinc ~ age + prestg10 + workhrs + race + sex,
                    data = gss)
-ols_thou_age <- lm(thouinc ~ age + prestg10 + workhrs + race + sex,
+ols_thou <- lm(thouinc ~ age + prestg10 + workhrs + race + sex,
                    data = gss)
-ols_log_age <- lm(logincome ~ age + prestg10 + workhrs + race + sex,
+ols_log <- lm(logincome ~ age + prestg10 + workhrs + race + sex,
                    data = gss)
-ols_log_exp <- lm(logincome ~ workexp + prestg10 + workhrs + race + sex,
+ols_log_thou <- lm(logthouinc ~ age + prestg10 + workhrs + race + sex,
                    data = gss)
 
-ols_transform_mods <- list("Income ~ Age" = ols_inc_age,
-                           "Inc/1000 ~ Age" = ols_thou_age,
-                           "Log Inc ~ Age" = ols_log_age,
-                           "Log Inc ~ Experience" = ols_log_exp)
+ols_transform_mods <- list("Income" = ols_inc,
+                           "Inc/1000" = ols_thou,
+                           "Log (Inc)" = ols_log_thou,
+                           "Log (Inc/1000)" = ols_log_thou)
 
 ols_transform_coefs <- c("age" = "Age",
-                         "workexp" = "Yrs Work Exp",
                          "prestg10" = "Prestige",
                          "sexFemale" = "Female",
                          "raceWhite" = "Race: White",
@@ -283,27 +296,96 @@ modelsummary(ols_transform_mods,
              statistic = c("s.e. = {std.error}", "t = {statistic}"),
              coef_map = ols_transform_coefs,
              gof_omit = "IC|Log|alg|pss",
-             title = "Frequentist Regression Output: Effect of Data Transformations",
+             title = "Effect of Data Transformations: Logarithmic Terms",
              notes = "Data: 2018 General Social Survey")
 
 ```
 
-Looking at our table, we can see that transforming our income variable to a natural log increased our model's prediction power (via the $R^2$). Transforming it into thousands of dollars had no such effect.
+We can see here that scaling only shifts the direction of variables, but has no effect on the final model statistics. Overall, the model with the logged term (`logincome`) worked best and is the most interpretable. (Remember, an increase in the natural-logged amount equates to a 1% increase in the raw amount. Scaling the logged amount doesn't have any effect since the increase in percent is stable across the board.) 
 
-Meanwhile, the simple shift of $work experience = age - 18$ also had no real effect, so we can pick whichever we'd like. 
+#### Work Experience 
+
+Now, let's try another transformation. This time, let's estimate the number of year's a person has been working by subtracting 18 years from their age. While we're here, let's also see what happens if we square the term. 
+
+We use a square term when we hypothesize a U-shape to the effect. That is, when we suspect the effect will increase at an increasing rate OR decrease at an increasing rate. 
+
+```{r data-man-trans}
+gss <- gss %>% 
+  mutate(workexp = age - 18,
+         worksq = workexp^2)
+gss %>% 
+  select(age, workexp, worksq) %>%
+  datasummary_skim(title = "Summary Statistics of Transformed Work Experience Variables")
+
+```
+
+Let's now test out whether these two data transformations affect our models. Below I've modeled whether age, work experience (equal to $age - 18$), work experience squared are better fits in the model. Lastly, I include a model with both work experience and work experience squared. 
+
+```{r ols-transform-age}
+
+ols_age <- lm(logincome ~ age + prestg10 + workhrs + race + sex,
+                   data = gss)
+ols_work <- lm(logincome ~ workexp + prestg10 + workhrs + race + sex,
+                   data = gss)
+ols_worksq <- lm(logincome ~ worksq + prestg10 + workhrs + race + sex,
+                   data = gss)
+ols_work_worksq <- lm(logincome ~ workexp + worksq + prestg10 + workhrs + race + sex,
+                   data = gss)
+
+ols_transform_mods <- list("Age" = ols_age,
+                           "Work Exp" = ols_work,
+                           "Square Term" = ols_worksq,
+                           "Both Terms" = ols_work_worksq)
+
+ols_transform_coefs <- c("age" = "Age",
+                         "workexp" = "Yrs Work Exp",
+                         "worksq" = "Yrs Work Exp ^2",
+                         "prestg10" = "Prestige",
+                         "sexFemale" = "Female",
+                         "raceWhite" = "Race: White",
+                         "raceOther" = "Race: Other",
+                         "(Intercept)" = "Constant")
+
+modelsummary(ols_transform_mods,
+             statistic = c("s.e. = {std.error}", "t = {statistic}"),
+             coef_map = ols_transform_coefs,
+             gof_omit = "IC|Log|alg|pss",
+             title = "Effect of Data Transformations: Square Terms",
+             notes = "Data: 2018 General Social Survey")
+
+```
+
+Looking at our table, we can see that the simple shift of $work experience = age - 18$ also had no real effect.
+
+Meanwhile, adding the square term increased our model's prediction power (via the $R^2$).
 
 With these in mind, we can tell that shifting or dividing a variable doesn't change the relationship; it only changes the amount. But changing the shape of the line (via taking the log) does change the relationship and therefore the income. 
 
-Let's go with `workexp` just for fun. 
+
+Okay, so what does this mean for prediction?
+
+Our equation now is $$\hat{log_e(income)} = \alpha + \hat{\beta_{Work Experience}} + \hat{\beta_{(Work Experience)^2}} + \hat{\beta_{Work Hours}} + \hat{\beta_{Prestige}} + \hat{\beta_{Female}} + \hat{\beta_{White}} + \hat{\beta_{Other}} + \upsilon$$
+
+Ignoring the rest of the terms, we can interpret the square term as $$\hat{log_e(income)} = \alpha + \hat{\beta_{Work Experience}} + \hat{\beta_{(Work Experience)^2}} + ... + \upsilon $$ 
+
+For a person with 12 years work experience, we can then plug it in as: $$\hat{log_e(income)} = `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)` + `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)`*12 + `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)`*(12^2) + ... + \upsilon $$ 
+
+And simplify it down to: 
+$$\hat{log_e(income)} = `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)` + `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)*12` + `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)*(12^2)` + ... + \upsilon $$ 
+$$\hat{log_e(income)} = `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2) +  round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)*12 + round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)*(12^2)` + ... + \upsilon $$ 
+
+(Knit this document so see the math worked out. Leaving it like this makes it easy for me if I change something.)
 
 ## Data Weights 
 
 Lastly, let's compare our models with and without weights on our data. Weighting the data assigns importance in the regression to different observations/individuals/respondents based on their probability of being selected in our sample. Rarely are there large effects, but you may be surprised. (Smaller effects point to better sampling of the population, while larger effects point to worse performance of the sampling procedure.)
 
 ```{r weight-test}
-ols_final_noweight <- lm(logincome ~ workexp + prestg10 + workhrs + sex + race + partyid + partyid + degree,
+ols_final_noweight <- lm(logincome ~ workexp + worksq + prestg10 + workhrs + 
+                           sex + race + partyid + degree,
                    data = gss)
-ols_final_weight <- lm(logincome ~ workexp + prestg10 + workhrs + sex + race + partyid + partyid + degree,
+ols_final_weight <- lm(logincome ~ workexp + worksq + prestg10 + workhrs + 
+                         sex + race + partyid + degree,
                    data = gss, weights = weight)
 
 ols_weight_mods <- list(ols_final_noweight, ols_final_weight)
@@ -334,22 +416,23 @@ ggplot() +
       xmax = conf.high,
       color = Model)
     ) +
-  facet_grid(term~., switch = "y") +
+  # geom_vline(aes(xintercept = 0),
+  #            linetype = "dotted", size = .5) +
+  facet_grid(term ~ ., switch = "y") +
   labs(x = "Coefficient",
        title = "OLS Regression Predicting Income (Logged)",
        subtitle = "Comparison of Weighted vs Unweighted Data") + 
   theme_minimal() + 
   theme(legend.position = "bottom",
+        plot.title = element_text(hjust = .5),
         strip.text.y.left = element_text(angle = 0),
         axis.title.y = element_blank(),
         axis.text.y = element_blank(),
         axis.ticks.y = element_blank())
   
-
-
 ```
 
-Note that the changes are very small, but still noticable for some variables. Regardless, it is good practice to weight our data so that our estimates from the sample more accurately reflect the population. 
+Note that the changes are very small, but still noticeable for some variables. Regardless, it is good practice to weight our data so that our estimates from the sample more accurately reflect the population. 
 
 # Bayesian Regression
 
@@ -357,7 +440,8 @@ Now that we have a final, weighted model, let's estimate it using `stan_glm()`. 
 
 ```{r bayes-mod}
 
-bayes_noweight <- stan_glm(logincome ~ workexp + prestg10 + workhrs + sex + race + partyid + degree,
+bayes_noweight <- stan_glm(logincome ~ workexp + worksq + prestg10 + 
+                             workhrs + sex + race + partyid + degree,
                             data = gss,
                             family = gaussian(link = "identity"),
                             seed = seed, 
@@ -365,14 +449,16 @@ bayes_noweight <- stan_glm(logincome ~ workexp + prestg10 + workhrs + sex + race
                             refresh = 0,
                             iter = 2000,  
                             warmup = 1000)
-bayes_weight <- stan_glm(logincome ~ workexp + prestg10 + workhrs + sex + race + partyid + degree,
-                            data = gss, weights = weight,
-                            family = gaussian(link = "identity"),
-                            seed = seed, 
-                            chains = 1,
-                            refresh = 0,
-                            iter = 2000,  
-                            warmup = 1000)
+bayes_weight <- stan_glm(logincome ~ workexp + worksq + prestg10 + 
+                           workhrs + sex + race + partyid + degree,
+                         data = gss, 
+                         weights = weight, ### WEIGHTS USE THIS ARGUMENT 
+                         family = gaussian(link = "identity"),
+                         seed = seed, 
+                         chains = 1,
+                         refresh = 0,
+                         iter = 2000,  
+                         warmup = 1000)
 
 ```
 
@@ -391,6 +477,7 @@ model_list <- list("OLS - Weighted" = ols_final_weight,
 
 coef_names <- c("age" = "Age",
                 "workexp" = "Yrs Work Exp",
+                "worksq" = "Yrs Work Exp ^2",
                 "prestg10" = "Prestige",
                 "sexFemale" = "Female",
                 "raceWhite" = "Race: White",
@@ -400,15 +487,18 @@ coef_names <- c("age" = "Age",
 bayesrows <- data.frame(
   
   c("Bayes R2 (Mean)", 
-    "Bayes R2 (Median)"),
+    "Bayes R2 (Median)",
+    "Bayes R2 (SD)"),
   
-  c("", ""), # OLS Model Blanks
-  
-  c(mean(bayes_R2(bayes_noweight)),
-    median(bayes_R2(bayes_weight))),
+  c("", "", ""), # OLS Model Blanks
   
   c(mean(bayes_R2(bayes_noweight)),
-    median(bayes_R2(bayes_weight)))
+    median(bayes_R2(bayes_noweight)),
+    sd(bayes_R2(bayes_noweight))),
+  
+  c(mean(bayes_R2(bayes_weight)),
+    median(bayes_R2(bayes_weight)),
+    sd(bayes_R2(bayes_weight)))
 )
 
 
