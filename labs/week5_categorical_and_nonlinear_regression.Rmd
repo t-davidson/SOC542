@@ -25,10 +25,10 @@ library(broom.mixed)
 options(modelsummary_get = "broom") 
 
 
-seed <- 12345
+seed <- 0890110980
 ```
 
-
+TODO: I had to install a lot of new packages to get this running and had to follow a couple of prompts in the Console as they installed. I also found that the chunk `data-sum-table` threw an error until I restarted R. It would be worth asking students to restart after installation.
 
 # Return of the GSS
 
@@ -39,37 +39,36 @@ Let's bring back our old friend, the General Social Survey!
 
 You may be wondering why we waited so long to get to it this semester. The reason is because it doesn't have as many continuous variables as we would've liked, making it hard to illustrate concepts in linear regression. But, now that we know how to incorporate dummy, indicator, and non-linear variables, it can take its rightful place as the peak in our course data-verse. 
 
-We're going to work with the newest iteration of the dataset, the 2021 version. It's currently saved in the profile folder, under "lab-data." With R projects, we can save data in a folder and load it each time with only the reference to it's location within the folder. In other words, the code below will work for everyone, and you won't have to find your working directory and alter it. (A plus for reproducability!)
-
-```{r gss-load}
-gss2018 <- haven::read_dta("lab-data/GSS2018.dta")
-```
-
-## Data Management 
-
-Now, let's do some data management. 
+We're going to work with the 2018 data. The file is currently saved in the profile folder, under "lab-data." With R projects, we can save data in a folder and load it each time with only the reference to it's location within the folder relative to the RMarkdown document. In other words, the code below will work for everyone, and you won't have to find your working directory and alter it (A+ for reproducability!).
 
 Today, we're going to investigate the effects that hours of work, occupational prestige, educational degree, sex, race, age,  and political party have on a person's earned income. 
-
-```{r data-manage}
+```{r gss-load-select}
+gss2018 <- haven::read_dta("lab-data/GSS2018.dta")
 
 gss <- gss2018 %>% 
   select(conrinc,                 # Target: Income  
          hrs1, prestg10, degree,  # Career Prep
          sex, race, age, partyid, # Other Demos
          wtss                     # Weight
-  ) %>% 
-  haven::zap_labels() %>% 
-  mutate(
+  ) %>% haven::zap_labels() # TODO: Explain what this does
+```
+
+## Data Management 
+
+Now, let's do some data management. We're going to recode some of the values in the data.
+TODO: please add a couple of short comments explaining the logic of the first three steps. I think the remainder will be obvious. This will help if students need to go back over it.
+```{r data-manage}
+gss <- gss %>% 
+  mutate( # TODO: Add short comment explaining
     workhrs = case_when(
       hrs1 == 89 ~ NaN,
       TRUE ~ hrs1
       ),
-    age = case_when(
+    age = case_when( # TODO: Add short comment explaining logic
       age > 88 ~ NaN,
       TRUE ~ age
     ),
-    degree = factor(degree,
+    degree = factor(degree, # TODO: explain
                     levels = c(0,1,2,3,4),
                     labels = c("Less_HS", "HS", "Assoc", "Bach", "Grad")
                     ),
@@ -90,32 +89,31 @@ gss <- gss2018 %>%
     weight = wtss
     ) %>% 
   select(-hrs1, -wtss) %>% 
-  drop_na()
-
-
-
+  drop_na() # Dropping rows missing on any variable
 ```
 
 
 
 ## Data Summary
-
 Last week, we used the function `datasummary_skim()` to give us a descriptive statistics table for our continuous data. The same function does not work well with categorical variables. After all, how can you create a mean or a histogram for discrete data?
 
 This week, we're going to use a sibling function, `datasummary_balance()`. This function will give us the mean and standard deviation for our continuous data, and below it, give us the counts and percentages for our categorical data. The ability to include both was only added a few weeks ago, so we need to ensure we're running the most recent version of the `modelsummary` package (hence the installation on lines 20 and 21). 
 
 The formula is `datasummary_balance( ~ 1, ...)`. The "`~ 1`" tells it to create this double-table for all variables in the data. 
 
-```{r data-sum-table}
+TODO: This function is neat but I'm a little worried that this kind of thing will serve as a crutch, preventing students from understanding how to do this kind of thing themselves using R. Could you add a couple of examples above showing how one can directly summarize using tidyverse. For example, `summarize_all` could be combined with some filtering to easily get means for any numeric variables. It should also be straightforward to do some counts and percent summaries for non-numeric variables. The other issue I have with these functions is that, while they create some nice summaries for exploratory work, they are not really publication quality. This would be worth mentioning.
 
-datasummary_balance( ~ 1,
+TODO: Finally, I have put `data.frame` as the output as I think it is preferable here. I want to encourage the students to work with tabular data and to consider the summaries as tables (that we can then render into nicer outputs for published documents). If knitting, latex is probably the preferable output type. I guess the example afterwards shows how we need a different output type if we want to show histograms within the table.
+
+
+```{r data-sum-table}
+s <- datasummary_balance( ~ 1,
                     title = "Sample Descriptive Statistics",
                     notes = "Data: 2018 General Social Survey",
-                    data = gss)
-
-
+                    data = gss,
+                    output = "data.frame")
+s
 ```
-
 
 If you'd like to reproduce the tables from last week and create a new table for categorical data, you can run the same code, including an argument specifying that the variables you want summarized are `type = "categorical"`. The default option is `type = numeric`, so you don't have to specify it if you don't want to, but it can be nice to include. 
 
@@ -124,38 +122,43 @@ If you'd like to reproduce the tables from last week and create a new table for 
 datasummary_skim(gss,
                  # type = "numeric", 
                  title = "Sample Descriptive Statistics: Continuous Variables",
-                 notes = "Data: 2018 General Social Survey")
+                 notes = "Data: 2018 General Social Survey",
+                 output = "kableExtra")
 
 datasummary_skim(gss, 
                  type = "categorical",
                  title = "Sample Descriptive Statistics: Categorical Variables",
-                 notes = "Data: 2018 General Social Survey")
+                 notes = "Data: 2018 General Social Survey",
+                 output = "data.frame")
 
 ```
 
 
 
-# Frequentist Regression
+# Multiple Regression
+TODO: Note that I removed the word frequentist. I think its fair to assume this is the default and that we will only use the term when we are comparing with Bayesian approaches. 
 
-## Model Creation
-Let's start with a simple model that only include three continuous variables and two categorical ones. Our model takes the form: $$\hat{income} = \alpha + \hat{\beta_{Age}} + \hat{\beta_{Work Hours}} + \hat{\beta_{Prestige}} + \hat{\beta_{Sex}} + \hat{\beta_{Race}} + \hat{\beta_{Party}} + \hat{\beta_{Degree}} + \upsilon$$
+## Model Specification
+TODO: Provide a little motivation and theory here before starting. What is the outcome? Why might we expect the predictors to be related?
+Let's start with a simple model that only include three continuous variables and two categorical ones. Our model takes the form: $$\hat{income} = \beta_0 + \hat{\beta_{Age}} + \hat{\beta_{Work Hours}} + \hat{\beta_{Prestige}} + \hat{\beta_{Sex}} + \hat{\beta_{Race}} + \hat{\beta_{Party}} + \hat{\beta_{Degree}} + u$$
 
 
 ```{r ols-base-model}
 ols1 <- lm(conrinc ~ age + prestg10 + workhrs + sex + race,
                    data = gss)
 summary(ols1)
-
 ```
 
+TODO: It isn't clear from the text whether you do this, but I'd like you to walk through the interpretation of the coefficients in the model before moving to the section below, which is more about prediction (hence the title change).
 
-## Model Interpretation
+## Prediction
 
 When interpreting, we can plug in the effects, just like from our models last week.
 
+
 For example, let's estimate a person's income, knowing that they were a 57 year-old white female with an occupational prestige of 70 and who worked 40 hours last week. We can simply input that information into the equation.
 
-Note, however, that each female, white, and black have their own coefficients. Instead of having a $\hat{\beta}$ for the categories of race or sex, we create a new one for each dummy: $$\hat{income} = \alpha + \hat{\beta_{Age}} + \hat{\beta_{Work Hours}} + \hat{\beta_{Prestige}} + \hat{\beta_{Female}} + \hat{\beta_{White}} + \hat{\beta_{Other}} + \upsilon$$
+Note, however, that each female, white, and black have their own coefficients. Instead of having a $\hat{\beta}$ for the categories of race or sex, we create a new one for each dummy: $$\hat{income} = \beta_0 + \hat{\beta_{Age}} + \hat{\beta_{Work Hours}} + \hat{\beta_{Prestige}} + \hat{\beta_{Female}} + \hat{\beta_{White}} + \hat{\beta_{Other}} + u$$
 
 So instead of multiplying `r round(ols1[["coefficients"]][["sexFemale"]],2)` by some abstract value of `sex`, we multiply it times 1 if the person is female, and by 0 if they are male. Essentially, we're adjusting the intercept term, not the slope. 
 
@@ -164,14 +167,12 @@ And the same goes for race: We multiply `r round(ols1[["coefficients"]][["raceWh
 And, while possible to do by hand, it's even easier to input the new person's information into a dataframe with these variables and `predict()` the value using R. 
 
 ```{r estim-byhand}
-
 newperson <- data.frame(age = 57,
                         prestg10 = 70,
                         workhrs = 40,
                         sex = "Female",
                         race = "White")
 predict(ols1, newperson)
-
 ```
 
 
@@ -182,7 +183,6 @@ predict(ols1, newperson)
 Another way to think about the above interpretation is by creating a series of "dummy variables." These operate where each variable is split into a series of zero-one variables. For example, our variable `sex` has two levels, "male" and "female." Turning it into a dummy would then create a new variable `male` where males have the coding `1` and females have the coding `0`. The `fastdummies` package has a function `dummy_cols()` that makes this easy.
 
 Let's try this now, turning the variables `sex`, `race`, `partyid`, and `degree` into a series of dummies.
-
 
 ```{r dummy-create}
 
@@ -227,21 +227,24 @@ modelsummary(list("No Dummies" = ols_nodummy,
              gof_omit = "IC|Log|alg|pss",
              title = "Frequentist Regression Output: Effect of Dummy Variable Choice"
              )
-
 ```
+TODO: Is there a way to present this more like a standard table, perhaps by using stargazer or by modifying the output. I actually find this quite hard to read within the Markdown document (although it does look good in the Knitted file). I think you can also drop the t-statistics and just show standard errors in parentheses (t can easily be derived from coefficient and SE if necessary). The formatting on Table 8 is much nicer so you could format this and other tables in the same way. If possible, please also use stars to indicate statistical significance for frequentist models.
+
 As we can see from these results, there is no difference in whether you use your own dummies or use the defaults. Just note, however, that R will drop whatever the first category is. In the case of `sex`, the first one was `male`, since I coded it as a `factor`. In the case of `race`, however, it was simply a `character`-type variable, so the first category, and the one that was dropped, was `black`. Creating and using your own dummies gives you more control over this, but isn't necessary. 
 
+TODO: Mention how we can reorder factors if we want to change the reference category.
 
-### Scaling and Non-Linearization 
 
-#### Income 
+## Scaling and Non-Linearization 
+
+### Income 
 If we look at our income variable, our value is very skewed. It's also in large dollar amounts that aren't easy to manage. Let's see what happens if we made two transformations. First, let's think of income in thousands of dollars instead of in total dollar amounts. Then, let's also take the natural log of our variable so we arrive at something more normally distributed. Finally, let's see what happens if we do both. 
 Taking the log of a term does two things. 
 
 1. Methodologically, it gives us a distribution that is more normally distributed, improving the overall fit.
 2. Theoretically, we use it when we think the effect is increasing at a decreasing rate OR decreasing at a decreasing rate. 
 
-(A true salsa dance of theory and methods! Hana/Norah/Luker would be proud.)
+TODO: You can say this but its a little too corny for my taste to leave in the slides :)
 
 ```{r plot-log}
 origincplot <- ggplot(gss) + geom_density(aes(conrinc))
@@ -253,7 +256,6 @@ cowplot::plot_grid(origincplot, thouincplot, logincplot, logthouincplot)
 ```
 
 Now, let's try a series of regressions to see what differences, if any, exist when we make these changes. 
-
 
 ```{r ols-transform-inc}
 gss <- gss %>% 
@@ -268,9 +270,7 @@ gss %>%
 
 ```
 
-
 ```{r ols-transform-inc-test}
-
 ols_inc <- lm(conrinc ~ age + prestg10 + workhrs + race + sex,
                    data = gss)
 ols_thou <- lm(thouinc ~ age + prestg10 + workhrs + race + sex,
@@ -300,6 +300,7 @@ modelsummary(ols_transform_mods,
              notes = "Data: 2018 General Social Survey")
 
 ```
+TODO: Same here, can you format using a more legible approach.
 
 We can see here that scaling only shifts the direction of variables, but has no effect on the final model statistics. Overall, the model with the logged term (`logincome`) worked best and is the most interpretable. (Remember, an increase in the natural-logged amount equates to a 1% increase in the raw amount. Scaling the logged amount doesn't have any effect since the increase in percent is stable across the board.) 
 
@@ -316,7 +317,6 @@ gss <- gss %>%
 gss %>% 
   select(age, workexp, worksq) %>%
   datasummary_skim(title = "Summary Statistics of Transformed Work Experience Variables")
-
 ```
 
 Let's now test out whether these two data transformations affect our models. Below I've modeled whether age, work experience (equal to $age - 18$), work experience squared are better fits in the model. Lastly, I include a model with both work experience and work experience squared. 
@@ -352,10 +352,9 @@ modelsummary(ols_transform_mods,
              gof_omit = "IC|Log|alg|pss",
              title = "Effect of Data Transformations: Square Terms",
              notes = "Data: 2018 General Social Survey")
-
 ```
-
-Looking at our table, we can see that the simple shift of $work experience = age - 18$ also had no real effect.
+TODO: Note that Latex does not respect spacing between words. You can add some spacing characters like `\:` if desired. But maybe the Latex is overkill for this example.
+Looking at our table, we can see that the simple shift of $work\:experience = age - 18$ also had no real effect.
 
 Meanwhile, adding the square term increased our model's prediction power (via the $R^2$).
 
@@ -364,15 +363,19 @@ With these in mind, we can tell that shifting or dividing a variable doesn't cha
 
 Okay, so what does this mean for prediction?
 
-Our equation now is $$\hat{log_e(income)} = \alpha + \hat{\beta_{Work Experience}} + \hat{\beta_{(Work Experience)^2}} + \hat{\beta_{Work Hours}} + \hat{\beta_{Prestige}} + \hat{\beta_{Female}} + \hat{\beta_{White}} + \hat{\beta_{Other}} + \upsilon$$
+TODO: Minor quibble, but the hats should only be over the betas, not the whole expression. i.e. $\hat{\beta}_{Prestige}$. Not a big deal so I'm not too bothered if you fix it, but worth knowing for next time.
 
-Ignoring the rest of the terms, we can interpret the square term as $$\hat{log_e(income)} = \alpha + \hat{\beta_{Work Experience}} + \hat{\beta_{(Work Experience)^2}} + ... + \upsilon $$ 
+Our equation now is $$\hat{log_e(income)} = \beta_0 + \hat{\beta_{Work Experience}} + \hat{\beta_{(Work Experience)^2}} + \hat{\beta_{Work Hours}} + \hat{\beta_{Prestige}} + \hat{\beta_{Female}} + \hat{\beta_{White}} + \hat{\beta_{Other}} + u$$
 
-For a person with 12 years work experience, we can then plug it in as: $$\hat{log_e(income)} = `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)` + `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)`*12 + `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)`*(12^2) + ... + \upsilon $$ 
+Ignoring the rest of the terms, we can interpret the square term as $$\hat{log_e(income)} = \beta_0 + \hat{\beta_{Work Experience}} + \hat{\beta_{(Work Experience)^2}} + ... + u $$ 
+
+TODO: In general I would avoid mixing Latex and R commands like below. I think it will be too confusing.In general, I use latex to show notation but not code. I would also recommend avoiding putting long fragments of code outside of the chunk as it is very difficult to read until the document is Knitted (and I presume students will be looking at this in RStudio for the most part). That said, I do think this is a neat example for the printed document so I would keep it for now.
+
+For a person with 12 years work experience, we can then plug it in as: $$\hat{log_e(income)} = `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)` + `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)`*12 + `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)`*(12^2) + ... + u $$ 
 
 And simplify it down to: 
-$$\hat{log_e(income)} = `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)` + `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)*12` + `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)*(12^2)` + ... + \upsilon $$ 
-$$\hat{log_e(income)} = `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2) +  round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)*12 + round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)*(12^2)` + ... + \upsilon $$ 
+$$\hat{log_e(income)} = `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)` + `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)*12` + `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)*(12^2)` + ... + u $$ 
+$$\hat{log_e(income)} = `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2) +  round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)*12 + round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)*(12^2)` + ... + u $$ 
 
 (Knit this document so see the math worked out. Leaving it like this makes it easy for me if I change something.)
 
@@ -396,11 +399,11 @@ modelsummary(ols_weight_mods,
              gof_omit = "IC|Log|alg|pss",
              title = "Frequentist Regression Output: Effect of Data Weights")
 ```
+TODO: Same here. Convert to stargazer.
 
 We can also visualize these changes like before.
 
 ``` {r weight-test-viz}
-
 ols_weight_ints <- broom::tidy(ols_final_weight, conf.int = T) %>% mutate(Model = "Weighted")
 ols_noweight_ints <- broom::tidy(ols_final_noweight, conf.int = T) %>% mutate(Model = "No Weights")
 ols_sum_ints <- bind_rows(ols_weight_ints, ols_noweight_ints) %>% 
@@ -432,7 +435,7 @@ ggplot() +
   
 ```
 
-Note that the changes are very small, but still noticeable for some variables. Regardless, it is good practice to weight our data so that our estimates from the sample more accurately reflect the population. 
+Note that the changes are very small, but still noticeable for some variables. Regardless, when using surveys we should use any provided weights so that our estimates from the sample more accurately reflect the population. 
 
 # Bayesian Regression
 
@@ -469,8 +472,6 @@ bayes_weight <- stan_glm(logincome ~ workexp + worksq + prestg10 +
 Ultimately, we can produce a final table that compares our OLS and Bayesian estimates. Notice in the final command that, should you want to print the `modelsummary` table to a word document, you can uncomment that line and it will produce a .docx file for you in your working directory. However, this will then not produce it in your PDF file. 
 
 ```{r comp-table}
-
-
 model_list <- list("OLS - Weighted" = ols_final_weight, 
                    "Bayes - Unweighted" = bayes_noweight, 
                    "Bayes - Weighted" = bayes_weight)
@@ -508,8 +509,8 @@ modelsummary(model_list,
              add_rows = bayesrows,
              # output = "week5_final_table.docx",
              title = "Frequentist vs Bayesian Regression Model Output")
-
-
 ```
+TODO: Same formatting for this table.
 
+In general, I would prefer them to be able to produce tables that render nicely in the Knitted output (e.g. render in Latex or Kable) rather than tables they can open in Word, although I do think this is worth doing.
 
