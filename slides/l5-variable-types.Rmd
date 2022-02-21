@@ -103,7 +103,7 @@ as.data.frame(cbind(x,y)) %>% group_by(x) %>% summarize(mean = mean(y)) %>% as.m
 - The coefficient represents the expected difference in the outcome when $x = 1$ compared to $x = 0$
 - Consider the following population model, predicting income as a function of union membership. 
 
-$$Income = \beta_0 + \beta_1Union + u$$
+$$Income = \beta_0 + \beta_1 Union + u$$
 
 -  $\beta_1$ represents the expected difference in income for union members compared to non-union members.
 - The dummy variable also impacts the meaning of the intercept $\beta_0$ is the average income for non-unionized workers.
@@ -135,7 +135,7 @@ print(mean.nonunionized$m + u.reg$coefficients[2])
 - The interpretation of the model depends on which value we assign to 1 or 0.
     - The value assigned to 0 is known as the \textbf{reference category}.
 - For a statistical perspective, the choice is arbitrary. 
-- But often there are theoretical reasons for selecting a certain reference category and the choices encode certain assumptions about the social world.\footnote{\tiny See Johfre and Freese (2021) for further discussion of reference categories.}
+- But often there are theoretical reasons for selecting a certain reference category and the choices encode certain assumptions about the social world.\footnote{\scriptsize See Johfre and Freese (2021) for further discussion of reference categories.}
 
 # Dummy variables
 ## Reversing the reference category
@@ -166,7 +166,7 @@ print(u.reg2)
 - McElreath discusses an alternative method of specifying dummy variables called \textbf{index variables}. 
 - Consider the earlier model, where $\beta_0$ represents the average income for non-unionized workers.
 
-$$Income = \beta_0 + \beta_1Union + u$$
+$$Income = \beta_0 + \beta_1 Union + u$$
 
 - Consider $\beta_0$. Do we expect the posterior distribution to be the same if we reverse the reference category? What does this imply about the prior on $\beta_0$?
 
@@ -174,7 +174,7 @@ $$Income = \beta_0 + \beta_1Union + u$$
 ## Model specification and priors
 - There are two problems that arise when trying to determine the prior for $\beta_0$:
     1. $\beta_0$ is the average income for the reference group. It is not clear what a reasonable expection is.
-    2. We assume more uncertainity about one of the groups:
+    2. We assume more uncertainty about one of the groups:
         - The predicted income of non-unionized workers requires a single parameter, $\beta_0$, whereas the predicted income of unionized workers requires two parameter, $\beta_0$ and $\beta_1$.
 - In practice, these issues tend to "wash out" if we have a lot of data.
 
@@ -183,18 +183,22 @@ $$Income = \beta_0 + \beta_1Union + u$$
 - McElreath recommends estimating the following model without an intercept:
 
 
-$$Income = \beta_1^*Union + \beta_2^*NonUnion + u$$
+$$Income = \beta_1^* Union + \beta_2^* NonUnion + u$$
 
 - Here the $*$ denotes that $\beta_1^* \neq \beta_1$ in the previous model.
 - $\beta_1^*$ is the average income for unionized workers and $\beta_2^*$ is the average income for non-unionized workers.
     - The prior on either coefficient is now more straightforward to define.
-- The estimate we get from a standard dummy variable can be recovered from this model:
+    
+
+# Dummy variables
+## Model specification and priors
+- We can get the typical dummy estimate directly from this model:
 
 
-$$\beta_1$ =  $\beta_1^* - \beta_2^*$$
+$$\beta_1 =  \beta_1^* - \beta_2^*$$
 
 
-- In a Bayesian regression, we can get a posterior distribution for $\beta_1$ by taking the difference between the posterior distributions (McElreath refers to this as a *contrast*).
+- In a Bayesian regression, the posterior distribution for $\beta_1$ is obtained by taking the difference between the posterior distributions (McElreath refers to this as a *contrast*).
     
 
 # Dummy variables
@@ -292,8 +296,7 @@ $$Income = \beta_0 + \beta_1Canada + \beta_2Mexico + u$$
 - Categorical data in surveys is often coded as numeric. This can lead to misleading results since we might consider *nominal* categories as *ordinal*. Consider the example below using the region variable in the GSS.
 
 ```{r gss-cats, echo=TRUE, mysize=TRUE, size='\\footnotesize'}
-c1 <- lm(realrinc ~ region, data = gss)
-coefficients(c1)
+print(lm(realrinc ~ region, data = gss))
 ```
 
 # Categorical variables
@@ -301,9 +304,9 @@ coefficients(c1)
 - We can fix this by casting the variable as a factor.
 ```{r gss-cats2, echo=TRUE, mysize=TRUE, size='\\footnotesize'}
 gss$region <- as.factor(gss$region)
-c2 <- lm(conrinc ~ region, data = gss)
-coefficients(c2)
+print(lm(realrinc ~ region, data = gss))
 ```
+
 
 # Categorical variables
 ## Fixed effects
@@ -319,7 +322,7 @@ $$Income = \beta_0 + \beta_1Female + \gamma State + u$$
 
 # Logarithms
 ## Logarithms and the exponential function
-- The \textbf{exponential function} raises a *base* $b$ is raised to a power $x$.\footnote{\tiny Note how this differs from the power function, where we raise $x$ to a specified power. E.g. $power(x, 2) = x^2$}
+- The \textbf{exponential function} raises a *base* $b$ is raised to a power $x$.\footnote{\scriptsize Note how this differs from the power function, where we raise $x$ to a specified power. E.g. $power(x, 2) = x^2$}
 
 $$exp(x) = b^x$$
 
@@ -478,11 +481,12 @@ print(l4)
 
 # Logarithms
 ## Model comparison
+The model fit statistics do not provide a meaningful comparison between Model 1 and the other models since the outcomes are different.
 ```{r log-fit, echo = FALSE, mysize=TRUE, size='\\footnotesize', warning = FALSE}
 modelsummary(list(l1, l2, l3, l4), gof_omit = "Log|AIC|BIC|F", stars = TRUE, output = "latex")
 ```
 
-The model fit statistics do not provide a meaningful comparison between Model 1 and the other models since the outcome variables are different.
+
 
 # Polynomials
 ## Definitions
@@ -511,12 +515,14 @@ ggplot(aes(x, y), data = df) + geom_line() + theme_minimal()
 
 $$Income = \beta_0 + \beta_1Age + \beta_2Age^2 + u$$
 
+
 - The effect of age is now decomposed into two coefficients:
     - $\beta_1$ captures the linear relationship between age and income. 
     - $\beta_2$ captures a non-linear association between age and income.
 - The coefficients do not have a simple interpretation.
     - Consider whether we can change $Age$ while holding $Age^2$ constant.
-    
+
+
 # Polynomials
 ## Age and Age-Squared
 ```{r age-age2, echo = FALSE, mysize=TRUE, size='\\footnotesize', warning = FALSE}
@@ -574,9 +580,8 @@ ggplot(aes(y = value, x = rep(18:88, 4), group = variable, color = variable), da
 # Polynomials
 ## When to use polynomial regression
 - A second-order polynomial (e.g. $Age^2$) is sufficient to capture non-linearity.
-    - In this case, there is evidence of a curvilinear relationship between age and income.\footnote{\tiny For an example of polynomials used in a different context, see Dokshin, Fedor A. 2016. “Whose Backyard and What’s at Issue? Spatial and Ideological Dynamics of Local Opposition to Fracking in New York State, 2010 to 2013.” \textit{American Sociological Review} 81 (5): 921–48.}
+    - In this case, there is evidence of a curvilinear relationship between age and income.\footnote{\scriptsize For an example of polynomials used in a different context, see Dokshin, Fedor A. 2016. “Whose Backyard and What’s at Issue? Spatial and Ideological Dynamics of Local Opposition to Fracking in New York State, 2010 to 2013.” \textit{American Sociological Review} 81 (5): 921–48.}
 - Higher-order polynomial terms can improve model fit and capture more complex non-linearities *use up degrees of freedom*.
-- \textbf{Generalized Additive Models} make use of polynomials to model complex functional forms.
     
 
 # Next week
