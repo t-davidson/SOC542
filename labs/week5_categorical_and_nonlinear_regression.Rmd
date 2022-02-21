@@ -164,8 +164,6 @@ gss_num_table <- gss %>%      # Creating object
 
 gss_num_table
 
-
-
 ```
 
 
@@ -435,8 +433,6 @@ stargazer(ols_final_noweight, ols_final_weight,
           title = "Effect of Data Weights",
           type = "text")
 
-
-
 ```
 
 We can also visualize these changes like before.
@@ -523,16 +519,19 @@ coef_names <- c("age" = "Age",
 
 bayesrows <- data.frame(
   
+  # Left Column 
   c("Bayes R2 (Mean)", 
     "Bayes R2 (Median)",
     "Bayes R2 (SD)"),
   
   c("", "", ""), # OLS Model Blanks
   
+  # Unweighted Bayes Model
   c(mean(bayes_R2(bayes_noweight)),
     median(bayes_R2(bayes_noweight)),
     sd(bayes_R2(bayes_noweight))),
   
+  # Weighted Bayes Model
   c(mean(bayes_R2(bayes_weight)),
     median(bayes_R2(bayes_weight)),
     sd(bayes_R2(bayes_weight)))
@@ -543,7 +542,8 @@ modelsummary(model_list,
              estimate = c("{estimate}{stars}", # We want stars for the first model ONLY
                           "estimate",          # And only the estimate for the other two models
                           "estimate"),
-             notes = "+ p < 0.1, * p < 0.05, ** p < 0.01, *** p < 0.001", # Explaining the stars
+             notes = c("+ p < 0.1, * p < 0.05, ** p < 0.01, *** p < 0.001", # Explaining the stars
+                       "Not every independent variable shown"),
              coef_map = coef_names,
              gof_omit = "IC|Log|alg|pss",
              add_rows = bayesrows,
