@@ -515,6 +515,9 @@ coef_names <- c("age" = "Age",
                 "sexFemale" = "Female",
                 "raceWhite" = "Race: White",
                 "raceOther" = "Race: Other",
+                "partyidRep" = "Party: Republican",
+                "partyidOther" = "Party: Other",
+                
                 "(Intercept)" = "Constant")
 
 bayesrows <- data.frame(
@@ -543,7 +546,8 @@ modelsummary(model_list,
                           "estimate",          # And only the estimate for the other two models
                           "estimate"),
              notes = c("+ p < 0.1, * p < 0.05, ** p < 0.01, *** p < 0.001", # Explaining the stars
-                       "Not every independent variable shown"),
+                       "Not every independent variable shown",
+                       "Reference Categories: Male, Black, Democrat"),
              coef_map = coef_names,
              gof_omit = "IC|Log|alg|pss",
              add_rows = bayesrows,
