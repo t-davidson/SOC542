@@ -19,16 +19,18 @@ remotes::install_github("vincentarelbundock/modelsummary")
 
 if((packageVersion("modelsummary") != '0.9.5.9000'))  # Making sure we have the most recent version 
   remotes::install_github("vincentarelbundock/modelsummary")
+## MAKE SURE YOU RESTART R AFTER THIS INSTALL 
 
 library(modelsummary)
 library(broom.mixed)
 options(modelsummary_get = "broom") 
 
+library(stargazer)
+
 
 seed <- 0890110980
 ```
 
-TODO: I had to install a lot of new packages to get this running and had to follow a couple of prompts in the Console as they installed. I also found that the chunk `data-sum-table` threw an error until I restarted R. It would be worth asking students to restart after installation.
 
 # Return of the GSS
 
@@ -50,27 +52,31 @@ gss <- gss2018 %>%
          hrs1, prestg10, degree,  # Career Prep
          sex, race, age, partyid, # Other Demos
          wtss                     # Weight
-  ) %>% haven::zap_labels() # TODO: Explain what this does
+  ) %>% haven::zap_labels() # This function takes away any "fluff" that NORC included in the data.
+                            # Try running this code without this last line and you'll quickly come across problems
 ```
 
 ## Data Management 
 
 Now, let's do some data management. We're going to recode some of the values in the data.
-TODO: please add a couple of short comments explaining the logic of the first three steps. I think the remainder will be obvious. This will help if students need to go back over it.
+
 ```{r data-manage}
 gss <- gss %>% 
-  mutate( # TODO: Add short comment explaining
+  mutate( # 
     workhrs = case_when(
       hrs1 == 89 ~ NaN,
       TRUE ~ hrs1
       ),
-    age = case_when( # TODO: Add short comment explaining logic
+    age = case_when(
+      # People who were age 89 or more were all marked as 89, 
+        # so we need to remove them to avoid problems in analysis
       age > 88 ~ NaN,
       TRUE ~ age
     ),
-    degree = factor(degree, # TODO: explain
-                    levels = c(0,1,2,3,4),
-                    labels = c("Less_HS", "HS", "Assoc", "Bach", "Grad")
+    degree = factor(degree,
+                    # Factors keep our categories in order
+                    levels = c(0,1,2,3,4),  # What are the original levels of it
+                    labels = c("Less_HS", "HS", "Assoc", "Bach", "Grad") # What do I want them to look like when printed out?
                     ),
     sex = factor(sex,
                  levels = c(1,2),
@@ -88,7 +94,7 @@ gss <- gss %>%
       ),
     weight = wtss
     ) %>% 
-  select(-hrs1, -wtss) %>% 
+  select(-hrs1, -wtss) %>%  # Removing the original work hours and weight variables 
   drop_na() # Dropping rows missing on any variable
 ```
 
@@ -99,12 +105,9 @@ Last week, we used the function `datasummary_skim()` to give us a descriptive st
 
 This week, we're going to use a sibling function, `datasummary_balance()`. This function will give us the mean and standard deviation for our continuous data, and below it, give us the counts and percentages for our categorical data. The ability to include both was only added a few weeks ago, so we need to ensure we're running the most recent version of the `modelsummary` package (hence the installation on lines 20 and 21). 
 
+**NOTE: You must restart R after this package installs before running the below code or else it will not work.**
+
 The formula is `datasummary_balance( ~ 1, ...)`. The "`~ 1`" tells it to create this double-table for all variables in the data. 
-
-TODO: This function is neat but I'm a little worried that this kind of thing will serve as a crutch, preventing students from understanding how to do this kind of thing themselves using R. Could you add a couple of examples above showing how one can directly summarize using tidyverse. For example, `summarize_all` could be combined with some filtering to easily get means for any numeric variables. It should also be straightforward to do some counts and percent summaries for non-numeric variables. The other issue I have with these functions is that, while they create some nice summaries for exploratory work, they are not really publication quality. This would be worth mentioning.
-
-TODO: Finally, I have put `data.frame` as the output as I think it is preferable here. I want to encourage the students to work with tabular data and to consider the summaries as tables (that we can then render into nicer outputs for published documents). If knitting, latex is probably the preferable output type. I guess the example afterwards shows how we need a different output type if we want to show histograms within the table.
-
 
 ```{r data-sum-table}
 s <- datasummary_balance( ~ 1,
@@ -114,6 +117,8 @@ s <- datasummary_balance( ~ 1,
                     output = "data.frame")
 s
 ```
+
+
 
 If you'd like to reproduce the tables from last week and create a new table for categorical data, you can run the same code, including an argument specifying that the variables you want summarized are `type = "categorical"`. The default option is `type = numeric`, so you don't have to specify it if you don't want to, but it can be nice to include. 
 
@@ -133,14 +138,88 @@ datasummary_skim(gss,
 
 ```
 
+### Data Summary with Tidyverse Functions
+
+We can also replicate these tables using the Tidyverse. First, we can use the below code to create summary statistics for our numeric variables. I've added comments to show what we're doing at these steps. 
+
+```{r gss-numtable}
+
+gss_num_table <- gss %>%      # Creating object
+  select_if(is.numeric) %>%   # Selecting only numeric columns
+  summarise_all(list(mean = mean, # Listing stats I want (name = function)
+                     sd = sd,
+                     min = min,
+                     median = median,
+                     max = max)) %>% 
+  round(2) %>%  # Rounding to two decimal places 
+  
+  # Things below here are shaping it into a clean dataframe
+  gather(stat, val) %>%  
+  separate(stat, into = c("variable", "stat"), sep = "_") %>%
+  spread(stat, val) %>% 
+  
+  # This reorders the variables and puts them into a dataframe
+  select(variable, mean, sd, min, median, max) %>%  
+  as.data.frame()
+
+gss_num_table
+
+
+
+```
+
+
+Next, we can do similar for our categorical variables, creating a table that displays counts and percentages for the variables. 
+```{r gss-sumcat, message=FALSE, warning=FALSE}
+
+gss_cat_table <- gss %>% 
+  select_if(negate(is.numeric)) %>%  # Select columns that are NOT numeric
+  gather(variable, value) %>%  # Change df to list each value 
+  group_by(variable, value) %>% 
+  summarise(n = n()) %>%  # Counting number of values within each variable 
+  mutate(percent = round(n / sum(n), 2)) %>%  # Creating percents 
+  as.data.frame()
+gss_cat_table
+
+```
+
+Lastly, we can combine the two columns to make one table that lists them all. To do this, we need to rename a few columns so they align, and then do a `full_join()` so all our rows (variables, in this case) are kept. Finally, we `select()` our columns to reorder them.
+
+Because we want our final table to have blanks where there aren't values, we do a couple weird R tricks. First, we create a column "value" in our numeric table, set as blank. We then mutate the min, median, and max columns in this table to be type character. This lets us then create similarly-named columsn in our categorical table which will line up and display as blanks. 
+
+```{r gss-sumtable, message=FALSE}
+
+gss_num_tab <- gss_num_table %>% 
+  rename("Mean or Count" = mean,
+         "SD or %" = sd) %>% 
+  mutate(value = " ",
+         min = as.character(min),
+         median = as.character(median),
+         max = as.character(max))
+
+gss_cat_tab <- gss_cat_table %>% 
+  rename("Mean or Count" = n,
+         "SD or %" = percent) %>% 
+  mutate(min = " ",
+         median = " ",
+         max = " ")
+
+gss_sum_table <- gss_num_tab %>% 
+  full_join(gss_cat_tab) %>% 
+  select(variable, value, `Mean or Count`, `SD or %`, min, median, max)
+
+gss_sum_table
+
+```
 
 
 # Multiple Regression
-TODO: Note that I removed the word frequentist. I think its fair to assume this is the default and that we will only use the term when we are comparing with Bayesian approaches. 
 
 ## Model Specification
-TODO: Provide a little motivation and theory here before starting. What is the outcome? Why might we expect the predictors to be related?
-Let's start with a simple model that only include three continuous variables and two categorical ones. Our model takes the form: $$\hat{income} = \beta_0 + \hat{\beta_{Age}} + \hat{\beta_{Work Hours}} + \hat{\beta_{Prestige}} + \hat{\beta_{Sex}} + \hat{\beta_{Race}} + \hat{\beta_{Party}} + \hat{\beta_{Degree}} + u$$
+
+Today, we're going to use GSS data to examine factors that might influence a person's earned annual income. We're think that a person's age will play a role in this, since people who have worked longer probably will make more money. Similarly, a person who works more hours will earn more. We also think that people with higher-prestige careers (physicians, engineers, etc) will be compensated for such prestige. Lastly, we want to account for any differences in race and sex. 
+
+Let's start with a simple model that only include three continuous variables and two categorical ones. Our model takes the form: $$\hat{income} = \beta_0 + \hat{\beta}_{Age} + \hat{\beta}_{Work Hours} + \hat{\beta}_{Prestige} + \hat{\beta}_{Sex} + \hat{\beta}_{Race} + \hat{\beta}_{Party} + \hat{\beta}_{Degree} + u$$
 
 
 ```{r ols-base-model}
@@ -149,22 +228,36 @@ ols1 <- lm(conrinc ~ age + prestg10 + workhrs + sex + race,
 summary(ols1)
 ```
 
-TODO: It isn't clear from the text whether you do this, but I'd like you to walk through the interpretation of the coefficients in the model before moving to the section below, which is more about prediction (hence the title change).
+## Interpretation 
 
-## Prediction
+Looking at our model, we have a series of coefficient estimates, standard errors, t-values, and p-values for each of our independent variables. Let's walk through these one at a time.
 
-When interpreting, we can plug in the effects, just like from our models last week.
+1. `age`: For each additional year of age, we can estimate that a person's income will increase by $`r round(ols1[["coefficients"]][["age"]],2)`, holding all else constant.
+2. `prestg10`: For each additional point of occupational prestige, we can estimate that a person's income will increase by $`r round(ols1[["coefficients"]][["prestg10"]],2)`, holding all else constant.
+3. `workhrs`: For each additional hour that a person worked in the week before they were interviewed, we can estimate that a person's income will increase by $`r round(ols1[["coefficients"]][["workhrs"]],2)`, holding all else constant.
 
+This is all what we've done last week, interpreting regression output for continuous variables.  
 
-For example, let's estimate a person's income, knowing that they were a 57 year-old white female with an occupational prestige of 70 and who worked 40 hours last week. We can simply input that information into the equation.
-
-Note, however, that each female, white, and black have their own coefficients. Instead of having a $\hat{\beta}$ for the categories of race or sex, we create a new one for each dummy: $$\hat{income} = \beta_0 + \hat{\beta_{Age}} + \hat{\beta_{Work Hours}} + \hat{\beta_{Prestige}} + \hat{\beta_{Female}} + \hat{\beta_{White}} + \hat{\beta_{Other}} + u$$
+Note, however, that each female, white, and black have their own coefficients. Instead of having a $\hat{\beta}$ for the categories of race or sex, we create a new one for each dummy: $$\hat{income} = \beta_0 + \hat{\beta}_{Age} + \hat{\beta}_{Work Hours} + \hat{\beta}_{Prestige} + \hat{\beta}_{Female} + \hat{\beta}_{White} + \hat{\beta}_{Other} + u$$
 
 So instead of multiplying `r round(ols1[["coefficients"]][["sexFemale"]],2)` by some abstract value of `sex`, we multiply it times 1 if the person is female, and by 0 if they are male. Essentially, we're adjusting the intercept term, not the slope. 
 
 And the same goes for race: We multiply `r round(ols1[["coefficients"]][["raceWhite"]],2)` times 1 if they are white, or by 0 if they are Black or another race, then  multiply `r round(ols1[["coefficients"]][["raceOther"]],2)` times 1 if they are "other", or by 0 if they are white or Black. 
 
-And, while possible to do by hand, it's even easier to input the new person's information into a dataframe with these variables and `predict()` the value using R. 
+Noting that these are all in reference to whatever category was dropped (we'll get to that more in a bit), we can finish our interpretation as follows:
+
+4. `sexFemale`: A person who is `female` can expect to make $`r round(ols1[["coefficients"]][["sexFemale"]],2)` compared to a person who is `male`. 
+5. `raceWhite`: A person who is `white` can expect to make $`r round(ols1[["coefficients"]][["raceWhite"]],2)` compared to a person who is `Black`. 
+6. `raceOther`:A person who is `other` can expect to make $`r round(ols1[["coefficients"]][["raceOther"]],2)` compared to a person who is `Black`. 
+
+
+## Prediction
+
+When predicting using our  values, we can plug in the effects, just like from our models last week.
+
+For example, let's estimate a person's income, knowing that they were a 57 year-old white female with an occupational prestige of 70 and who worked 40 hours last week. We can simply input that information into the equation.
+
+While it's possible to do this by hand, it's even easier to input the new person's information into a dataframe with these variables and `predict()` the value using R. 
 
 ```{r estim-byhand}
 newperson <- data.frame(age = 57,
@@ -184,7 +277,7 @@ Another way to think about the above interpretation is by creating a series of "
 
 Let's try this now, turning the variables `sex`, `race`, `partyid`, and `degree` into a series of dummies.
 
-```{r dummy-create}
+```{r dummy-create, warning=FALSE}
 
 gss <- gss %>% 
   fastDummies::dummy_cols(select_columns = c("sex", "race", "partyid", "degree"))
@@ -207,44 +300,26 @@ ols_dummy2 <- lm(conrinc ~ age + prestg10 + workhrs +
                    sex_Male,
                    data = gss)
 
-ols_dummy_coefs <- c("(Intercept)" = "Constant",
-                     "sexFemale" = "Female (No Dummy)", 
-                     "sex_Female" = "Female",
-                     "sex_Male" = "Male",
-                     "workexp" = "Yrs Work Exp",
-                     "raceWhite" = "Race: White (No Dummy)",
-                     "raceOther" = "Race: Other (No Dummy)",
-                     "race_White" = "Race: White",
-                     "race_Other" = "Race: Other",
-                     "age" = "Age",
-                     "prestg10" = "Occupational Prestige")
+stargazer(ols_nodummy, ols_dummy1, ols_dummy2,
+          title = "Testing Dummy Variables",
+          type = "text")
 
-modelsummary(list("No Dummies" = ols_nodummy, 
-                  "Dummy for Female" = ols_dummy1,
-                  "Dummy for Male" = ols_dummy2),
-             statistic = c("s.e. = {std.error}", "t = {statistic}"),
-             coef_map = ols_dummy_coefs,
-             gof_omit = "IC|Log|alg|pss",
-             title = "Frequentist Regression Output: Effect of Dummy Variable Choice"
-             )
 ```
-TODO: Is there a way to present this more like a standard table, perhaps by using stargazer or by modifying the output. I actually find this quite hard to read within the Markdown document (although it does look good in the Knitted file). I think you can also drop the t-statistics and just show standard errors in parentheses (t can easily be derived from coefficient and SE if necessary). The formatting on Table 8 is much nicer so you could format this and other tables in the same way. If possible, please also use stars to indicate statistical significance for frequentist models.
 
 As we can see from these results, there is no difference in whether you use your own dummies or use the defaults. Just note, however, that R will drop whatever the first category is. In the case of `sex`, the first one was `male`, since I coded it as a `factor`. In the case of `race`, however, it was simply a `character`-type variable, so the first category, and the one that was dropped, was `black`. Creating and using your own dummies gives you more control over this, but isn't necessary. 
 
-TODO: Mention how we can reorder factors if we want to change the reference category.
+If we'd like to change the "reference category," AKA the category that is dropped, one options is to turn the variable into a factor with new levels (1 = White, 2 = Black, 3 = Other). Another is by putting in ourselves which levels to include in the model: Including Black and Other makes White the reference. 
 
 
-## Scaling and Non-Linearization 
+### Scaling and Non-Linearization 
 
-### Income 
+#### Income 
 If we look at our income variable, our value is very skewed. It's also in large dollar amounts that aren't easy to manage. Let's see what happens if we made two transformations. First, let's think of income in thousands of dollars instead of in total dollar amounts. Then, let's also take the natural log of our variable so we arrive at something more normally distributed. Finally, let's see what happens if we do both. 
 Taking the log of a term does two things. 
 
 1. Methodologically, it gives us a distribution that is more normally distributed, improving the overall fit.
 2. Theoretically, we use it when we think the effect is increasing at a decreasing rate OR decreasing at a decreasing rate. 
 
-TODO: You can say this but its a little too corny for my taste to leave in the slides :)
 
 ```{r plot-log}
 origincplot <- ggplot(gss) + geom_density(aes(conrinc))
@@ -280,27 +355,11 @@ ols_log <- lm(logincome ~ age + prestg10 + workhrs + race + sex,
 ols_log_thou <- lm(logthouinc ~ age + prestg10 + workhrs + race + sex,
                    data = gss)
 
-ols_transform_mods <- list("Income" = ols_inc,
-                           "Inc/1000" = ols_thou,
-                           "Log (Inc)" = ols_log_thou,
-                           "Log (Inc/1000)" = ols_log_thou)
-
-ols_transform_coefs <- c("age" = "Age",
-                         "prestg10" = "Prestige",
-                         "sexFemale" = "Female",
-                         "raceWhite" = "Race: White",
-                         "raceOther" = "Race: Other",
-                         "(Intercept)" = "Constant")
-
-modelsummary(ols_transform_mods,
-             statistic = c("s.e. = {std.error}", "t = {statistic}"),
-             coef_map = ols_transform_coefs,
-             gof_omit = "IC|Log|alg|pss",
-             title = "Effect of Data Transformations: Logarithmic Terms",
-             notes = "Data: 2018 General Social Survey")
+stargazer(ols_inc, ols_thou, ols_log, ols_log_thou,
+          title = "Effect of Data Transformations: Logarithmic Terms",
+          type = "text")
 
 ```
-TODO: Same here, can you format using a more legible approach.
 
 We can see here that scaling only shifts the direction of variables, but has no effect on the final model statistics. Overall, the model with the logged term (`logincome`) worked best and is the most interpretable. (Remember, an increase in the natural-logged amount equates to a 1% increase in the raw amount. Scaling the logged amount doesn't have any effect since the increase in percent is stable across the board.) 
 
@@ -332,44 +391,23 @@ ols_worksq <- lm(logincome ~ worksq + prestg10 + workhrs + race + sex,
 ols_work_worksq <- lm(logincome ~ workexp + worksq + prestg10 + workhrs + race + sex,
                    data = gss)
 
-ols_transform_mods <- list("Age" = ols_age,
-                           "Work Exp" = ols_work,
-                           "Square Term" = ols_worksq,
-                           "Both Terms" = ols_work_worksq)
+stargazer(ols_age, ols_work, ols_worksq, ols_work_worksq,
+          omit.stat = c("F", "ser"),
+          title = "Effect of Data Transformations: Square Terms",
+          type = "text")
 
-ols_transform_coefs <- c("age" = "Age",
-                         "workexp" = "Yrs Work Exp",
-                         "worksq" = "Yrs Work Exp ^2",
-                         "prestg10" = "Prestige",
-                         "sexFemale" = "Female",
-                         "raceWhite" = "Race: White",
-                         "raceOther" = "Race: Other",
-                         "(Intercept)" = "Constant")
-
-modelsummary(ols_transform_mods,
-             statistic = c("s.e. = {std.error}", "t = {statistic}"),
-             coef_map = ols_transform_coefs,
-             gof_omit = "IC|Log|alg|pss",
-             title = "Effect of Data Transformations: Square Terms",
-             notes = "Data: 2018 General Social Survey")
 ```
-TODO: Note that Latex does not respect spacing between words. You can add some spacing characters like `\:` if desired. But maybe the Latex is overkill for this example.
 Looking at our table, we can see that the simple shift of $work\:experience = age - 18$ also had no real effect.
 
 Meanwhile, adding the square term increased our model's prediction power (via the $R^2$).
 
 With these in mind, we can tell that shifting or dividing a variable doesn't change the relationship; it only changes the amount. But changing the shape of the line (via taking the log) does change the relationship and therefore the income. 
 
-
 Okay, so what does this mean for prediction?
 
-TODO: Minor quibble, but the hats should only be over the betas, not the whole expression. i.e. $\hat{\beta}_{Prestige}$. Not a big deal so I'm not too bothered if you fix it, but worth knowing for next time.
+Our equation now is $$\hat{log_e(income)} = \beta_0 + \hat{\beta}_{Work Experience} + \hat{\beta}_{(Work Experience)^2} + \hat{\beta}_{Work Hours} + \hat{\beta}_{Prestige} + \hat{\beta}_{Female} + \hat{\beta}_{White} + \hat{\beta}_{Other} + u$$
 
-Our equation now is $$\hat{log_e(income)} = \beta_0 + \hat{\beta_{Work Experience}} + \hat{\beta_{(Work Experience)^2}} + \hat{\beta_{Work Hours}} + \hat{\beta_{Prestige}} + \hat{\beta_{Female}} + \hat{\beta_{White}} + \hat{\beta_{Other}} + u$$
-
-Ignoring the rest of the terms, we can interpret the square term as $$\hat{log_e(income)} = \beta_0 + \hat{\beta_{Work Experience}} + \hat{\beta_{(Work Experience)^2}} + ... + u $$ 
-
-TODO: In general I would avoid mixing Latex and R commands like below. I think it will be too confusing.In general, I use latex to show notation but not code. I would also recommend avoiding putting long fragments of code outside of the chunk as it is very difficult to read until the document is Knitted (and I presume students will be looking at this in RStudio for the most part). That said, I do think this is a neat example for the printed document so I would keep it for now.
+Ignoring the rest of the terms, we can interpret the square term as $$\hat{log_e(income)} = \beta_0 + \hat{\beta}_{Work Experience} + \hat{\beta}_{(Work Experience)^2} + ... + u $$ 
 
 For a person with 12 years work experience, we can then plug it in as: $$\hat{log_e(income)} = `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)` + `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)`*12 + `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)`*(12^2) + ... + u $$ 
 
@@ -377,7 +415,7 @@ And simplify it down to:
 $$\hat{log_e(income)} = `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)` + `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)*12` + `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)*(12^2)` + ... + u $$ 
 $$\hat{log_e(income)} = `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2) +  round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)*12 + round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)*(12^2)` + ... + u $$ 
 
-(Knit this document so see the math worked out. Leaving it like this makes it easy for me if I change something.)
+(Knit this document so see the math worked out. Leaving it like this makes it easy for me if I change something above this (data, equation, etc.).)
 
 ## Data Weights 
 
@@ -391,15 +429,15 @@ ols_final_weight <- lm(logincome ~ workexp + worksq + prestg10 + workhrs +
                          sex + race + partyid + degree,
                    data = gss, weights = weight)
 
-ols_weight_mods <- list(ols_final_noweight, ols_final_weight)
+stargazer(ols_final_noweight, ols_final_weight,
+          single.row = T,
+          digits = 2,
+          title = "Effect of Data Weights",
+          type = "text")
 
 
-modelsummary(ols_weight_mods,
-             statistic = c("s.e. = {std.error}", "t = {statistic}"),
-             gof_omit = "IC|Log|alg|pss",
-             title = "Frequentist Regression Output: Effect of Data Weights")
+
 ```
-TODO: Same here. Convert to stargazer.
 
 We can also visualize these changes like before.
 
@@ -419,8 +457,6 @@ ggplot() +
       xmax = conf.high,
       color = Model)
     ) +
-  # geom_vline(aes(xintercept = 0),
-  #            linetype = "dotted", size = .5) +
   facet_grid(term ~ ., switch = "y") +
   labs(x = "Coefficient",
        title = "OLS Regression Predicting Income (Logged)",
@@ -504,13 +540,14 @@ bayesrows <- data.frame(
 
 
 modelsummary(model_list,
+             estimate = c("{estimate}{stars}", # We want stars for the first model ONLY
+                          "estimate",          # And only the estimate for the other two models
+                          "estimate"),
+             notes = "+ p < 0.1, * p < 0.05, ** p < 0.01, *** p < 0.001", # Explaining the stars
              coef_map = coef_names,
              gof_omit = "IC|Log|alg|pss",
              add_rows = bayesrows,
              # output = "week5_final_table.docx",
              title = "Frequentist vs Bayesian Regression Model Output")
 ```
-TODO: Same formatting for this table.
-
-In general, I would prefer them to be able to produce tables that render nicely in the Knitted output (e.g. render in Latex or Kable) rather than tables they can open in Word, although I do think this is worth doing.
 
