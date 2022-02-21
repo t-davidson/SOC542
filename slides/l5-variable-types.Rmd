@@ -376,11 +376,14 @@ ggplot(aes(x=x,y = logarithm, group = base, color = base), data = df) +
 ```
 
 # Logarithms
-## Why use logarithms?
+## When to use logarithms
+- Use logarithms when
+    - All values of $x$ are positive
+    - $x$ has a wide range (e.g. income)
 - Interpretation
-    - Logarithms allow us to transform variables to measure differences in *magnitude* and sometimes *percentages*
+    - Logarithms allow us to transform variables to measure differences in *magnitude* and sometimes *percentages*.
 - Specification
-    - Logarithms can induce normality for if a variable has a \textbf{log normal} distribution.
+    - Logarithms can induce normality and reduce variance for if a variable has a \textbf{log normal} distribution.
 
 # Logarithms
 ## A unit increase of $log_{10}$
