@@ -125,7 +125,7 @@ If you'd like to reproduce the tables from last week and create a new table for 
 ```{r data-sum-double-table}
 
 datasummary_skim(gss,
-                 # type = "numeric", 
+                 type = "numeric",
                  title = "Sample Descriptive Statistics: Continuous Variables",
                  notes = "Data: 2018 General Social Survey",
                  output = "kableExtra")
@@ -183,7 +183,7 @@ gss_cat_table
 
 Lastly, we can combine the two columns to make one table that lists them all. To do this, we need to rename a few columns so they align, and then do a `full_join()` so all our rows (variables, in this case) are kept. Finally, we `select()` our columns to reorder them.
 
-Because we want our final table to have blanks where there aren't values, we do a couple weird R tricks. First, we create a column "value" in our numeric table, set as blank. We then mutate the min, median, and max columns in this table to be type character. This lets us then create similarly-named columsn in our categorical table which will line up and display as blanks. 
+Because we want our final table to have blanks where there aren't values, we do a couple weird R tricks. First, we create a column "value" in our numeric table, set as blank. We then mutate the min, median, and max columns in this table to be type character. This lets us then create similarly-named columns in our categorical table which will line up and display as blanks. 
 
 ```{r gss-sumtable, message=FALSE}
 
@@ -407,11 +407,11 @@ Our equation now is $$\hat{log_e(income)} = \beta_0 + \hat{\beta}_{Work Experien
 
 Ignoring the rest of the terms, we can interpret the square term as $$\hat{log_e(income)} = \beta_0 + \hat{\beta}_{Work Experience} + \hat{\beta}_{(Work Experience)^2} + ... + u $$ 
 
-For a person with 12 years work experience, we can then plug it in as: $$\hat{log_e(income)} = `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)` + `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)`*12 + `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)`*(12^2) + ... + u $$ 
+For a person with 12 years work experience, we can then plug it in as: $$\hat{log_e(income)} = `r round(ols_work_worksq[["coefficients"]][["(Intercept)"]], 3)` + `r round(ols_work_worksq[["coefficients"]][["workexp"]], 3)`*12 + `r round(ols_work_worksq[["coefficients"]][["worksq"]], 3)`*(12^2) + ... + u $$ 
 
 And simplify it down to: 
-$$\hat{log_e(income)} = `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)` + `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)*12` + `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)*(12^2)` + ... + u $$ 
-$$\hat{log_e(income)} = `r round(ols_worksq[["coefficients"]][["(Intercept)"]], 2) +  round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)*12 + round(ols_worksq[["coefficients"]][["(Intercept)"]], 2)*(12^2)` + ... + u $$ 
+$$\hat{log_e(income)} = `r round(ols_work_worksq[["coefficients"]][["(Intercept)"]], 3)` + `r round(ols_work_worksq[["coefficients"]][["workexp"]], 3)*12` + `r round(ols_work_worksq[["coefficients"]][["worksq"]], 3)*(12^2)` + ... + u $$ 
+$$\hat{log_e(income)} = `r round(ols_work_worksq[["coefficients"]][["(Intercept)"]], 3) +  round(ols_work_worksq[["coefficients"]][["workexp"]], 3)*12 + round(ols_work_worksq[["coefficients"]][["worksq"]], 3)*(12^2)` + ... + u $$ 
 
 (Knit this document so see the math worked out. Leaving it like this makes it easy for me if I change something above this (data, equation, etc.).)
 
