@@ -148,41 +148,52 @@ I will also make additional accommodations due to the COVID-19 pandemic. If you 
 
 *Readings* 
 
-- GHV 10-11 (selections)
-- McElreath 4 (selections)
+- GHV 10.1-10.2, 10.7-11.6
+- McElreath 4-4.4, 5-5.2
 
-*Homework 2 released, due 2/25*
+*Homework 2 released, due 2/27*
 
 ## Week 5 -  February 21 - Dummy, categorical, and non-linear variables
 
 *Readings*
 
-- GHV 10-12 (selections)
-- McElreath 5 (selections)
+- GHV 10.3-10.6, 12-12.5, 12.7-12.8
+- McElreath 4.5.1, 5.3-5.4
+
+*Recommended*
+
+- Johfre, Sasha Shen, and Jeremy Freese. 2021. “Reconsidering the Reference Category.” *Sociological Methodology* 51 (2): 253–69. https://doi.org/10.1177/0081175020982632.
+
 
 ## Week 6 -  February 28  - Interactions
 
 *Readings* 
 
-- GHV 10 (selections)
+- GHV 10.3, 12.2
 - McElreath 8
 
-*Homework 3 released, due 5/11*
+*Recommended*
+
+- Mize, Trenton. 2019. “Best Practices for Estimating, Interpreting, and Presenting Nonlinear Interaction Effects.” *Sociological Science* 6: 81–117. https://doi.org/10.15195/v6.a4.
+
+
+<!--*Homework 3 released, due 3/11*-->
 
 ## Week 7 - March 7 - Model checking and missing data
 
 *Readings* 
 
-- GHV 11, 17.3-17.8
-- McElreath 6-7 (selections)
+- GHV 11.7-11.9, 17.3-17.8
+- McElreath 7
 
 *Recommended*
 
-- Watts, Duncan J. 2014. “Common Sense and Sociological Explanations.” *American Journal of Sociology* 120 (2): 313–51. https://doi.org/10.1086/678271.
 - Young, Cristobal, and Katherine Holsteen. 2017. “Model Uncertainty and Robustness: A Computational Framework for Multimodel Analysis.” *Sociological Methods & Research* 46 (1): 3–40. https://doi.org/10.1177/0049124115610347.
 - Slez, Adam. 2017. “The Difference Between Instability and Uncertainty: Comment on Young and Holsteen (2017).” *Sociological Methods & Research* 48 (2): 400–430. https://doi.org/10.1177/0049124117729704.
 - Muñoz, John, and Cristobal Young. 2018. “We Ran 9 Billion Regressions: Eliminating False Positives through Computational Model Robustness.” *Sociological Methodology* 48 (1): 1–33. https://doi.org/10.1177/0081175018777988.
+- Western, Bruce. 2018. “Comment: Bayes, Model Uncertainty, and Learning From Data.” *Sociological Methodology* https://doi.org/10.1177/0081175018799095.
 - Molina, Mario, and Filiz Garip. 2019. “Machine Learning for Sociology.” *Annual Review of Sociology* 45: 27–45. https://doi.org/10.1146/annurev-soc-073117-041106.
+- McElreath 15.2
 
 
 
