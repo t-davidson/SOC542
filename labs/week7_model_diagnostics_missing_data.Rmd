@@ -178,7 +178,7 @@ Another method is call the Variance Inflation Factor or VIF. This is related to 
 
 Using the same model above, with our tolerance for prestige at .98081, we can calculate $VIF = \frac{1}{.98081}=1.08196$. 
 
-A variable where the other predictors have no effects in predicting it would have a VIF that is very close to 1 ($1 /(0-0) = 1/0 = Undefined$). Conversely, a variable that is perfectly predicted by the others would have a VIF very close to 1 since $1 /(1-1) = 1$. Thus, VIF's range from 1 (not at all predicted) to infinitely large (perfectly predicted) 
+A variable where the other predictors have no effects in predicting it would have a VIF that is very close to 1 ($1 /(1-0) = 1/1 = 1$). Conversely, a variable that is perfectly predicted by the others would have a VIF larger than 1 (e.g. when $R^2=.9$, $1 /(1-.9) = 1/.1 = 10$). Thus, VIF's range from 1 (not at all predicted) to infinitely large (perfectly predicted). 
 
 VIF's larger than 2 (when tolerance = .5) are cause to revisit the model, and larger than 5 should require a much closer look. 
 
@@ -186,7 +186,7 @@ VIF's larger than 2 (when tolerance = .5) are cause to revisit the model, and la
 ### Calculating Multicollinearity 
 
 Because VIF is more commonly used, we'll calculate that first. We can use the `vif()` function from the package `car` to get the VIF. We can then invert VIF (${1}/{VIF}$) to calculate tolerance. 
-```{r}
+```{r calc-multicol}
 library(car)
 
 mcol <- vif(mod1) %>% as.data.frame() %>% 
@@ -204,7 +204,7 @@ You'll notice that these don't align perfectly. This is because the `car::vif()`
 #### High Multicollinearity 
 Let's try to now create a model that *will* have high multicollinearity. 
 
-```{r}
+```{r high-multicol}
 multicolmol <- lm(logincome ~ prestg10 + educ + degree + workexp + worksq,
                   data=gsscomp)
 
@@ -235,7 +235,7 @@ Because we as humans like to quantify things, we have three key metrics we use.
 
 3. Bayesian information criteria (BIC), calculated as $BIC = -2*LL + log(N)*k$, where LL is the log likelihood, N is the number of observations, and k is the number of predictors. Lower BICs reflect better model fit. 
 
-```{r}
+```{r aic-bic}
 modstats <- data.frame(
   model = seq_along(ourmods),
   AIC = sapply(ourmods, AIC),
@@ -249,7 +249,7 @@ print(modstats)
 
 While `stargazer::stargazer()` won't give you AIC, BIC, or Log Likelihood in the output (and adding them in is complicated), `modelsummary()` provides all three in the default. (But not for Bayesian Models.)
 
-```{r}
+```{r gof-tab}
 modelsummary(ourmods,
              statistic = NULL,
              stars = T)
@@ -297,9 +297,9 @@ loo_compare(loo1, loo2)
 ```
 The results here show that model 1, compared to model1 2, decreases the log likelihood by 97.2, with a standard error of this difference of 15.1. Since 97.2 is much larger than 15.1, we can say the second model is better. 
 
-### K-Wise Cross Validation
+### K-Fold Cross Validation
 
-The most popular form of cross validation, however, is K-wise. This means we subset the data into K number of partitions, then cross-validate the model on that. The command is `kfold(model, K = K)`. Below, I run them on just 5 folds for speed, although 10 is the standard. 
+The most popular form of cross validation, however, is K-fold. This means we subset the data into K number of partitions, then cross-validate the model on that. The command is `kfold(model, K = K)`. Below, I run them on just 5 folds for speed, although 10 is the standard. 
 
 ```{r kfold, message=FALSE, warning=FALSE}
 kf1 <- kfold(bayes_mod1,
