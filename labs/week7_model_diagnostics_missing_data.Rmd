@@ -15,10 +15,11 @@ library(naniar)
 
 library(rstanarm)
 library(tidybayes)
+library(mice)
 
 library(modelsummary)
 library(broom.mixed)
-  options(modelsummary_get = "broom") 
+  # options(modelsummary_get = "broom")
 
 seed <- 12345
 ```
@@ -121,7 +122,7 @@ gss_cat_table
 
 Now that we know what our data looks like, and know there are missing values, let's run some models. The first and second models use the same predictors, but the second model only uses observations that have no missing data on our variables (`data = gsscomp`). 
 
-```{r}
+```{r some-mods}
 
 mod1 <- lm(logincome ~ prestg10 + selfemp + race + sex,
            data = gss, weights = weight)
@@ -137,11 +138,12 @@ stargazer(ourmods,
           type = "text")
 ```
 
-Below, I quickly graph the first two models to see how the coefficients change when we only use complete cases. The `dotwhisker` package is handy for doing this, and the `dw_plot()` function in it does all the backwork in transforming our models into data frames, plotting them in `ggplot2` objects for us. Since it is `ggplot2`, I could then easily add on a vertical line. 
+Below, I quickly graph the first two models to see how the coefficients change when we only use complete cases. The `modelsummary::modelplot()` function does all the backwork in transforming our models into data frames, plotting them in `ggplot2` objects for us. Since it is `ggplot2`, I could then easily add on a vertical line. 
 
 (Alternatively, lines 101-141 on Week 4's Lab will have a by-hand way to create the same thing, which works better  when you want more control over the output.)
 ```{r  mod-comp}
-dotwhisker::dwplot(list(mod1, mod2)) +
+modelplot(list(mod1, mod2), 
+          coef_omit = 'Interc') +
   geom_vline(aes(xintercept = 0), 
              linetype = "dotted", size = 1, alpha = .5)
 ```
@@ -158,7 +160,7 @@ One measure of multicollinearity is called "Tolerance." The Tolerance for a vari
 
 In other words, we run a regression of a variable, subtract the $R^2$ from 1, and use this to estimate how similar the variable is. We'll do this for each independent variable to get a final table showing them all. 
 
-```{r}
+```{r calc-tol}
 tol_prestg10 <- lm(prestg10 ~ selfemp + race + sex,
                    data = gss)
 summary(tol_prestg10)
@@ -312,6 +314,7 @@ Similar to before, we see that the second model increased the log likelihood, me
 
 # Missing Data 
 
+## Patterns of Missingness
 Lastly tonight, let's talk about missing data. 
 
 To start, let's take a look at which variables are missing data. A powerful way to do this is to examine "patterns of missingness." The `naniar` package provides a function `gg_miss_upset()` to create an "upset plot" showing how many observations have missing data on certain combinations of variables. 
@@ -393,9 +396,7 @@ If you're curious, more detail on the steps that make these equations chained ca
 
 Below, we use the `mice` command to create five new, imputed datasets. (If we only wanted one dataset, a la regression imputation, we set `m = 1`.) 
 
-```{r}
-library(mice)
-
+```{r mice1}
 imp <- mice(gss, m = 5, maxit = 2,
             printFlag = F)
 
@@ -403,13 +404,13 @@ imp <- mice(gss, m = 5, maxit = 2,
 
 The output tells us there are several "logged events." There are several reasons this can occur. The biggest ones are due to collinearity. Let's take a look and see. 
 
-```{r}
+```{r mice-logged}
 imp$loggedEvents
 ```
 
 The column `meth` tells us that collinearity is to blame for five of the six problem variables. We can then select these columns out to create a new dataset that doesn't include the variables we don't want in our final regression. 
 
-```{r}
+```{r mice2}
 newimp <- gss %>% select(-age, -conrinc, -logincome) %>% 
   mice(., m= 5, maxit = 2,
        seed = seed,
@@ -425,10 +426,11 @@ We're okay with these now, since we know they were created this way.
 To create a linear regression with imputed data, we cannot use our normal function. Instead we use the `with()` function to tell R to regress "with" our imputed dataset.
 
 ```{r imp-reg}
-# impmod1 <- lm(imp_loginc ~ sex + race + workhrs,    # CAN"T USE THIS WITH MICE DATA
+# CAN"T USE THIS WITH MICE DATA
+# impmod1 <- lm(imp_loginc ~ sex + race + workhrs + prestg10,    
 #               data = newimp)
 
-impmod1 <- with(newimp, lm(imp_loginc ~ sex + race + workhrs))
+impmod1 <- with(newimp, lm(imp_loginc ~ sex + race + workhrs + prestg10))
 
 summary(impmod1)
 ```
@@ -440,30 +442,34 @@ If you simply run `summary` on the regression object, R will give you one row fo
 Instead, we can use `mice::pool()` to take the average of the summaries and get a result more like we're used to.
 
 ```{r imp-sum}
-summary(mice::pool(impmod1))
+impmod_pool <- pool(impmod1)
+summary(impmod_pool)
 
 ```
 
-Also, `modelsummary` will do this for us. However, it won't give us goodness-of-fit info. 
+Also, `modelsummary` will do this for us. However, it won't give us goodness-of-fit info. Let's put together a table comparing the model with imputed data alongside the base model with no imputed data, the complete case model, and the model with mean-imputation. 
 
-```{r imp-compare}
+```{r imp-compare, message=FALSE, warning=FALSE}
 
-mod4 <- lm(logincome ~ sex + race + workhrs,
+mod4 <- lm(logincome ~ sex + race + workhrs + prestg10,
            data = gss)
-mod5 <- lm(imp_loginc ~ sex + race + workhrs,
-           data = gss)
-mod6 <- lm(logincome ~ sex + race + workhrs,
+mod5 <- lm(logincome ~ sex + race + workhrs + prestg10,
            data = gsscomp)
+mod6 <- lm(imp_loginc ~ sex + race + workhrs + prestg10,
+           data = gss)
 lastmods <- list("Orig Data" = mod4,
-                 "Mean Imp" = mod5,
-                 "Comp Case" = mod6,
-                 "Imp Model" = impmod1)
+                 "Comp Case" = mod5,
+                 "Mean Imp" = mod6,
+                 "Imp Model" = impmod_pool)
 
-
-  # options(modelsummary_get = "glance") 
-
-# modelsummary(lastmods, stars = T)
+modelsummary(lastmods, stars = T,
+             title = "Comparison of Methods of Handling Missing Data",
+             gof_omit = "est|RMSE")
 
 ```
 
+We can also, of course, visualize this as a coefficient plot. 
+```{r imp-complot}
+modelplot(lastmods, coef_omit = 'Interc') 
+```
 
