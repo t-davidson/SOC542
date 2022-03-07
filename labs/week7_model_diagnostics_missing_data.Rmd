@@ -384,7 +384,7 @@ Regression imputation is like mean imputation, but using multiple variables. It 
 
 (If you're wondering how R does this for categorical variables, we'll get to it after spring break.)
 
-### Multiple Imputation by Chained Equations (MICE)
+### Multivariate Imputation by Chained Equations (MICE)
 
 Multiple imputation is a term that means we're doing (regression) imputation multiple times. 
 
