@@ -361,6 +361,7 @@ threeint4 <- lm(prestg10 ~ logincome * educ * female,
 
 stargazer(threeint1, threeint2, threeint3, threeint4,
           omit.stat = c("ser", "F"),
+          single.row = F,
           type = "text")
 
 ```
