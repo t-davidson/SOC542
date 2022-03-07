@@ -258,6 +258,9 @@ ggplot(d2, aes(x = x, group = X, fill = X)) +  geom_density(alpha = 0.5) + scale
 ## Simple imputation: Random imputation
 - We can address some of the limitations of mean imputation by using the full distribution of the observed variable. This is known as \textbf{random imputation}
 - However, the imputed values will not necessarily reflect the underlying association between variables and we do not make use of other information.
+
+# Missing data
+## Simple imputation: Random imputation
 ```{r guess-random, echo =TRUE, mysize=TRUE, size='\\footnotesize'}
 missing <- is.na(X.m)
 X.g2 <- X.m
@@ -270,8 +273,8 @@ X.g2[missing] <- sample(X.m[!is.na(X.m)],
 # Missing data
 ## Simple imputation: Random imputation
 ```{r guess-plot2, echo =FALSE, mysize=TRUE, size='\\footnotesize'}
-d <- cbind(X, X.m, X.g, X.g2)
-colnames(d) <- c("Complete", "Missing", "Mean Imp.", "Random Imp.")
+d <- cbind(X, X.m, X.g2)
+colnames(d) <- c("Complete", "Missing", "Mean Imp.")
 d2 <- melt(d)
 colnames(d2) <- c("ID", "X", "x")
     
@@ -506,9 +509,9 @@ $$\hat{y} = \hat{\beta_0} + \hat{\beta_1}x + \hat{\beta_2}x^2  + \hat{\beta_3}z 
 - The technique allows us to measure generalization error:
     1. Estimate an model using a sample $X$.
     2. Use the fitted model to predict the outcome for a new dataset $X'$.
-    3. Compare the predictive accuracy (e.g. mean squared error) across the two datasets.
-        - Model generalizes well if $MSE(\hat{y}=f(X)) \approx MSE(\hat{y}=f(X'))$ and both MSE are low
-        - Model overfits $MSE(\hat{y}=f(X)) << MSE(\hat{y}=f(X'))$
+    3. Compare the predictive accuracy (e.g. mean squared error) across the two datasets:
+        - Model generalizes well if $MSE(\hat{y}=f(X)) \approx MSE(\hat{y}=f(X'))$ and both are low
+        - Model overfits if $MSE(\hat{y}=f(X)) << MSE(\hat{y}=f(X'))$
         - Model underfit if both MSE scores are high
 
 # Model checking
@@ -598,10 +601,9 @@ pp_check(m.u, plotfun = "stat_2d", stat = c("mean", "sd"))
 # Model checking
 ## Prediction and explanation
 - Predictive models are designed to predict $\hat{y}$'s with high accuracy.
-- In sociology, we typically estimate explanatory models where the primary goal is to estimate one or more $\hat{\beta}$'s.
-- Prediction is typically a secondary concern and the best predictive models are not necessarily the best explanatory models.\footnote{\tiny See Mullainathan, Sendhil, and Jann Spiess. 2017. “Machine Learning: An Applied Econometric Approach.” Journal of Economic Perspectives 31 (2): 87–106. https://doi.org/10.1257/jep.31.2.87.
+- In sociology, we typically estimate explanatory models where the primary goal is to estimate one or more $\hat{\beta}$'s and prediction is typically used to explore relationships between variables.
+- Nonetheless, generalization error can be a useful heuristic for comparing and selecting different models, particularly when we do not have strong theory to guide model specification.\footnote{\tiny See Watts, Duncan J. 2014. “Common Sense and Sociological Explanations.” American Journal of Sociology 120 (2): 313–51. https://doi.org/10.1086/678271 for further elaboration of this idea and Mullainathan, Sendhil, and Jann Spiess. 2017. “Machine Learning: An Applied Econometric Approach.” Journal of Economic Perspectives 31 (2): 87–106. https://doi.org/10.1257/jep.31.2.87 for some discussion of the limitations of predictive modeling.
 }
-- Nonetheless, generalization error can be a useful heuristic for comparing and selecting different models, particularly when we do not have strong theory to guide model specification.\footnote{\tiny See Watts, Duncan J. 2014. “Common Sense and Sociological Explanations.” American Journal of Sociology 120 (2): 313–51. https://doi.org/10.1086/678271 for further elaboration of this idea.}
 
 # Model checking
 ## Multicollinearity
@@ -638,16 +640,17 @@ vif(m)
 
 -->
 
+<!--
 # Model checking
 ## Additional Bayesian diagnostics
-- There are several other diagnostics specific to Bayesian inference\footnote{\tiny See the \href{https://mc-stan.org/misc/warnings}{Stan documentation} for discussion of these issues and how to address them.}
+- There are several other diagnostics specific to Bayesian inference and help to determine whether the MCMC algorithms have converged\footnote{\tiny See the \href{https://mc-stan.org/misc/warnings}{Stan documentation} for discussion of these issues and how to address them.}
     - \textbf{R-hat values} indicate whether a model has converged. 
         - Values should be 1.01 or less
     - \textbf{Divergent transitions} indicate problems with the MCMC estimation
         - The sampler is making large "jumps" rather than smoothly exploring the posterior distribution
     - \textbf{Trace plots} are useful for assessing MCMC chains
         - Ideally, chains should be moving randomly, without strong autocorrelation
-        
+-->
 
 # Model robustness
 ## Defining robustness
@@ -667,14 +670,14 @@ vif(m)
 ```{r hy, out.width="70%",out.height="70%", fig.align="center"}
 include_graphics('../img/young_holsteen.png')
 ```
-Young and Holsteen 2017.
+\tiny \centering Young and Holsteen 2017.
 
 # Model robustness
 ## How robust are our results?
 ```{r my, out.width="70%",out.height="70%", fig.align="center"}
 include_graphics('../img/young_munoz.png')
 ```
-Muñoz and Young 2018.
+\tiny \centering Muñoz and Young 2018.
     
 # Model robustness
 ## Bayesian Model Averaging
