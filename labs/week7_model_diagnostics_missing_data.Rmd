@@ -447,7 +447,21 @@ summary(impmod_pool)
 
 ```
 
-Also, `modelsummary` will do this for us. However, it won't give us goodness-of-fit info. Let's put together a table comparing the model with imputed data alongside the base model with no imputed data, the complete case model, and the model with mean-imputation. 
+The `modelsummary()` command will run this for us and will pool the R-squared, but it won't give us other goodness-of-fit info. 
+
+To explore how the number of imputed datasets can affect the output, let's create one with 100 imputations.
+
+```{r bigimp}
+bigimp <- gss %>% select(-age, -conrinc, -logincome) %>% 
+  mice(., m= 100, maxit = 2,
+       seed = seed,
+       printFlag=F)
+impmod2 <- with(bigimp, lm(imp_loginc ~ sex + race + workhrs + prestg10))
+impmod2_pool <- pool(impmod2)
+
+```
+
+Now, let's put together a table comparing out two MICE data models alongside the base model with no imputed data, the complete case model, and the model with mean-imputation. 
 
 ```{r imp-compare, message=FALSE, warning=FALSE}
 
@@ -459,8 +473,9 @@ mod6 <- lm(imp_loginc ~ sex + race + workhrs + prestg10,
            data = gss)
 lastmods <- list("Orig Data" = mod4,
                  "Comp Case" = mod5,
-                 "Mean Imp" = mod6,
-                 "Imp Model" = impmod_pool)
+                 "Mean/Med Imp" = mod6,
+                 "Imp Model" = impmod_pool,
+                 "Big Imp Model" = impmod2_pool)
 
 modelsummary(lastmods, stars = T,
              title = "Comparison of Methods of Handling Missing Data",
@@ -470,6 +485,8 @@ modelsummary(lastmods, stars = T,
 
 We can also, of course, visualize this as a coefficient plot. 
 ```{r imp-complot}
-modelplot(lastmods, coef_omit = 'Interc') 
+modelplot(lastmods, coef_omit = 'Interc') +
+  geom_vline(aes(xintercept = 0), 
+             linetype = "dotted", size = 1, alpha = .5)
 ```
 
