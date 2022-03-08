@@ -107,7 +107,7 @@ options("modelsummary_format_numeric_latex" = "plain")
 - Consider the following population model
 
 $$z = N(0,1)$$
-$$x = 0.5z + N(0,1)$$
+$$x = N(0,1)$$
 $$y = 2x - 2z + N(0,10)$$
 
 
@@ -118,7 +118,7 @@ N <- 1000
 results <- tibble()
 for (i in 1:1E3) {
     z <- rnorm(N, mean = 1)
-    x <- 0.2*z + rnorm(N, mean = 1)
+    x <- rnorm(N, mean = 1)
     y <- 2*x - 2*z + rnorm(N, sd = 10)
     x.mcar <- ifelse(rbinom(N,1,prob = 1-0.6), x, NA)
     x.mar <- ifelse(z > 0, ifelse(rbinom(N,1,prob = 1-0.8), x, NA), x)
@@ -189,6 +189,8 @@ s2 <- s + theme(legend.position = "none")
 l <- get_legend(s)
 plot_grid(b, s2, l, nrow= 1)
 ```
+
+<!--TODO: Make a better simulation. The disparities are not very clear in some cases-->
 
 # Missing data
 ## Missingness in practice
@@ -274,7 +276,7 @@ X.g2[missing] <- sample(X.m[!is.na(X.m)],
 ## Simple imputation: Random imputation
 ```{r guess-plot2, echo =FALSE, mysize=TRUE, size='\\footnotesize'}
 d <- cbind(X, X.m, X.g2)
-colnames(d) <- c("Complete", "Missing", "Mean Imp.")
+colnames(d) <- c("Complete", "Missing", "Random Imp.")
 d2 <- melt(d)
 colnames(d2) <- c("ID", "X", "x")
     
@@ -330,7 +332,7 @@ m1 <- lm(y ~ x + w, data = d1)
 d2 <- as.data.frame(cbind(y,x.m,w)) %>% rename(x = x.m)
 mm <- lm(y ~ x + w, data = d2)
 d3 <- as.data.frame(cbind(y,x.mean,w)) %>% rename(x = x.mean)
-m2 <- lm(y ~ x + w)
+m2 <- lm(y ~ x + w, data = d3)
 d4 <- as.data.frame(cbind(y,x.r,w)) %>% rename(x = x.r)
 m3 <- lm(y ~ x + w, data = d4)
 d5 <- as.data.frame(cbind(y,x.imp, w)) %>% rename(x = x.imp)
@@ -524,7 +526,7 @@ $$\hat{y} = \hat{\beta_0} + \hat{\beta_1}x + \hat{\beta_2}x^2  + \hat{\beta_3}z 
 # Model checking
 ## Cross-validation: `loo`
 - The `rstanarm` package includes a function `loo`, which computes an approximation of LOO-CV, avoiding the need to fit N models.
-- Models can be compared using the *expected log pointwise predictive density* (ELPD)}, a quantity that captures the predictive accuracy of the model (McElreath 7.2-4, GHV 11.8). 
+- Models can be compared using the *expected log pointwise predictive density* (ELPD), a quantity that captures the predictive accuracy of the model (McElreath 7.2-4, GHV 11.8). 
 - The function can also be used to compute a k-fold CV score and an information theoretic measure WAIC.\footnote{\tiny See the \href{http://mc-stan.org/rstanarm/reference/loo.stanreg.html}{documentation} and \href{https://mc-stan.org/rstanarm/articles/rstanarm.html}{vignette} for further details on implementation.}
 
     
@@ -571,7 +573,8 @@ loo_compare(loo(m), loo(m.u), loo(m.o))
 # Model checking
 ## Posterior predictive checks
 - We can also evaluate Bayesian models by examining the posterior predictive distribution
-- Recall that Bayesian models are *generative*; we can use the posterior distribution to make predictions, creating new, hypothetical datasets
+- Recall that Bayesian models are *generative*;
+    - We can use the posterior distribution to make predictions, creating new, hypothetical datasets
 - These predictions can be used to evaluate how well the models fit the data, including key statistics
 
 # Model checking
