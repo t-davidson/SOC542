@@ -196,7 +196,7 @@ print(mcol)
 
 These are all very weakly predicted by the others. Hooray!
 
-You'll notice that these don't align perfectly. This is because the `car::vif()` command calculates the Generalized GIF. Additionally, the term $GVIF^{1 / (2*Df)}$ is useful in comparing GVIF's across models since it accounts for the number of total predictors. 
+You'll notice that these don't align perfectly. This is because the `car::vif()` command calculates the Generalized VIF. Additionally, the term $GVIF^{1 / (2*Df)}$ is useful in comparing GVIF's across models since it accounts for the number of total predictors. 
 
 - For more information, see John Fox's response to the question here: https://stats.stackexchange.com/questions/70679/which-variance-inflation-factor-should-i-be-using-textgvif-or-textgvif 
 - And the linked paper here: https://www.tandfonline.com/doi/abs/10.1080/01621459.1992.10475190 
