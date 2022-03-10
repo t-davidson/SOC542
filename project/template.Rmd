@@ -1,0 +1,74 @@
+---
+output: 
+  pdf_document:
+    keep_tex: true
+    fig_caption: yes
+geometry: margin=1in
+
+title: Replication template
+
+date: "May 11, 2022"
+author: Author
+
+fontfamily: mathpazo
+fontsize: 12pt
+urlcolor: black
+header-includes:
+    - \pagenumbering{arabic}
+    - \usepackage{setspace}\doublespacing
+---
+
+
+```{r setup, include=FALSE}
+# This cell contains default chunk options
+# These will be applied to all chunks unless an individual chunk is modified
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(include = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(dev = 'pdf')
+
+# You may modify this chunk to include additional options
+# For example, there are options that can change the layout for all figures
+
+# You can also modify the header options above this chunk to change the
+# formatting of the output, but do so at your own risk.
+
+# This book provides lots of tips for using RMarkdown: https://bookdown.org/yihui/rmarkdown-cookbook/
+```
+
+# INTRODUCTION
+
+*Before adding to this document, click the Knit button above to ensure that you are able to Knit it as a PDF. You should also modify the author and title information above.*
+
+This section can can be used to discuss the paper you have chosen to replicate and the particular results you will be analyzing.
+
+# REPLICATION
+Present the initial replication and discuss your findings. This section should include a table or figure showing the replicated result (as close to the original paper as possible).
+
+Below is an example of a code chunk. Due to the defaults used above, neither the code nor the output will get rendered to the final document. You will need to modify the chunk options appropriately, depending on your goal. These options are fine for loading and cleaning data, but will need to be changed if you want to display a table or plot. I recommend giving all of your chunks informative names.
+```{r test}
+# Add code here or remove and add other chunks where necessary
+x <- 4
+print(x)
+```
+
+You can also use LaTeX to render equations, either as part of a sentencence like $this$ or as a separate like like the following:
+
+$$E = MC^2$$
+
+# BAYESIAN REPLICATION
+Present the Bayesian extension of the model and discuss your findings. Pay close attention to any discrepancies between the Bayesian and frequentist models.
+
+
+# ALTERNATIVE SPECIFICATIONS
+Discuss each of the alternative specifications and use tables and/or figures to present your results. There should be at least three alternatives (one changing data, one changing variables, one changing model) but you are welcome to do more or to consider something more systematic.
+
+# DISCUSSION
+Discuss your findings and reflect upon the replication exercise.
+
+# REFERENCES
+Provide a section listing works cited. You can add the references directly in the text. It is also possible to include references directly from a bibliography file, see https://bookdown.org/yihui/rmarkdown-cookbook/bibliography.html
+
+If you are not doing so already, I highly recommend using a reference management program (I use Zotero as it is free and open source). It will take a little time to set up but will save you a lot of time in the long-run.
+
