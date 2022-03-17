@@ -203,8 +203,14 @@ I will also make additional accommodations due to the COVID-19 pandemic. If you 
 
 *Readings* 
 
-- GHV 13
-- McElreath 10-11 (selections)
+- GHV 13, 15.1, 15.4
+- McElreath 10.2-10.4, 11.1
+
+*Recommended*
+
+- McElreath 10.1
+- Battey, H. S., D. R. Cox, and M. V. Jackson. 2019. “On the Linear in Probability Model for Binary Data.” *Royal Society Open Science* 6 (5): 190067. https://doi.org/10.1098/rsos.190067.
+
 
 *Homework 4 released, due 4/1*
 
@@ -214,7 +220,6 @@ I will also make additional accommodations due to the COVID-19 pandemic. If you 
 
 - GHV 14
 - Long, J. Scott, and Sarah A. Mustillo. 2018. “Using Predictions and Marginal Effects to Compare Groups in Regression Models for Binary Outcomes.” *Sociological Methods & Research* 50 (3): 1284–1320. https://doi.org/10.1177/0049124118799374.
-- Mize, Trenton D., Long Doan, and J. Scott Long. 2019. “A General Framework for Comparing Predictions and Marginal Effects across Models.” *Sociological Methodology* 49 (1): 152–89. https://doi.org/10.1177/0081175019852763.
 
 *Recommended*
 
@@ -224,8 +229,8 @@ I will also make additional accommodations due to the COVID-19 pandemic. If you 
 
 *Readings*
 
-- GHV 15 (selections)
-- McElreath 11-12 (selections)
+- GHV 15.2-15.3
+- McElreath 11.2, 12.1-12.2
 
 *Homework 5 released, due 4/22*
 
@@ -233,22 +238,38 @@ I will also make additional accommodations due to the COVID-19 pandemic. If you 
 
 *Readings* 
 
-- GHV 15 (selections)
-- McElreath 12 (selections)
+- GHV 15.5
+- McElreath 12.3-12.5
 
 ## Week 12 - April 18 -  Clustered data
 
 *Readings*
 
-- McElreath 13-14 (selections)
+- McElreath 13-13.3, 13.5-13.6, 14-14.2
 - Bell, Andrew, Malcolm Fairbrother, and Kelvyn Jones. 2019. “Fixed and Random Effects Models: Making an Informed Choice.” *Quality & Quantity* 53 (2): 1051–74. https://doi.org/10.1007/s11135-018-0802-x.
-- TBD
+- King, Gary, and Margaret E. Roberts. 2015. “How Robust Standard Errors Expose Methodological Problems They Do Not Fix, and What to Do About It.” *Political Analysis* 23 (02): 159–79. https://doi.org/10.1093/pan/mpu015.
+
+*Recommended*
+
+- Keele, Luke, and Nathan J. Kelly. 2006. “Dynamic Models for Dynamic Theories: The Ins and Outs of Lagged Dependent Variables.” *Political Analysis* 14 (02): 186–205. https://doi.org/10.1093/pan/mpj006.
+- De Boef, Suzanna, and Luke Keele. 2008. “Taking Time Seriously.” *American Journal of Political Science* 52 (1): 184–200. https://doi.org/10.1111/j.1540-5907.2007.00307.x
+- Rüttenauer, Tobias. 2019. “Spatial Regression Models: A Systematic Comparison of Different Model Specifications Using Monte Carlo Experiments.” *Sociological Methods & Research*, November, 004912411988246. https://doi.org/10.1177/0049124119882467.
+- Chi, Guangqing, and Jun Zhu. 2008. “Spatial Regression Models for Demographic Analysis.” *Population Research and Policy Review* 27 (1): 17–42. https://doi.org/10.1007/s11113-007-9051-8.
+- Dow, Malcolm M., Michael L. Burton, and Douglas R. White. 1982. “Network Autocorrelation: A Simulation Study of a Foundational Problem in Regression and Survey Research.” *Social Networks* 4 (2): 169–200. https://doi.org/10.1016/0378-8733(82)90031-4.
+- DellaPosta, Daniel, Yongren Shi, and Michael Macy. 2015. “Why Do Liberals Drink Lattes?” *American Journal of Sociology* 120 (5): 1473–1511. https://doi.org/10.1086/681254.
 
 ## Week 13 - April 25 -  Causal inference using observational data
 
 *Readings* 
 
-- McElreath 6, 14 (selections)
-- TBD
+- GHV 18-21
+- Cunningham p. 96-198 (Chapters 3-5), 
+
+*Recommended*
+
+- Cunningham *skim* p. 241-509 (Chapters 6-9)
+- McElreath 6
+- King, Gary, and Richard Nielsen. 2019. “Why Propensity Scores Should Not Be Used for Matching.” *Political Analysis* 27 (4): 435–54. https://doi.org/10.1017/pan.2019.11.
+
 
 ## Week 14 - May 2 - Student presentations
