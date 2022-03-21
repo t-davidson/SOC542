@@ -232,11 +232,15 @@ lin_glm1 <- glm(legal_grass ~ conservatism + age + educ + race + sex,
                 family = gaussian(link = "identity"),
                 data = gss)
 
-logit1 <- glm(legal_grass ~ conservatism + age + educ + race + sex,
+logit1 <- glm(legal_grass ~ conservatism,
               family = "binomial",
                data = gss)
 
-stargazer(linprob1, lin_glm1, logit1,
+logit2 <- glm(legal_grass ~ conservatism + age + educ + race + sex,
+              family = "binomial",
+               data = gss)
+
+stargazer(linprob1, lin_glm1, logit1, logit2,
           type = "text")
 
 ```
@@ -250,7 +254,8 @@ Let's plot the coefficients and standard errors to see how they compare.
 ```{r mod-comp-graph}
 compmods <- list("Linear Prob. via OLS" = linprob1,
                  "Linear Prob. via GLM" = lin_glm1,
-                 "Logit via GLM" = logit1)
+                 "Base Logit" = logit1,
+                 "Full Logit" = logit2)
 
 modelplot(compmods, coef_omit = 'Interc') +
   geom_vline(aes(xintercept = 0), 
@@ -265,12 +270,12 @@ We see here just how big the confidence intervals are in our logit model. We als
 Let's reproduce just the output for our logit model so we can interpret it.
 
 ```{r logit-table}
-stargazer(logit1, 
+stargazer(logit2,
           single.row = T, type = "text")
 ```
 
 
-When interpreting our logit model, we're working with log odds. So we say that a person moving one step more conservative decreases the log odds of them favoring marijuana legalization by 0.35 and each additional year of age decreases them by 0.03.
+When interpreting our "full" logit model, we're working with log odds. So we say that a person moving one step more conservative decreases the log odds of them favoring marijuana legalization by 0.35 and each additional year of age decreases them by 0.03.
 
 We can also interpret the categorical variables in a similar way. Being Black does not significantly affect the log odds of opinions on marijuana legalization but being hispanic is associated with significantly lower log odds of favoring legalization. 
 
@@ -286,7 +291,7 @@ logitpreddata <- expand_grid(conservatism = seq(1, 7),
                            race = "Black",
                            sex = "Female")
 
-logitpreddata$pred_grass <- predict(linprob1, newdata = logitpreddata, type = "response")
+logitpreddata$pred_grass <- predict(logit2, newdata = logitpreddata, type = "response")
 
 head(logitpreddata)
 range(logitpreddata$pred_grass)
@@ -296,9 +301,10 @@ We can also plot our predicted values with a heatmap.
 
 ```{r log-pred-graph}
 
-logitprobgraph <- ggplot(logitpreddata, aes(x = conservatism,
-                                        y = age,
-                                        fill = pred_grass)) +
+logitprobgraph <- ggplot(logitpreddata, 
+                         aes(x = conservatism,
+                             y = age,
+                             fill = pred_grass)) +
   geom_tile() + 
   scale_fill_viridis_c() +
   geom_text(aes(label = round(pred_grass, 2)), color = "white", size = 4) +
@@ -312,7 +318,7 @@ logitprobgraph
 
 ```
 
-
+Note that, when using a logit function, our probabilities will range 0 to 1. 
 
 # Odds Ratios
 
@@ -321,8 +327,8 @@ Because log odds are often difficult to interpret, another way of presenting you
 Getting the exponentiated coefficients is easy. Just use `exp()` on the coefficients of your model. Below, I compare the log odds and the odds ratios of our logit1 model. 
 
 ```{r odds-ratio}
-cbind(Estimate=round(coef(logit1),3),
-      OddsRatio=round(exp(coef(logit1)),3)) 
+cbind(Estimate=round(coef(logit2),3),
+      OddsRatio=round(exp(coef(logit2)),3)) 
 ```
 
 So here, we would say that being Hispanic decreases the odds of favoring marijuana legalization. 
@@ -340,26 +346,49 @@ Because of this easy interpretation, at least as far as applying results, I pers
 
 While exponentiating the coefficients is easy, getting standard errors for these is much more difficult. 
 
-Doing this with stargazer is tricky, but modelsummary makes it easy: just include `exponentiate = T`. Note, however, that you cannot combine exponentiated models with nonexponentiated models in the same modelsummary function. Below, I provide one way to do it, but it's clunky and not great. 
+Doing this with stargazer is tricky, but modelsummary makes it easy: just include `exponentiate = T`. Note, however, that you cannot combine exponentiated models with nonexponentiated models in the same modelsummary function. 
 
-<!-- TOM: Any thought on how to improve this?? -->
 
 ```{r OR-table}
-# m1 <- modelsummary(logit1,
-#              stars = T, output = "data.frame",
-#              gof_omit = "log")
-# 
-# options("modelsummary_get" = "easystats")
-# m2 <- modelsummary(logit1,
-#              stars = T, output = "data.frame",
-#              exponentiate = T) %>% 
-#   select("Model 1") %>% rename("Model 2" = "Model 1")
-# m <- cbind(m1, m2)
-# 
-# kableExtra::kable(m)
+modelsummary(list(logit1, logit2),
+             estimate = "{estimate} ({std.error}) {stars}",
+             statistic = NULL, stars = T,
+             exponentiate = T)
 
 ```
 
+
+# Model Evaluation 
+
+## Log Likelihood
+
+Just like before, we can use the log-likelihood for the model. 
+
+```{r loglike}
+logLik(logit1) 
+logLik(logit2) 
+logLik(lin_glm1)
+
+```
+
+In the models above, we see that the base logit model, which only included conservatism as a predictor for legalization, had the lowest log-likelihood, showing it was worst-performing of the three. The full logit model, with all predictor included, performed best. 
+
+## Pseudo R-Squared
+
+The most standard method of model evaluation is the $R^2$ However, we cannot calculate it in logistic regression. Instead, we can approximate it with a "pseudo" $R^2$. A good way of doing this is McFadden's $R^2$, calcuated as: 
+
+$$R^2_{McFadden} =  \frac{1 - LL_{mod}}{ LL_0}$$
+Where $LL_{mod}$ is the log-likelihood for the model, and $LL_0$ is the Log Likelihood for the null model which only includes the intercept as the predictor. (More info here: http://thestatsgeek.com/2014/02/08/r-squared-in-logistic-regression/)
+
+We can calculate it using the `DescTools` package. (**Note** that I use `package::function()` form below, since `DescTools` overwrites some important functions in `modelsummary`.) We can also ask it to give us the log-likelihood. 
+
+```{r}
+DescTools::PseudoR2(logit1, which = c("McFadden","McFaddenAdj", "logLik"))
+DescTools::PseudoR2(logit2, which = c("McFadden","McFaddenAdj", "logLik"))
+DescTools::PseudoR2(lin_glm1, which = c("McFadden","McFaddenAdj", "logLik")) 
+```
+
+Just like with log likelihood, we want to maximize McFadden's $R^2$. We can see that teh linear probability model 
 
 # Bayesian Modeling 
 Let's finish by replicating two of our previous analyses using `stan_glm()`. The first is the linear probability model and the second is the logistic model. You'll note that they display the exact same except for the line that tell `rstanarm` what "family" of distributions to pull from. 
@@ -385,12 +414,13 @@ bmodlinpro <- stan_glm(legal_grass ~ conservatism + age + educ + race + sex,
                        warmup = 1000)
 ```
 
-Now, let's build a table with all five models together. 
+Now, let's build a table with all six models together. 
 ```{r comp-table}
 lastmods <- list("LPM" = linprob1,
                  "Linear GLM" = lin_glm1,
                  "Bayes LPM" = bmodlinpro,
-                 "Logit" = logit1,
+                 "Base Logit" = logit1,
+                 "Full Logit" = logit2,
                  "Bayes Logit" = bmodlogit)
 coefnames <- c("conservatism" = "Conservatism \n(7 pt scale)", # The "\n" will come in handy in a second
                "age" = "Age (Yrs)",
@@ -401,7 +431,7 @@ coefnames <- c("conservatism" = "Conservatism \n(7 pt scale)", # The "\n" will c
                "(Intercept)" = "Constant")
 
 modelsummary(lastmods,
-             coef_map = coefnames,
+             coef_map = coefnames, gof_omit = "pss|alg|RMSE",
              title = "Model Comparison: Predicing Support for Marijuana Legalization",
              notes = c("Reference Categories: Male, White",
                        "Data: 2018 General Social Survey"))
