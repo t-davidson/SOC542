@@ -360,8 +360,8 @@ $$OR(0.6, 0.8) = \frac{\frac{0.6}{1-0.6}}{\frac{0.8}{1-0.8}} = \frac{1.5}{4} = 0
 # Logistic regression
 ## Interpretation: Odds-ratios
 - We can get the \textbf{odds ratio} by exponentiating the coefficients
-    - $OR(age) = exp(0.3) = 1.35$. A 1 year increase in age is associated with a 34% increase in the probability of SHG membership.
-    - $OR(caste) = \frac{Odds(SHG=1|lower-caste)}{Odds(SHG=1|higher-caste)} = exp(0.315) = 1.37$. This implies that low caste residents are more likely to belong to SHGs (a 37% increase in the probability of SHG membership).
+    - $OR(age) = exp(0.3) = 1.35$. A 1 year increase in age is associated with a 34% increase in the odds of SHG membership.
+    - $OR(caste) = \frac{Odds(SHG=1|lower-caste)}{Odds(SHG=1|higher-caste)} = exp(0.315) = 1.37$. This implies that low caste residents are more likely to belong to SHGs (a 37% increase in the odds of SHG membership).
     
 <!--A useful post explaining why we get odds ratios and not just odds when we exponentiate: https://stats.stackexchange.com/questions/361529/why-are-exponentiated-logistic-regression-coefficients-considered-odds-ratios (see replies)-->
 
