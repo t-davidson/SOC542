@@ -219,10 +219,9 @@ I will also make additional accommodations due to the COVID-19 pandemic. If you 
 *Readings*
 
 - GHV 14
-- Long, J. Scott, and Sarah A. Mustillo. 2018. “Using Predictions and Marginal Effects to Compare Groups in Regression Models for Binary Outcomes.” *Sociological Methods & Research* 50 (3): 1284–1320. https://doi.org/10.1177/0049124118799374.
 
 *Recommended*
-
+- Long, J. Scott, and Sarah A. Mustillo. 2018. “Using Predictions and Marginal Effects to Compare Groups in Regression Models for Binary Outcomes.” *Sociological Methods & Research* 50 (3): 1284–1320. https://doi.org/10.1177/0049124118799374.
 - Mize, Trenton. 2019. “Best Practices for Estimating, Interpreting, and Presenting Nonlinear Interaction Effects.” *Sociological Science* 6: 81–117. https://doi.org/10.15195/v6.a4.
 
 ## Week 10 - April 4 -  GLMs III: Count outcomes and overdispersion
