@@ -23,7 +23,7 @@ library(broom.mixed)
   
 # Making sure we have the most recent version 
 if((packageVersion("marginaleffects") != '0.4.0.9000'))  
-  remotes::install_github("vincentarelbundock/modelsummary")
+  remotes::install_github("vincentarelbundock/marginaleffects")
 ## MAKE SURE YOU RESTART R AFTER THIS INSTALL 
 
 library(marginaleffects)
