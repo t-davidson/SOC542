@@ -207,7 +207,8 @@ ggplot(incpreds,
   facet_wrap(~sex) +
   theme_minimal() + 
   labs(title = "Predicted Value of Income (Logged)",
-       subtitle = "Data: 2018 GSS")
+       subtitle = "Data: 2018 GSS",
+       caption = "Shaded regions show one standard error from the mean.")
 ```
 
 
