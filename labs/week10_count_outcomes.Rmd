@@ -36,7 +36,7 @@ seed <- 12345
 
 # Data Loading and Management
 
-Let's use the GSS again. This week, we'll be looking at three specific variables related to family life: The number of sexual partners, siblings, and children as person has. Since all  three are count variables, we'll be using new methods to analyze them. 
+Let's use the GSS again. This week, we'll be looking at three specific variables related to family life: The number of sexual partners, siblings, and children as person has. Since all three are count variables, we'll be using new methods to analyze them. 
 
 ```{r gss-loading}
 gss2018 <- haven::read_dta("lab-data/GSS2018.dta")
@@ -85,7 +85,7 @@ It was probably: `Error in select(...) : unused argument (...)`. One of the pack
 
 If this happens, restart R (CTRL + Shift + F10 on PC) and run the `dplyr` code before running `library(MASS)`. 
 
-Also, when this happens, use `package::function()` format, as I have done above (`dplyr::select()`) and below (`MASS::glm.nb`). Because of this, I still loaded `dplyr`, which is invaluable to me throughout the script, and did not load MASS, since I only need it in a few choice locations.  
+Also, when this happens, use `package::function()` format, as I have done above (`dplyr::select()`) and below (`MASS::glm.nb`). Because of this, I still loaded `dplyr`, which is invaluable to me throughout the script, and did not load MASS, since I only need it in a few choice locations. 
 
 
 ## Descriptives
@@ -136,7 +136,7 @@ stargazer(partner_ols, sibs_ols, child_ols,
           type = "text")
 ```
 
-We see, generally, that widows, women, those  who are separated, and those who are older tend to have fewer sexual partners, while those with more education tend to have more. 
+We see, generally, that widows, women, those who are separated, and those who are older tend to have fewer sexual partners, while those with more education tend to have more. 
 
 Also, those who are separated tend to have more siblings, for some reason, as do women and those who are older. Those with more education tend to have fewer. 
 
@@ -163,7 +163,7 @@ summary(partner_poi)
 Let's break down what we see above:
 1. The formula call
 
-2. Deviance Residuals: We're looking for residuals that are not very skewed. In this case, the median is close to zero, which is good, and the 1st and 3rd quartiles are even enough. Looking at a density plot of the residuals below, we see they're slightly skewed with a tail to the right.  Compared to the OLS  version, though, it is much more centered. 
+2. Deviance Residuals: We're looking for residuals that are not very skewed. In this case, the median is close to zero, which is good, and the 1st and 3rd quartiles are even enough. Looking at a density plot of the residuals below, we see they're slightly skewed with a tail to the right. Compared to the OLS version, though, it is much more centered. 
 
 ```{r poisson-resid}
 cowplot::plot_grid(
@@ -175,7 +175,7 @@ cowplot::plot_grid(
 )
 ```
 
-3. Coefficients: We interpret these (kind of) like normal. A one-year increase in age, for example,  is associated with a .015  decrease in the **expected log count** of children. 
+3. Coefficients: We interpret these (kind of) like normal. A one-year increase in age, for example, is associated with a .015 decrease in the **expected log count** of children. 
 
 4. Deviance information: We can use this to perform goodness-of-fit tests for the model. Below, I run a chi-squared test, with the null hypothesis that the deviance is acceptable for the number of data points and predictors. We fail to reject the null, so the model is adequately fit. 
 
@@ -186,7 +186,6 @@ with(partner_poi, cbind(res.deviance = deviance,
 ```
 
 ## Model Interpretation
-
 
 Let's create a quick output of our coefficients. 
 
@@ -216,7 +215,7 @@ cbind(Estimate = coef(partner_poi),
       exp(confint(partner_poi)))
 ```
 
-So here we see that each year of education increases the rate ratio of sexual partners by a factor of 1.02, or a 2% increase, and each year of age decreases it by a factor of .015, or a 1.5% decrease.  
+So here we see that each year of education increases the rate ratio of sexual partners by a factor of 1.02, or a 2% increase, and each year of age decreases it by a factor of .015, or a 1.5% decrease. 
 
 When we talk about categorical contrasts, we don't have to speak of ratios, because the change from x to x+1 only occurs once. So females are expected to have a rate of sexual partners that is 23% less than males. We could also say that it changes by a factor of .77. Additionally, widows are expected to have a rate of sexual partners that is 61% lower ($1 - .39$) than never-married individuals. 
 
@@ -248,13 +247,9 @@ ggplot(gss, aes(x = sibs)) + geom_density() + theme_light()
 table(gss$sibs)
 ```
 
+As a rule of thumb, the residual deviance in a Poisson model should be about equal to the degrees of freedom of the residuals in the model. (See top of page 4 [here](https://biometry.github.io/APES/LectureNotes/2016-JAGS/Overdispersion/OverdispersionJAGS.pdf). 
 
-As a rule of thumb, the residual deviance in a poisson model should be about equal to the degrees of freedom of the residuals in the model. (See top of page 4 [here](https://biometry.github.io/APES/LectureNotes/2016-JAGS/Overdispersion/OverdispersionJAGS.pdf). 
-
-TOM:  What are your thoughts on this? 
-TD: Not something I've considered before but it sounds reasonable. I won't be discussing this in lecture.
-
-Below, I create a Poisson model estimating the number of siblings a person has, then divide the null deviance by the DF's  of the residuals. 
+Below, I create a Poisson model estimating the number of siblings a person has, then divide the null deviance by the DF's of the residuals. 
 
 ```{r sibspoi-dev}
 sibs_poisson <- glm(sibs ~ marital + age + educ + sex,
@@ -273,7 +268,7 @@ with(partner_poi, cbind("Deviance" = deviance,
 
 ```
 
-Because our siblings variable is overdispersed in our currently-specified poisson model, we will use a negative binomial model. 
+Because our siblings variable is overdispersed in our currently-specified Poisson model, we will use a negative binomial model. 
 
 ## The Negative Binomial Model
 
@@ -281,7 +276,7 @@ The negative binomial model includes a Theta parameter ($\theta$) that accounts 
 
 To make one, we use the package MASS. The MASS package (Modern Applied Statistics with S) was one of the original packages for R and has a ton of statistical tools. It is also the package that overwrites `dplyr::select()`, which is why we use `MASS::glm.nb()` in the code below and `dplyr::select()` in the code at the top. 
 
-To create our negative binomial model, we will use the `MASS::glm.nb()` function. Because  there is only one "family" of distributions inside, we don't have to specify it, like we do with Poisson and Binomial models. 
+To create our negative binomial model, we will use the `MASS::glm.nb()` function. Because there is only one "family" of distributions inside, we don't have to specify it, like we do with Poisson and Binomial models. 
 
 ```{r sigs-negbi}
 sibs_negbi <- MASS::glm.nb(sibs ~ marital + age + educ + sex,
@@ -298,7 +293,7 @@ Let's take a look at our output.
 summary(sibs_negbi)
 ```
 
-We see similar output here as we did in our poisson model above. Note the Theta parameter at the bottom. This is the measure of dispersion in the model. Smaller thetas provide better justification for using negative binomial instead of Poisson. 
+We see similar output here as we did in our Poisson model above. Note the Theta parameter at the bottom. This is the measure of dispersion in the model. Smaller thetas provide better justification for using negative binomial instead of Poisson. 
   - Stata, SAS, SPSS, and every other software gives an alpha parameter which is equal to the inverse of Theta. 
   - "The model becomes Poisson as the value of alpha approaches zero. ... Where alpha is closer to zero, the model statistics displayed in Poisson output are nearly the same as those of a negative binomial." Joseph Hilbe (2011): Negative Binomial Regression. 
   
@@ -306,7 +301,7 @@ So our model Theta of 5 points to a high level of dispersion.
 
 ## Interpretation
 
-With the modeling done, we can  interpret negative binomial coefficients just like Poisson ones. 
+With the modeling done, we can interpret negative binomial coefficients just like Poisson ones. 
 
 Let's create a table to look at our output. 
 ```{r}
@@ -331,7 +326,7 @@ cbind(Estimate = coef(sibs_negbi),
       exp(confint(sibs_negbi)))
 ```
 
-So each additional year of age increases the rate ratio by a factor of 1.002 and each additional year of education  decreases it by about 7%. Additionally, women tend to have about 10% more siblings than men. 
+So each additional year of age increases the rate ratio by a factor of 1.002 and each additional year of education decreases it by about 7%. Additionally, women tend to have about 10% more siblings than men. 
 
 # Zero-Inflation: Number of Children 
 
@@ -414,11 +409,11 @@ And viewing it in modelsummary will give you both, but will tag each of the term
 modelsummary(list(child_zip, child_ols), output = "huxtable", stars = T)
 ```
 
-With a lot of work, we can them  side by side. Here is  what I'm doing:
+With a lot of work, we can them side by side. Here is what I'm doing:
 1. Create two objects to store the estimates and standard errors for the counting model and the zero model. 
 2. Create an object to store whatever model diagnostic information I want.
-3. For each of the objects in step 1,  I create a list that has two parts: "tidy", which contains the model  terms and estimates, and "glance", which has the model diagnostics. 
-4. Change  the classes for both of these lists from step 3 into "modelssummary_list".
+3. For each of the objects in step 1, I create a list that has two parts: "tidy", which contains the model terms and estimates, and "glance", which has the model diagnostics. 
+4. Change the classes for both of these lists from step 3 into "modelssummary_list".
 5. Create a list that contains the two lists from earlier, as well as the OLS model.
 6. Create the modelsummary object as normal. 
 ```{r}
@@ -462,7 +457,6 @@ modelsummary(freqmods, output = "huxtable", stars = T,
 
 ```
 
-
 Another option is to use the `coef_map` option in `modelsummary::modelsummary()` to rename the coefficients.
 
 ```{r}
@@ -492,12 +486,11 @@ modelsummary(list("ZI Poisson" = child_zip,
              output = "huxtable", stars = T)
 ```
 
-
 ## Predictions
 
 We can create predictions from our estimates using the `marginaleffects` package. 
 
-Below, we see that there seems to be an effect of education and age together, up to around the mid-30's, such  that higher levels of education are  associated with decreased odds of having children. But, as my parents would be happy to know, such effect balances out at a point and  highly-educated adults still bring home grandchildren. 
+Below, we see that there seems to be an effect of education and age together, up to around the mid-30's, such that higher levels of education are associated with decreased odds of having children. But, as my parents would be happy to know, such effect balances out at a point and highly-educated adults still bring home grandchildren. 
 
 ```{r child-pred-educ}
 plot_cap(child_zip, condition = c("age", "educ"))  +
@@ -552,7 +545,6 @@ modelsummary(list(partner_stan_poisson, sibs_stan_negbi, child_stan_poisson),
              output = "huxtable")
 
 ```
-
 
 Since count data is subject to often-unusual distributions, let's plot our posterior distributions and compare them to the original data. 
 
