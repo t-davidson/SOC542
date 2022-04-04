@@ -252,8 +252,9 @@ table(gss$sibs)
 As a rule of thumb, the residual deviance in a poisson model should be about equal to the degrees of freedom of the residuals in the model. (See top of page 4 [here](https://biometry.github.io/APES/LectureNotes/2016-JAGS/Overdispersion/OverdispersionJAGS.pdf). 
 
 TOM:  What are your thoughts on this? 
+TD: Not something I've considered before but it sounds reasonable. I won't be discussing this in lecture.
 
-Below, I create a poisson model estimating the number of siblings a person has, then divide the null deviance by the  DF's  of the residuals. 
+Below, I create a Poisson model estimating the number of siblings a person has, then divide the null deviance by the DF's  of the residuals. 
 
 ```{r sibspoi-dev}
 sibs_poisson <- glm(sibs ~ marital + age + educ + sex,
@@ -297,7 +298,7 @@ Let's take a look at our output.
 summary(sibs_negbi)
 ```
 
-We see similar output here as we did in our poisson model above. Note the Theta parameter at the bottom. This is the measure of dispersion in the model. Larger thetas provide better justification for using negative binomial instead of Poisson. 
+We see similar output here as we did in our poisson model above. Note the Theta parameter at the bottom. This is the measure of dispersion in the model. Smaller thetas provide better justification for using negative binomial instead of Poisson. 
   - Stata, SAS, SPSS, and every other software gives an alpha parameter which is equal to the inverse of Theta. 
   - "The model becomes Poisson as the value of alpha approaches zero. ... Where alpha is closer to zero, the model statistics displayed in Poisson output are nearly the same as those of a negative binomial." Joseph Hilbe (2011): Negative Binomial Regression. 
   
@@ -305,7 +306,7 @@ So our model Theta of 5 points to a high level of dispersion.
 
 ## Interpretation
 
-With the modeling  out of the way, we can  interpret negative binomial coefficients just like poisson ones. 
+With the modeling done, we can  interpret negative binomial coefficients just like Poisson ones. 
 
 Let's create a table to look at our output. 
 ```{r}
@@ -316,13 +317,13 @@ modelsummary(sibscompare, output = "huxtable", stars = T,
              add_rows = data.frame("Theta", sibs_negbi$theta, "",""))
 ```
 
-We interpret this just like we do for poisson models. Note, however, that I had to add in a row to display the Theta parameter for our NB model. 
+We interpret this just like we do for Poisson models. Note, however, that I had to add in a row to display the Theta parameter for our NB model. 
 
 Notice also that there is only a slight difference in coefficients in our NB model, but the Poisson model has smaller standard errors. Compared to the OLS model however, the standard errors are much more precise. We can see that the difference in the log of expected counts decreases with each additional year of education by about .06 and increases by about .005 with each year of age. 
 
 ### Incidence Rate Ratios
 
-Just like with the Poisson model, we can also transform our estimates into incidence rate ratios. They are interpreted the same as the poisson. 
+Just like with the Poisson model, we can also transform our estimates into incidence rate ratios. They are interpreted the same as the Poisson. 
 
 ```{r sibs-irr}
 cbind(Estimate = coef(sibs_negbi), 
@@ -343,7 +344,7 @@ ggplot(gss, aes(childs)) +
 table(gss$childs) %>% prop.table() %>% round(3)
 ```
 
-We see that about 30% of our sample has no children. The poisson distribution is not set up for that. After all, given some probability of having children, it's highly unlikely that there will not be any children. 
+We see that about 30% of our sample has no children. The Poisson distribution is not set up for that. After all, given some probability of having children, it's highly unlikely that there will not be any children. 
 
 What we can do instead is use a "Zero-Inflated Model." This model has two steps:
 1. Model the likelihood of being zero.
@@ -356,7 +357,7 @@ In listing the regressors, we put a vertical line (found above enter on the keyb
 
 If you have both sides the same, you can simply list one group of regressors, and they will be applied to both parts of the model. 
 
-After the term specification, it is optional, but recommended, to specify the distribution for the count model. The default is `dist = "poisson"`, which uses a poisson distribution. If you think the model would be better fit by a zero-inflated negative binomial model, you can change the distribution to "negbin". 
+After the term specification, it is optional, but recommended, to specify the distribution for the count model. The default is `dist = "poisson"`, which uses a Poisson distribution. If you think the model would be better fit by a zero-inflated negative binomial model, you can change the distribution to "negbin". 
 
 The default for the zero-inflation model is "logit," specified as `link = "logit"`. Other options (including probit) are available but less frequently used. 
 
@@ -383,7 +384,7 @@ In this case, the log-likelihood is the same, so there's no need to complicate t
 
 ## Model Interpretation 
 
-Let's look at the zero-inflated poisson model.
+Let's look at the zero-inflated Poisson model.
 
 ```{r child-zip}
 summary(child_zip)
@@ -391,7 +392,7 @@ summary(child_zip)
 
 We can see we have two sections. The top section is the model for counts. See that any relationship status increases the predicted number of children compared to those who were never married. Being older and having more siblings are also strongly associated with increasing the number of children. The difference in the log of the expected counts of children decreases by about .04 for each sibling a person has. Big families create big families.
 
-Below the count model, we  see the zero-inflation model. Here, we are modeling the likelihood that `childs==0`. It sounds counterintuitive, I know. Think of it as the likelihood of not being including in the first (counts) model. 
+Below the count model, we see the zero-inflation model. Here, we are modeling the likelihood that `childs==0`. It sounds counterintuitive, I know. Think of it as the likelihood of not being including in the first (counts) model. 
 
 As we would expect, being married decreases the likelihood of not having children, as does being older, while education increases it. 
 
@@ -399,7 +400,7 @@ As we would expect, being married decreases the likelihood of not having childre
 ## Viewing ZIM's
 Viewing ZIM's is just about always going to be ugly, so be warned. 
 
-Viewing it in stargazer will give you only the poisson portion, ignoring the zero-inflated part. 
+Viewing it in stargazer will give you only the Poisson portion, ignoring the zero-inflated part. 
 ```{r}
 stargazer(child_zip, child_ols,
           single.row = T,
@@ -411,7 +412,6 @@ And viewing it in modelsummary will give you both, but will tag each of the term
 
 ```{r}
 modelsummary(list(child_zip, child_ols), output = "huxtable", stars = T)
-
 ```
 
 With a lot of work, we can them  side by side. Here is  what I'm doing:
@@ -560,7 +560,6 @@ Since count data is subject to often-unusual distributions, let's plot our poste
 pp_check(partner_stan_poisson) + ggtitle("Partners, Poisson")
 pp_check(sibs_stan_negbi) + ggtitle("Siblings, Neg Binom")
 pp_check(child_stan_poisson) + ggtitle("Children, Poisson")
-
 ```
 
 As we can see, our model performed exceptionally well on predicting siblings with the negative binomial distribution. For partners, it tended to predict more siblings than the actual. For children, it actually did fairly well, except for missing the mark on those with only one child. I expect that this is due to the zero-inflated nature of the data, which is not accounted for well in the Poisson model. 
