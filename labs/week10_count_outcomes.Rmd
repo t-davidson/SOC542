@@ -175,7 +175,7 @@ cowplot::plot_grid(
 )
 ```
 
-3. Coefficients: We interpret these (kind of) like normal. A one-year increase in age, for example, is associated with a .015 decrease in the **expected log count** of children. 
+3. Coefficients: We interpret these (kind of) like normal. A one-year increase in age, for example, is associated with a .015 decrease in the **expected log count** of partners.  
 
 4. Deviance information: We can use this to perform goodness-of-fit tests for the model. Below, I run a chi-squared test, with the null hypothesis that the deviance is acceptable for the number of data points and predictors. We fail to reject the null, so the model is adequately fit. 
 
@@ -413,7 +413,7 @@ With a lot of work, we can them side by side. Here is what I'm doing:
 1. Create two objects to store the estimates and standard errors for the counting model and the zero model. 
 2. Create an object to store whatever model diagnostic information I want.
 3. For each of the objects in step 1, I create a list that has two parts: "tidy", which contains the model terms and estimates, and "glance", which has the model diagnostics. 
-4. Change the classes for both of these lists from step 3 into "modelssummary_list".
+4. Change the classes for both of these lists from step 3 into "modelsummary_list".
 5. Create a list that contains the two lists from earlier, as well as the OLS model.
 6. Create the modelsummary object as normal. 
 ```{r}
@@ -554,6 +554,6 @@ pp_check(sibs_stan_negbi) + ggtitle("Siblings, Neg Binom")
 pp_check(child_stan_poisson) + ggtitle("Children, Poisson")
 ```
 
-As we can see, our model performed exceptionally well on predicting siblings with the negative binomial distribution. For partners, it tended to predict more siblings than the actual. For children, it actually did fairly well, except for missing the mark on those with only one child. I expect that this is due to the zero-inflated nature of the data, which is not accounted for well in the Poisson model. 
+As we can see, our model performed exceptionally well on predicting siblings with the negative binomial distribution. For partners, it tended to predict more than the actual. For children, it actually did fairly well, except for missing the mark on those with only one child. I expect that this is due to the zero-inflated nature of the data, which is not accounted for well in the Poisson model. 
 
 
