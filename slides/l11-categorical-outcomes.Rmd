@@ -81,6 +81,7 @@ options("modelsummary_format_numeric_latex" = "plain")
 - Ordered logistic regression
 
 # Categorical outcomes
+## Categories of categories
 - A categorical outcome consists of *three or more discrete categories*
 - *Ordered* categorical outcomes
     - e.g. Very good, good, okay, bad, very bad.
@@ -95,13 +96,13 @@ options("modelsummary_format_numeric_latex" = "plain")
 - Categories without *order* do not have clearly defined intervals between categories.
     
 # Categorical outcomes
-- Modeling categorical outcomes using existing tools:
-    - OLS regression
-        - Only suitable if there are many categories and intervals are *even*
-    - *One-versus-rest* logistic regression models
-        - One model for each category with a binary outcome
-        - Limitations: Loss of information
-        
+## Modeling categories using existing approaches
+- OLS regression
+    - Only suitable if there are many categories and intervals are *even*
+- *One-versus-rest* logistic regression models
+    - One model for each category with a binary outcome
+    - Limitations: Loss of information
+    
 # Data
 ## GSS 2018
 - Two outcomes from the GSS 2018:
