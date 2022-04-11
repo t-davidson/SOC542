@@ -7,31 +7,15 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-options(scipen = 10)
 
 library(tidyverse)
 library(stargazer)
+library(modelsummary)
 library(naniar)
-
-library(rstanarm)
-library(tidybayes)
 
 # library(MASS) # For Ordinal Models
 library(nnet) # For Multinomial Models
-
-# Making sure we have the most recent version 
-if((packageVersion("modelsummary") != '0.10.0')) 
-  remotes::install_github("vincentarelbundock/modelsummary")
-library(modelsummary)
-
-library(broom.mixed)
-  options(modelsummary_get = "broom")
  
-# Making sure we have the most recent version 
-if((packageVersion("marginaleffects") != '0.4.1')) 
-  remotes::install_github("vincentarelbundock/marginaleffects")
-library(marginaleffects)
-
 seed <- 12345
 ```
 
@@ -412,67 +396,88 @@ DescTools::PseudoR2(mult2)
 
 We can use `rstanarm::stan_polr()` to create Bayesian ordinal models. The big change here is that we have to specify a prior for the $r^2$. 
 
-TOM: Is this true? Any advice on choosing the R2 prior?
-
 ```{r bordinal-create}
-bordinal1 <- stan_polr(rightsprog ~ gender + race + age + employ,
+library(rstanarm)
+bordinal1 <- stan_polr(rightsprog ~ gender + race + age + marital + ideo,
                       data = pewamend,
                       method = "logistic",
                       prior = R2(location = .15),
                       seed = seed, chains = 1, refresh = 0, 
                       iter = 2000, warmup = 1000)
-bordinal2 <- stan_polr(rightsprog ~ gender + race + age + marital + ideo,
-                      data = pewamend,
-                      method = "logistic",
-                      prior = R2(location = .15),
-                      seed = seed, chains = 1, refresh = 0, 
-                      iter = 2000, warmup = 1000)
-print(bordinal2)
-prior_summary(bordinal2)
+
 ```
 
-We can then use `modelsummary()` just like normal to display our output. (We first have to remove the function we made earlier since our bayesian object is also type "polr.")
+```{r bordinal-view}
+print(bordinal1)
+prior_summary(bordinal1)
+```
+
+
+We can then use `modelsummary()` just like normal to display our output. (We first have to remove the function we made earlier since our Bayesian object is also type "`polr`.")
 ```{r bordinal-table}
 class(bordinal1)
 rm("tidy_custom.polr")
-modelsummary(list(bordinal1, bordinal2),
-             output = "huxtable")
+
+library(broom.mixed)
+  options(modelsummary_get = "broom")
+
+modelsummary(list("Log Odds" = bordinal1, 
+             "Odds Ratios" = bordinal1),
+             estimate = "{estimate} ({std.error})", statistic = NULL,
+             gof_omit = c("pss|alg"),
+             exponentiate = c(F,T), output = "huxtable")
 ```
 
-We can also use our regular `rstanarm::loo` and `rstanarm::loo_compare` to create model diagnostics. 
+We can also use our regular `rstanarm::loo` to create model diagnostics. 
 ```{r bordinal-loo}
-plot(loo_ord1 <- loo(bordinal1))
-plot(loo_ord2 <- loo(bordinal2))
-loo_compare(loo_ord1, loo_ord2)
+(loo_ord <- loo(bordinal1))
+plot(loo_ord)
 ```
 
-So here we see that the second model performs much better than the first. 
+Lastly, we can do a posterior predictive check to see how well our model fits to the actual outcomes.
 
-## Multinomial Models with `brms::`
+```{r}
+pp_check(bordinal1)
+```
 
-`rstanarm` doesn't (yet!) have a method to create multinomial models, however. We can use "the other" Bayesian package, BRMS, to do this. 
 
-TOM: Any way to speed this up?
+## Multinomial Models with `brms::brm`
+
+`rstanarm` doesn't (yet!) have a method to create multinomial models, however. We can use "the other" Bayesian package, BRMS, to do this. This process takes a long time, so I've bookended it with a series of `Sys.time()` functions to calculate the runtime. (Not at all necessary, but sometimes helpful in knowing what's going on.)
 
 ```{r bmult}
 bmultstart <- Sys.time()
 library(brms)
 bmult1 <- brms::brm(milestone ~ gender + race + age,
                     data = pewamend, 
-                    # weights = weight,
                     family = categorical(link = "logit"),
-                    seed = seed, chains = 1, refresh = 0, 
+                    seed = seed, chains = 1, refresh = 250, 
                     iter = 2000, warmup = 1000)
 bmultend <- Sys.time()
 
 ```
 
 Let's view it now.
-TOM: Advice on making this actually readable? 
 
 ```{r bmult-view}
 bmultend - bmultstart
 print(bmult1)
 ```
+
+Unfortunately, there's no easy way to coerce this output into a readable format. But we can still see the coefficient estimates and standard errors for each variable and outcome. 
+
+Additionally, we can view the `loo` outputs for the model to see if there are any outliers.
+
+```{r bmult-loo}
+(loo_mult <- loo(bmult1))
+plot(loo_mult)
+```
+
+Lastly, we can do a posterior predictive check to see how well the model predicts each outcome. 
+
+```{r bmult-ppcheck}
+pp_check(bmult1)
+```
+
 
 
