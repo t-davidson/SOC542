@@ -289,7 +289,7 @@ props$log.cm.odds %>% round(3) %>% print()
 ## Estimation
 - Each cutpoint on the previous graph representing the log-cumulative-odds that $y_i$ is less than or equal to some value $k$. These can be considered as group-level *intercepts*.
 
-$$log(\frac{P(y_i \leq k)}{1- P(y_i \leq k}) = \alpha_k$$
+$$log(\frac{P(y_i \leq k)}{1- P(y_i \leq k)}) = \alpha_k$$
 
 
 - The intercept for the final value is $\infty$ since $log(\frac{1}{1-1}) = \infty$. Therefore we only need $K-1$ intercepts.
@@ -474,7 +474,7 @@ https://stats.stackexchange.com/questions/41006/predicting-ordered-logit-in-r
 - Unordered categories
     - Multinomial logistic regression
 - Ordered categories
-    - Orderinal logistic regression
+    - Ordinal logistic regression
     - OLS if many categories and equal intervals
 - These models are complex and more difficult to fit and interpret than previous models we have covered
 
