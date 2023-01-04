@@ -1,0 +1,559 @@
+---
+title: "Week 10 - Count Outcomes"
+author: "Fred Traylor, Lab TA"
+date: "4/4/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen = 10)
+
+library(tidyverse)
+library(stargazer)
+library(naniar)
+
+library(rstanarm)
+library(tidybayes)
+
+# library(MASS) # For Negative Binomial Models
+library(pscl) # For Zero-Inflated Models
+
+library(modelsummary)
+library(broom.mixed)
+  options(modelsummary_get = "broom")
+  
+# Making sure we have the most recent version 
+if((packageVersion("marginaleffects") != '0.4.0.9000'))  
+  remotes::install_github("vincentarelbundock/marginaleffects")
+## MAKE SURE YOU RESTART R AFTER THIS INSTALL 
+
+library(marginaleffects)
+
+seed <- 12345
+```
+
+
+# Data Loading and Management
+
+Let's use the GSS again. This week, we'll be looking at three specific variables related to family life: The number of sexual partners, siblings, and children as person has. Since all three are count variables, we'll be using new methods to analyze them. 
+
+```{r gss-loading}
+gss2018 <- haven::read_dta("lab-data/GSS2018.dta")
+
+gss <- gss2018 %>% 
+  dplyr::select(
+
+    # Targets: Children, Partners, and Siblings
+    partners, # https://gssdataexplorer.norc.org/variables/5049/vshow
+    sibs,     # https://gssdataexplorer.norc.org/variables/51/vshow
+    childs,   # https://gssdataexplorer.norc.org/variables/52/vshow
+    
+    # Demographics 
+    marital, 
+    sex, age, educ, 
+    wtss 
+    ) %>% 
+  haven::zap_labels() %>% 
+  mutate( 
+    
+    # New Variables
+    marital = factor(marital,
+                     levels = c(5, 1:4),
+                     labels = c("Never Married", "Married", 
+                                "Widowed", "Divorced", "Separated")
+                     ),
+
+    # Variables we've used before
+    age = case_when(
+      age > 88 ~ NaN,
+      TRUE ~ age
+      ),
+    sex = factor(sex,
+                 levels = c(1,2),
+                 labels = c("Male", "Female")
+                 ),
+    weight = wtss
+    ) %>% 
+  dplyr::select(-wtss) %>% 
+  drop_na()
+
+```
+
+## If you get an error...
+It was probably: `Error in select(...) : unused argument (...)`. One of the packages we're using today, `MASS` has a `select()` function that will cover up `dplyr::select()`. For more info, see [this page](https://datacornering.com/dplyr-error-in-select-unused-argument/).
+
+If this happens, restart R (CTRL + Shift + F10 on PC) and run the `dplyr` code before running `library(MASS)`. 
+
+Also, when this happens, use `package::function()` format, as I have done above (`dplyr::select()`) and below (`MASS::glm.nb`). Because of this, I still loaded `dplyr`, which is invaluable to me throughout the script, and did not load MASS, since I only need it in a few choice locations. 
+
+
+## Descriptives
+As always, let's look at our descriptive statistics. 
+```{r desc-tables}
+datasummary_skim(gss,
+                 type = "numeric",
+                 fmt = 2, # Show 2 decimal places 
+                 histogram = F,
+                 title = "Sample Descriptive Statistics: Continuous Variables",
+                 notes = "Data: 2018 General Social Survey",
+                 output = "flextable")
+
+datasummary_skim(gss, 
+                 type = "categorical",
+                 title = "Sample Descriptive Statistics: Categorical Variables",
+                 notes = "Data: 2018 General Social Survey",
+                 output = "flextable")
+```
+
+Let's look at our three variables. 
+```{r var-plots}
+cowplot::plot_grid(
+  ggplot(gss, aes(childs)) + theme_minimal() + 
+    geom_histogram(binwidth = .5) + scale_x_continuous(breaks = seq(0,10)),
+  ggplot(gss, aes(partners)) + theme_minimal() + 
+    geom_histogram(binwidth = .5) + scale_x_continuous(breaks = seq(0,10)),
+  ggplot(gss, aes(sibs)) + theme_minimal() + 
+    geom_histogram(binwidth = .5),
+  nrow = 3
+)
+
+```
+
+# OLS Methods 
+
+Let's start by creating three models of our target data using OLS methods. We'll come back to these later, but for now, just note that using OLS is an option, but not the most correct option. 
+
+```{r ols-mods}
+partner_ols <- lm(partners ~ marital + age + educ + sex,
+                  data = gss, weights = weight)
+sibs_ols <- lm(sibs ~ marital + age + educ + sex,
+               data = gss, weights = weight)
+child_ols <- lm(childs ~ marital + age + educ + sex,
+                 data = gss, weights = weight)
+stargazer(partner_ols, sibs_ols, child_ols, 
+          single.row = T,
+          type = "text")
+```
+
+We see, generally, that widows, women, those who are separated, and those who are older tend to have fewer sexual partners, while those with more education tend to have more. 
+
+Also, those who are separated tend to have more siblings, for some reason, as do women and those who are older. Those with more education tend to have fewer. 
+
+Finally, we see that that people who are (or were) in some sort of marital relationship have more children, which is to be expected. Those who are older also have more children and those who have more education have fewer. 
+
+# Poisson Regression: Number of Partners
+
+For something like count data, we need to use a Poisson model. This models counts of discrete things. In this example, we'll model the number of sexual partners a person has. 
+
+It takes the same form as our previous GLM's, but setting the family argument to "poisson" instead of "binomial."
+
+For help on creating the model in R, I suggest UCLA's OARC page: https://stats.oarc.ucla.edu/r/dae/poisson-regression/
+Their page on interpreting the models is great as well, though the output is in STATA: https://stats.oarc.ucla.edu/stata/output/poisson-regression/
+
+```{r poission}
+partner_poi <- glm(partners ~ marital + age + educ + sex,
+                   data = gss, weights = weight, family = "poisson")
+
+summary(partner_poi)
+
+```
+
+## Model Output Interpretation
+Let's break down what we see above:
+1. The formula call
+
+2. Deviance Residuals: We're looking for residuals that are not very skewed. In this case, the median is close to zero, which is good, and the 1st and 3rd quartiles are even enough. Looking at a density plot of the residuals below, we see they're slightly skewed with a tail to the right. Compared to the OLS version, though, it is much more centered. 
+
+```{r poisson-resid}
+cowplot::plot_grid(
+  ggplot(gss, aes(x =  resid(partner_poi))) +
+    geom_density(size = 2) + theme_light() + geom_vline(aes(xintercept = 0)),
+  ggplot(gss, aes( x = resid(partner_ols))) +
+    geom_density(size = 2) + theme_light() + geom_vline(aes(xintercept = 0)),
+  nrow = 2
+)
+```
+
+3. Coefficients: We interpret these (kind of) like normal. A one-year increase in age, for example, is associated with a .015 decrease in the **expected log count** of partners.  
+
+4. Deviance information: We can use this to perform goodness-of-fit tests for the model. Below, I run a chi-squared test, with the null hypothesis that the deviance is acceptable for the number of data points and predictors. We fail to reject the null, so the model is adequately fit. 
+
+```{r poisson-dev}
+with(partner_poi, cbind(res.deviance = deviance, 
+                        df = df.residual,
+                        p = pchisq(deviance, df.residual, lower.tail=FALSE)))
+```
+
+## Model Interpretation
+
+Let's create a quick output of our coefficients. 
+
+```{r poisson-starg}
+stargazer(partner_poi, partner_ols, single.row = T, type = "text")
+```
+
+In interpreting Poisson models, $$ \beta = log(\mu_{x+1}) - log(\mu_x)$$ where going from x to x+1 is the change in x. For this reason, we say there is a "difference in the log of expected counts" as we move from x to x+1. 
+
+So here we can say that each additional year of age decreases the number of sexual partners a person had in the past year. The difference in the log of expected counts is expected to decrease by .015 for each year of age. 
+
+The line goes similarly for contrasts in categorical variables. Somebody who is widowed is expected to have a decreases in the log of the expected counts by .94, and women are expected to have a decrease in the log of the expected counts by .25. 
+
+### Incidence Rate Ratios
+
+For those of us who prefer odds ratios, we can create incidence rate ratios, which act similarly. 
+
+When subtracting logs, we can do some algebra to change the form: $$ \beta = log(\mu_{x+1}) - log(\mu_x) = log(\frac{\mu_{x+1}}{\mu_x})$$. 
+
+In other words, we're examining the ratios of the rate of increasing sexual partners by moving from x to x+1. When we exponentiate this, we go from $$\beta = log(\frac{\mu_{x+1}}{\mu_x}) --> log(\beta) = \frac{\mu_{x+1}}{\mu_x}$$
+
+As such, we can now talk about changes in the "rate ratio" as we move from x to x+1. 
+
+```{r poisson-irr}
+cbind(Estimate = coef(partner_poi), 
+      IRR = exp(coef(partner_poi)),
+      exp(confint(partner_poi)))
+```
+
+So here we see that each year of education increases the rate ratio of sexual partners by a factor of 1.02, or a 2% increase, and each year of age decreases it by a factor of .015, or a 1.5% decrease. 
+
+When we talk about categorical contrasts, we don't have to speak of ratios, because the change from x to x+1 only occurs once. So females are expected to have a rate of sexual partners that is 23% less than males. We could also say that it changes by a factor of .77. Additionally, widows are expected to have a rate of sexual partners that is 61% lower ($1 - .39$) than never-married individuals. 
+
+## Predictions
+
+We can use our functions from the `marginaleffects` package to create and plot predicted values. 
+
+```{r poisson-pred}
+predictions(partner_poi, newdata = datagrid(marital = levels(gss$marital),
+                                            educ = c(12, 16)))
+cowplot::plot_grid(
+  plot_cap(partner_poi, condition = c("age", "sex")) +
+    ggtitle("Predicted Number of Sexual Partners in Past 12 Months"),
+  ggplot() + theme_minimal() + ggtitle("Actual Number of Sexual Partners in Past 12 Months") + 
+    geom_smooth(gss, mapping = aes(x = age, y = partners, color = sex, fill = sex), alpha = .25),
+  nrow = 2
+)
+```
+
+Above, we see our model did a pretty good job at predicting partners. 
+
+# Negative Binomial: Number of Siblings
+
+## Overdispersion
+Overdispersion occurs when our data display higher variance than expected. For example, while most people only have a few siblings, there are several who have more than ten. 
+
+```{r sibs-overdisp}
+ggplot(gss, aes(x = sibs)) + geom_density() + theme_light()
+table(gss$sibs)
+```
+
+As a rule of thumb, the residual deviance in a Poisson model should be about equal to the degrees of freedom of the residuals in the model. (See top of page 4 [here](https://biometry.github.io/APES/LectureNotes/2016-JAGS/Overdispersion/OverdispersionJAGS.pdf). 
+
+Below, I create a Poisson model estimating the number of siblings a person has, then divide the null deviance by the DF's of the residuals. 
+
+```{r sibspoi-dev}
+sibs_poisson <- glm(sibs ~ marital + age + educ + sex,
+                    data = gss, weights = weight, family = "poisson")
+with(sibs_poisson, cbind("Deviance" = deviance,
+                         "DF Resid" = df.residual,
+                         "Dev / DF" = deviance / df.residual))
+```
+
+For comparison, our model estimating sexual partners had a deviance:DF ratio of 0.75. 
+
+```{r partpoi-dev}
+with(partner_poi, cbind("Deviance" = deviance,
+                         "DF Resid" = df.residual,
+                         "Dev / DF" = deviance / df.residual))
+
+```
+
+Because our siblings variable is overdispersed in our currently-specified Poisson model, we will use a negative binomial model. 
+
+## The Negative Binomial Model
+
+The negative binomial model includes a Theta parameter ($\theta$) that accounts for the overdispersion among our dependent variable. 
+
+To make one, we use the package MASS. The MASS package (Modern Applied Statistics with S) was one of the original packages for R and has a ton of statistical tools. It is also the package that overwrites `dplyr::select()`, which is why we use `MASS::glm.nb()` in the code below and `dplyr::select()` in the code at the top. 
+
+To create our negative binomial model, we will use the `MASS::glm.nb()` function. Because there is only one "family" of distributions inside, we don't have to specify it, like we do with Poisson and Binomial models. 
+
+```{r sigs-negbi}
+sibs_negbi <- MASS::glm.nb(sibs ~ marital + age + educ + sex,
+                           data = gss, weights = weight)
+with(sibs_negbi, cbind("Deviance" = deviance,
+                       "DF Resid" = df.residual,
+                       "Dev / DF" = deviance / df.residual))
+```
+
+With this model, we see the deviance:DF ratio is back in order.
+
+Let's take a look at our output.
+```{r sibs-negbiout}
+summary(sibs_negbi)
+```
+
+We see similar output here as we did in our Poisson model above. Note the Theta parameter at the bottom. This is the measure of dispersion in the model. Smaller thetas provide better justification for using negative binomial instead of Poisson. 
+  - Stata, SAS, SPSS, and every other software gives an alpha parameter which is equal to the inverse of Theta. 
+  - "The model becomes Poisson as the value of alpha approaches zero. ... Where alpha is closer to zero, the model statistics displayed in Poisson output are nearly the same as those of a negative binomial." Joseph Hilbe (2011): Negative Binomial Regression. 
+  
+So our model Theta of 5 points to a high level of dispersion. 
+
+## Interpretation
+
+With the modeling done, we can interpret negative binomial coefficients just like Poisson ones. 
+
+Let's create a table to look at our output. 
+```{r}
+sibscompare <- list("Negative Binomial" = sibs_negbi,
+                    "Poisson" = sibs_poisson,
+                    "OLS" = sibs_ols)
+modelsummary(sibscompare, output = "huxtable", stars = T,
+             add_rows = data.frame("Theta", sibs_negbi$theta, "",""))
+```
+
+We interpret this just like we do for Poisson models. Note, however, that I had to add in a row to display the Theta parameter for our NB model. 
+
+Notice also that there is only a slight difference in coefficients in our NB model, but the Poisson model has smaller standard errors. Compared to the OLS model however, the standard errors are much more precise. We can see that the difference in the log of expected counts decreases with each additional year of education by about .06 and increases by about .005 with each year of age. 
+
+### Incidence Rate Ratios
+
+Just like with the Poisson model, we can also transform our estimates into incidence rate ratios. They are interpreted the same as the Poisson. 
+
+```{r sibs-irr}
+cbind(Estimate = coef(sibs_negbi), 
+      IRR = exp(coef(sibs_negbi)),
+      exp(confint(sibs_negbi)))
+```
+
+So each additional year of age increases the rate ratio by a factor of 1.002 and each additional year of education decreases it by about 7%. Additionally, women tend to have about 10% more siblings than men. 
+
+# Zero-Inflation: Number of Children 
+
+Sometimes, when we model count data, we have a lot of zeroes. For example, let's look back at the number of children people have:
+
+```{r}
+ggplot(gss, aes(childs)) + 
+  geom_histogram(binwidth = .5) +
+  theme_minimal()
+table(gss$childs) %>% prop.table() %>% round(3)
+```
+
+We see that about 30% of our sample has no children. The Poisson distribution is not set up for that. After all, given some probability of having children, it's highly unlikely that there will not be any children. 
+
+What we can do instead is use a "Zero-Inflated Model." This model has two steps:
+1. Model the likelihood of being zero.
+2. For those who aren't zero, model the counts. 
+
+## Model Creation 
+To create one, we use the function `pscl::zeroinfl()`. (PSCL = Political Science Computational Laboratory at Stanford U.) 
+
+In listing the regressors, we put a vertical line (found above enter on the keyboard) to separate the regressors for the count outcome (left side) from those for the zero-inflation outcome (right side). In the model below, I use marital status, age, the number of siblings, and sex for the count model, but marital, age, and education for the zero model.
+
+If you have both sides the same, you can simply list one group of regressors, and they will be applied to both parts of the model. 
+
+After the term specification, it is optional, but recommended, to specify the distribution for the count model. The default is `dist = "poisson"`, which uses a Poisson distribution. If you think the model would be better fit by a zero-inflated negative binomial model, you can change the distribution to "negbin". 
+
+The default for the zero-inflation model is "logit," specified as `link = "logit"`. Other options (including probit) are available but less frequently used. 
+
+
+```{r zipmods}
+child_zip <- zeroinfl(childs ~ marital + age + sex + sibs | marital + age + educ,
+                      dist = "poisson",
+                      data = gss, weights = weight)
+child_zinb <- zeroinfl(childs ~ marital + age + sex + sibs | marital + age + educ,
+                       dist = "negbin",
+                       data = gss, weights = weight)
+```
+
+We can then look at the log-likelihood for the two models and compare to see which we want. The function `lmtest::lrtest()` performs a likelihood ratio test to compare the log-likelihoods of the models and quantify the difference with a chi-square. 
+
+```{r zip-loglik}
+child_zip$loglik
+child_zinb$loglik
+
+lmtest::lrtest(child_zip, child_zinb)
+```
+
+In this case, the log-likelihood is the same, so there's no need to complicate the model by making it negative binomial. 
+
+## Model Interpretation 
+
+Let's look at the zero-inflated Poisson model.
+
+```{r child-zip}
+summary(child_zip)
+```
+
+We can see we have two sections. The top section is the model for counts. See that any relationship status increases the predicted number of children compared to those who were never married. Being older and having more siblings are also strongly associated with increasing the number of children. The difference in the log of the expected counts of children decreases by about .04 for each sibling a person has. Big families create big families.
+
+Below the count model, we see the zero-inflation model. Here, we are modeling the likelihood that `childs==0`. It sounds counterintuitive, I know. Think of it as the likelihood of not being including in the first (counts) model. 
+
+As we would expect, being married decreases the likelihood of not having children, as does being older, while education increases it. 
+
+
+## Viewing ZIM's
+Viewing ZIM's is just about always going to be ugly, so be warned. 
+
+Viewing it in stargazer will give you only the Poisson portion, ignoring the zero-inflated part. 
+```{r}
+stargazer(child_zip, child_ols,
+          single.row = T,
+          type = "text")
+
+```
+
+And viewing it in modelsummary will give you both, but will tag each of the terms separately for the zero-inflated and count portions of the model, which also means you will have separate rows if you have multiple models. 
+
+```{r}
+modelsummary(list(child_zip, child_ols), output = "huxtable", stars = T)
+```
+
+With a lot of work, we can them side by side. Here is what I'm doing:
+1. Create two objects to store the estimates and standard errors for the counting model and the zero model. 
+2. Create an object to store whatever model diagnostic information I want.
+3. For each of the objects in step 1, I create a list that has two parts: "tidy", which contains the model terms and estimates, and "glance", which has the model diagnostics. 
+4. Change the classes for both of these lists from step 3 into "modelsummary_list".
+5. Create a list that contains the two lists from earlier, as well as the OLS model.
+6. Create the modelsummary object as normal. 
+```{r}
+# Step 1
+zimest_count <- get_estimates(child_zip) %>% 
+  filter(str_detect(term,"count")) %>% mutate(term = str_remove(term,"count_"))
+zimest_zero <- get_estimates(child_zip) %>% 
+  filter(str_detect(term,"zero")) %>% mutate(term = str_remove(term,"zero_"))
+
+# Step 2
+zimest_glance <- data.frame(
+  "Num.Obs." = child_zip$n,
+  "Log.Lik." = logLik(child_zip),
+  AIC = AIC(child_zip),
+  BIC = BIC(child_zip)
+  )
+# Step 3
+zimmod_count <- list(
+  tidy = zimest_count,
+  glance = zimest_glance
+  )
+zimmod_zero <- list(
+  tidy = zimest_zero,
+  glance = zimest_glance
+  )
+
+# Step 4
+class(zimmod_count) <- "modelsummary_list"
+class(zimmod_zero) <- "modelsummary_list"
+
+# Step 5
+freqmods <- list(
+  "ZIM - Zero" = zimmod_zero,
+  "ZIM - Count" = zimmod_count,
+  "OLS" = child_ols
+  )
+
+# Step 6
+modelsummary(freqmods, output = "huxtable", stars = T,
+             title = "Model  Comparison - Number  of Children")
+
+```
+
+Another option is to use the `coef_map` option in `modelsummary::modelsummary()` to rename the coefficients.
+
+```{r}
+
+zipnames <- c(
+  'count_(Intercept)' = "Count: Constant",
+  'count_maritalMarried' = "Count: Married",
+  'count_maritalWidowed' = "Count: Widowed",
+  'count_maritalDivorced' = "Count: Divorced",
+  'count_maritalSeparated' = "Count: Separated",
+  'count_age'  = "Count: Age",
+  'count_sexFemale' = "Count: Female",
+  'count_sibs' = "Count: Siblings",
+  'zero_(Intercept)' = "Zero: Constant",
+  'zero_maritalMarried' = "Zero: Married",
+  'zero_maritalWidowed' = "Zero: Widowed",
+  'zero_maritalDivorced' = "Zero: Divorced",
+  'zero_maritalSeparated' = "Zero: Separated",
+  'zero_age' = "Zero: Age",
+  'zero_sexFemale' = "Zero: Female",
+  'zero_sibs' = "Zero: Siblings",
+  'zero_educ' = "Zero: Education"
+)
+modelsummary(list("ZI Poisson" = child_zip, 
+                  "ZI Neg Bi" = child_zinb), 
+             coef_map = zipnames,
+             output = "huxtable", stars = T)
+```
+
+## Predictions
+
+We can create predictions from our estimates using the `marginaleffects` package. 
+
+Below, we see that there seems to be an effect of education and age together, up to around the mid-30's, such that higher levels of education are associated with decreased odds of having children. But, as my parents would be happy to know, such effect balances out at a point and highly-educated adults still bring home grandchildren. 
+
+```{r child-pred-educ}
+plot_cap(child_zip, condition = c("age", "educ"))  +
+  labs(title = "Predicted Number of Children",
+       caption = "Data: 2018 General Social Survey",
+       color = "Years of Education",
+       fill = "Years of Education",
+       y = "Children", x = "Age") +
+  theme(legend.position = "bottom")
+
+```
+
+Because I only included education in the zero-inflated portion of the model, we see a logistic curve for those with education and a more linear function for those without. 
+
+We can do this, too, with the number of siblings a person has:
+
+```{r child-pred-sibs}
+plot_cap(child_zip, condition = c("age", "sibs"))  +
+  labs(title = "Predicted Number of Children",
+       caption = "Data: 2018 General Social Survey",
+       color = "Number of Siblings", fill = "Number of Siblings",
+       y = "Children", x = "Age") + 
+  theme(legend.position = "bottom")
+```
+
+In this graph, people with a lot of siblings will have more children, but everyone else is around the same number, though with a slightly increasing trend as people age. 
+
+# Bayesian Models
+
+For Bayesian modeling, as usual, the `stan_glm()` command works out similar to the usual `glm()`. For Poisson models, the `family = "poisson"` argument is also the same. Two quick differences:
+
+1. The big difference is that negative binomial models take the form `family = "neg_binomial_2"` instead of using `glm.nb()` as we did earlier. 
+2. There is not (yet!) a method for zero-inflated models in `rstanarm`. As such, we'll be using just the count model (Poisson). 
+
+Also, if you want more info, you can follow this link to Aki Vehtari's page, where he shows how to do this modeling: https://avehtari.github.io/modelselection/roaches.html
+
+```{r bayesmods}
+partner_stan_poisson <- stan_glm(partners ~ marital + age + educ + sex,
+                                 data = gss, family = "poisson",
+                                 seed = seed, chains = 1, refresh = 0, 
+                                 iter = 2000, warmup = 1000)
+sibs_stan_negbi <- stan_glm(sibs ~ marital + age + educ + sex,
+                            data = gss, family = "neg_binomial_2",
+                            seed = seed, chains = 1, refresh = 0, 
+                            iter = 2000, warmup = 1000)
+child_stan_poisson <- stan_glm(childs ~ marital + age + educ + sex,
+                               data = gss, family = "poisson",
+                               seed = seed, chains = 1, refresh = 0, 
+                               iter = 2000, warmup = 1000)
+
+modelsummary(list(partner_stan_poisson, sibs_stan_negbi, child_stan_poisson),
+             output = "huxtable")
+
+```
+
+Since count data is subject to often-unusual distributions, let's plot our posterior distributions and compare them to the original data. 
+
+```{r bayes-plots}
+pp_check(partner_stan_poisson) + ggtitle("Partners, Poisson")
+pp_check(sibs_stan_negbi) + ggtitle("Siblings, Neg Binom")
+pp_check(child_stan_poisson) + ggtitle("Children, Poisson")
+```
+
+As we can see, our model performed exceptionally well on predicting siblings with the negative binomial distribution. For partners, it tended to predict more than the actual. For children, it actually did fairly well, except for missing the mark on those with only one child. I expect that this is due to the zero-inflated nature of the data, which is not accounted for well in the Poisson model. 
+
+

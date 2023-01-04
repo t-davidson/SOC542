@@ -1,0 +1,144 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\PassOptionsToPackage{dvipsnames,svgnames,x11names}{xcolor}
+%
+\documentclass[
+  12pt,
+]{article}
+\title{Replication template}
+\author{Author}
+\date{May 11, 2022}
+
+\usepackage{amsmath,amssymb}
+\usepackage[]{mathpazo}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math}
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{xcolor}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\IfFileExists{bookmark.sty}{\usepackage{bookmark}}{\usepackage{hyperref}}
+\hypersetup{
+  pdftitle={Replication template},
+  pdfauthor={Author},
+  colorlinks=true,
+  linkcolor={Maroon},
+  filecolor={Maroon},
+  citecolor={Blue},
+  urlcolor={black},
+  pdfcreator={LaTeX via pandoc}}
+\urlstyle{same} % disable monospaced font for URLs
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+% Set default figure placement to htbp
+\makeatletter
+\def\fps@figure{htbp}
+\makeatother
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\pagenumbering{arabic}
+\usepackage{setspace}\doublespacing
+\ifLuaTeX
+  \usepackage{selnolig}  % disable illegal ligatures
+\fi
+
+\begin{document}
+\maketitle
+
+\hypertarget{introduction}{%
+\section{INTRODUCTION}\label{introduction}}
+
+\emph{Before adding to this document, click the Knit button above to
+ensure that you are able to Knit it as a PDF. You should also modify the
+author and title information above.}
+
+This section can can be used to discuss the paper you have chosen to
+replicate and the particular results you will be analyzing.
+
+\hypertarget{replication}{%
+\section{REPLICATION}\label{replication}}
+
+Present the initial replication and discuss your findings. This section
+should include a table or figure showing the replicated result (as close
+to the original paper as possible).
+
+Below is an example of a code chunk. Due to the defaults used above,
+neither the code nor the output will get rendered to the final document.
+You will need to modify the chunk options appropriately, depending on
+your goal. These options are fine for loading and cleaning data, but
+will need to be changed if you want to display a table or plot. I
+recommend giving all of your chunks informative names.
+
+You can also use LaTeX to render equations, either as part of a
+sentencence like \(this\) or as a separate like like the following:
+
+\[E = MC^2\]
+
+\hypertarget{bayesian-replication}{%
+\section{BAYESIAN REPLICATION}\label{bayesian-replication}}
+
+Present the Bayesian extension of the model and discuss your findings.
+Pay close attention to any discrepancies between the Bayesian and
+frequentist models.
+
+\hypertarget{alternative-specifications}{%
+\section{ALTERNATIVE SPECIFICATIONS}\label{alternative-specifications}}
+
+Discuss each of the alternative specifications and use tables and/or
+figures to present your results. There should be at least three
+alternatives (one changing data, one changing variables, one changing
+model) but you are welcome to do more or to consider something more
+systematic.
+
+\hypertarget{discussion}{%
+\section{DISCUSSION}\label{discussion}}
+
+Discuss your findings and reflect upon the replication exercise.
+
+\hypertarget{references}{%
+\section{REFERENCES}\label{references}}
+
+Provide a section listing works cited. You can add the references
+directly in the text. It is also possible to include references directly
+from a bibliography file, see
+\url{https://bookdown.org/yihui/rmarkdown-cookbook/bibliography.html}
+
+If you are not doing so already, I highly recommend using a reference
+management program (I use Zotero as it is free and open source). It will
+take a little time to set up but will save you a lot of time in the
+long-run.
+
+\end{document}

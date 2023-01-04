@@ -1,0 +1,622 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+%
+\documentclass[
+  10pt,
+]{article}
+\title{SOC542\\
+\hspace*{0.333em}STATISTICAL METHODS IN SOCIOLOGY II\\
+Rutgers University\\
+\strut \\
+\hspace*{0.333em}Syllabus}
+\author{}
+\date{\vspace{-2.5em}Spring 2022}
+
+\usepackage{amsmath,amssymb}
+\usepackage[]{mathpazo}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math}
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{xcolor}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\IfFileExists{bookmark.sty}{\usepackage{bookmark}}{\usepackage{hyperref}}
+\hypersetup{
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+\urlstyle{same} % disable monospaced font for URLs
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+% Set default figure placement to htbp
+\makeatletter
+\def\fps@figure{htbp}
+\makeatother
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\linespread{1.05}
+\ifLuaTeX
+  \usepackage{selnolig}  % disable illegal ligatures
+\fi
+
+\begin{document}
+\maketitle
+
+\hypertarget{contact-and-office-hours}{%
+\section{CONTACT AND OFFICE HOURS}\label{contact-and-office-hours}}
+
+Instructor: Thomas Davidson
+
+E-mail: \texttt{thomas.davidson@rutgers.edu}
+
+Office hours: Wednesday 11:00-12:00pm, 109 Davison Hall, or by
+appointment.
+
+Teaching Assistant: Fred Traylor
+
+E-mail: \texttt{frederic.traylor@rutgers.edu}
+
+Office hours: Thursday 11:00-12:00pm, Davison Hall or Zoom.
+
+\hypertarget{logistics}{%
+\section{LOGISTICS}\label{logistics}}
+
+Class meetings: Mondays 5:00-8:00 p.m. \emph{Our first meeting will be
+on Zoom and we will return to in-person classes in Davison Hall from
+1/31 onwards.}
+
+Course website: \texttt{https://github.com/t-davidson/SOC542-S22}
+
+\hypertarget{course-description}{%
+\section{COURSE DESCRIPTION}\label{course-description}}
+
+This is the second course in a two-semester sequence of graduate-level
+statistics. The goal of the course is to provide an understanding of the
+principles and application of statistics to sociological research. The
+course begins with an overview of the quantitative approach to
+sociological research and a review of basic statistics and ordinary
+least squares regression. We then cover multiple regression, followed by
+generalized linear models for binary, count, and categorical data.
+Throughout the course, we will consider both frequentist and Bayesian
+approaches to estimation and will explore various techniques for
+improving the robustness and validity of statistical analyses. We will
+pay close attention to the theoretical interpretations of statistical
+models and emphasize effective and accurate scientific communication.
+
+\hypertarget{prerequisites}{%
+\section{PREREQUISITES}\label{prerequisites}}
+
+Students should have taken SOC541 or an equivalent introduction to
+statistics. The course assumes some basic familiarity with data
+manipulation and visualization in R and RStudio.
+
+\hypertarget{learning-goals}{%
+\section{LEARNING GOALS}\label{learning-goals}}
+
+By the end of the semester, students will:
+
+\begin{itemize}
+\tightlist
+\item
+  Be proficient in preparing datasets, running basic descriptive
+  analyses, and producing informative data visualizations using R.
+\item
+  Understand the conceptual underpinnings and assumptions of multiple
+  regression and generalized linear models
+\item
+  Be able to implement and interpret various different forms of
+  regression models
+\item
+  Be familiar with and proficient in handling interaction effects,
+  non-linear relationships, and violations of assumptions in multiple
+  regression analyses
+\item
+  Understand and apply frequentist and Bayesian methods for estimation
+\item
+  Replicate, reassess, and extend quantitative research published in
+  leading sociological journals
+\end{itemize}
+
+\hypertarget{assessment}{%
+\section{ASSESSMENT}\label{assessment}}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \emph{Homework assignments} (50\%): Homework assignments will be used
+  to assess comprehension of materials covered in class. Assignments
+  will be submitted using Github Classroom. Students can work together
+  on the problem sets but must submit assignments individually.
+\item
+  \emph{Replication paper} (40\%). Each student will write a replication
+  paper. The objectives of the replication will be to (a) reproduce a
+  finding published in a leading sociological journal, (b) to assess the
+  robustness of the reporting finding to alternative specifications, and
+  (c) to extend the original analysis.
+\item
+  \emph{Class presentation} (10\%). Each student will present the
+  findings of their replication paper to the class during one of the
+  last two class sessions.
+\end{enumerate}
+
+\hypertarget{readings}{%
+\section{READINGS}\label{readings}}
+
+There are weekly reading assignments for this course. Students are
+expected to complete the assigned readings \emph{before} class. Students
+must purchase copies of the two required texts. Some weeks will also
+include additional papers published in academic journals. The
+recommended texts provide useful background material on data analysis,
+visualization, and causal inference. All three are available for free
+online (links are embedded in the book titles).
+
+\emph{Required}
+
+\begin{itemize}
+\tightlist
+\item
+  Gelman, Andrew, Jennifer Hill, and Aki Vehtari. 2020. \emph{Regression
+  and Other Stories}. Cambridge University Press.
+\item
+  McElreath, Richard. 2020. \emph{Statistical Rethinking: A Bayesian
+  Course with Examples in R and Stan}. 2nd ed.~Chapman and Hall/CRC.
+\end{itemize}
+
+\emph{Recommended}
+
+\begin{itemize}
+\item
+  Wickham, Hadley, and Garrett Grolemund. 2016.
+  \textit{\href{https://r4ds.had.co.nz/}{R for Data Science: Import, Tidy, Transform, Visualize, and Model Data}}.
+  (\emph{R4DS}). O'Reilly Media, Inc.
+\item
+  Healy, Kieran. 2018.
+  \textit{\href{https://socviz.co/}{Data Visualization: A Practical Introduction}}.
+  Princeton University Press.
+\item
+  Cunningham, Scott. 2021.
+  \textit{\href{https://mixtape.scunning.com/}{Causal Inference: The Mixtape}}.
+  Yale University Press.
+\end{itemize}
+
+\hypertarget{policies}{%
+\section{POLICIES}\label{policies}}
+
+The Rutgers Sociology Department strives to create an environment that
+supports and affirms diversity in all manifestations, including race,
+ethnicity, gender, sexual orientation, religion, age, social class,
+disability status, region/country of origin, and political orientation.
+We also celebrate diversity of theoretical and methodological
+perspectives among our faculty and students and seek to create an
+atmosphere of respect and mutual dialogue. We have zero tolerance for
+violations of these principles and have instituted clear and respectful
+procedures for responding to such grievances.
+
+Students must abide by the Code of Student Conduct and the university's
+Academic Integrity Policy at all times, including during lectures and in
+participation online. Violations of academic integrity will result in
+disciplinary action.
+
+In accordance with University policy, if you have a documented
+disability and require accommodations to obtain equal access in this
+course, please contact me during the first week of classes. Students
+with disabilities must be registered with the Office of Student
+Disability Services and must provide verification of their eligibility
+for such accommodations.
+
+I will also make additional accommodations due to the COVID-19 pandemic.
+If you or your family are affected in any way that impedes your ability
+to participate in this course, please contact me as soon as you can so
+that we can make necessary arrangements.
+
+\hypertarget{outline}{%
+\section{OUTLINE}\label{outline}}
+
+\hypertarget{week-1---january-24---statistics-review-and-course-overview}{%
+\subsection{Week 1 - January 24 - Statistics review and course
+overview}\label{week-1---january-24---statistics-review-and-course-overview}}
+
+\emph{Readings}
+
+\begin{itemize}
+\tightlist
+\item
+  Gelman, Hill, and Vehtari (GHV) Chapters 1-5
+\item
+  McElreath Chapter 1
+\item
+  Imbens, Guido W. 2021. ``Statistical Significance, p-Values, and the
+  Reporting of Uncertainty.'' \emph{Journal of Economic Perspectives} 35
+  (3): 157--74. \url{https://doi.org/10.1257/jep.35.3.157}.
+\end{itemize}
+
+\emph{Recommended}
+
+\begin{itemize}
+\tightlist
+\item
+  Raftery, Adrian E. 2000. ``Statistics in Sociology, 1950--2000.''
+  \emph{Journal of the American Statistical Association} 95 (450):
+  654--61. \url{https://doi.org/10.1080/01621459.2000.10474245}.
+\item
+  Cunningham p.~16-36
+\end{itemize}
+
+\hypertarget{week-2---january-30---linear-regression-with-a-single-predictor}{%
+\subsection{Week 2 - January 30 - Linear regression with a single
+predictor}\label{week-2---january-30---linear-regression-with-a-single-predictor}}
+
+\emph{Readings}
+
+\begin{itemize}
+\tightlist
+\item
+  GHV 6-7
+\item
+  Freese, Jeremy, and David Peterson. 2017. ``Replication in Social
+  Science.'' \emph{Annual Review of Sociology} 43: 147--65.
+  \url{https://doi.org/10.1146/annurev-soc-060116-053450}
+\end{itemize}
+
+\emph{Recommended}
+
+\begin{itemize}
+\tightlist
+\item
+  Cunningham p.~37-76
+\end{itemize}
+
+\emph{Homework 1 released, due 2/11}
+
+\hypertarget{week-3---february-7---frequentist-and-bayesian-approaches-to-estimation}{%
+\subsection{Week 3 - February 7 - Frequentist and Bayesian approaches to
+estimation}\label{week-3---february-7---frequentist-and-bayesian-approaches-to-estimation}}
+
+\emph{Readings}
+
+\begin{itemize}
+\tightlist
+\item
+  McElreath 2-3
+\item
+  GHV 8-9
+\end{itemize}
+
+\emph{Recommended}
+
+\begin{itemize}
+\tightlist
+\item
+  Gelman, Andrew. 2014. ``How Bayesian Analysis Cracked the Red-State,
+  Blue-State Problem.'' \emph{Statistical Science} 29 (1).
+  \url{https://doi.org/10.1214/13-STS458}.
+\item
+  Kruschke, John K., and Torrin M. Liddell. 2018. ``The Bayesian New
+  Statistics: Hypothesis Testing, Estimation, Meta-Analysis, and Power
+  Analysis from a Bayesian Perspective.'' \emph{Psychonomic Bulletin \&
+  Review} 25 (1): 178--206.
+  \url{https://doi.org/10.3758/s13423-016-1221-4}.
+\item
+  Lynch, Scott M., and Bryce Bartlett. 2019. ``Bayesian Statistics in
+  Sociology: Past, Present, and Future.'' \emph{Annual Review of
+  Sociology} 45 (1): 47--68.
+  \url{https://doi.org/10.1146/annurev-soc-073018-022457}.
+\item
+  Lundberg, Ian, Rebecca Johnson, and Brandon M Stewart. 2021. ``What Is
+  Your Estimand? Defining the Target Quantity Connects Statistical
+  Evidence to Theory.'' \emph{American Sociological Review} 86 (3):
+  532--65. \url{https://doi.org/10.1177/00031224211004187}.
+\end{itemize}
+
+\hypertarget{week-4---february-14---multiple-regression}{%
+\subsection{Week 4 - February 14 - Multiple
+regression}\label{week-4---february-14---multiple-regression}}
+
+\emph{Readings}
+
+\begin{itemize}
+\tightlist
+\item
+  GHV 10.1-10.2, 10.7-11.6
+\item
+  McElreath 4-4.4, 5-5.2
+\end{itemize}
+
+\emph{Homework 2 released, due 2/27}
+
+\hypertarget{week-5---february-21---dummy-categorical-and-non-linear-variables}{%
+\subsection{Week 5 - February 21 - Dummy, categorical, and non-linear
+variables}\label{week-5---february-21---dummy-categorical-and-non-linear-variables}}
+
+\emph{Readings}
+
+\begin{itemize}
+\tightlist
+\item
+  GHV 10.3-10.6, 12-12.5, 12.7-12.8
+\item
+  McElreath 4.5.1, 5.3-5.4
+\end{itemize}
+
+\emph{Recommended}
+
+\begin{itemize}
+\tightlist
+\item
+  Johfre, Sasha Shen, and Jeremy Freese. 2021. ``Reconsidering the
+  Reference Category.'' \emph{Sociological Methodology} 51 (2): 253--69.
+  \url{https://doi.org/10.1177/0081175020982632}.
+\end{itemize}
+
+\hypertarget{week-6---february-28---interactions}{%
+\subsection{Week 6 - February 28 -
+Interactions}\label{week-6---february-28---interactions}}
+
+\emph{Readings}
+
+\begin{itemize}
+\tightlist
+\item
+  GHV 10.3, 12.2
+\item
+  McElreath 8
+\end{itemize}
+
+\emph{Recommended}
+
+\begin{itemize}
+\tightlist
+\item
+  Mize, Trenton. 2019. ``Best Practices for Estimating, Interpreting,
+  and Presenting Nonlinear Interaction Effects.'' \emph{Sociological
+  Science} 6: 81--117. \url{https://doi.org/10.15195/v6.a4}.
+\end{itemize}
+
+\hypertarget{week-7---march-7---model-checking-and-missing-data}{%
+\subsection{Week 7 - March 7 - Model checking and missing
+data}\label{week-7---march-7---model-checking-and-missing-data}}
+
+\emph{Readings}
+
+\begin{itemize}
+\tightlist
+\item
+  GHV 11.7-11.9, 17.3-17.8
+\item
+  McElreath 7
+\end{itemize}
+
+\emph{Recommended}
+
+\begin{itemize}
+\tightlist
+\item
+  Young, Cristobal, and Katherine Holsteen. 2017. ``Model Uncertainty
+  and Robustness: A Computational Framework for Multimodel Analysis.''
+  \emph{Sociological Methods \& Research} 46 (1): 3--40.
+  \url{https://doi.org/10.1177/0049124115610347}.
+\item
+  Slez, Adam. 2017. ``The Difference Between Instability and
+  Uncertainty: Comment on Young and Holsteen (2017).''
+  \emph{Sociological Methods \& Research} 48 (2): 400--430.
+  \url{https://doi.org/10.1177/0049124117729704}.
+\item
+  Muñoz, John, and Cristobal Young. 2018. ``We Ran 9 Billion
+  Regressions: Eliminating False Positives through Computational Model
+  Robustness.'' \emph{Sociological Methodology} 48 (1): 1--33.
+  \url{https://doi.org/10.1177/0081175018777988}.
+\item
+  Western, Bruce. 2018. ``Comment: Bayes, Model Uncertainty, and
+  Learning From Data.'' \emph{Sociological Methodology}
+  \url{https://doi.org/10.1177/0081175018799095}.
+\item
+  Molina, Mario, and Filiz Garip. 2019. ``Machine Learning for
+  Sociology.'' \emph{Annual Review of Sociology} 45: 27--45.
+  \url{https://doi.org/10.1146/annurev-soc-073117-041106}.
+\item
+  McElreath 15.2
+\end{itemize}
+
+\hypertarget{spring-break---no-class}{%
+\subsection{\texorpdfstring{\emph{SPRING BREAK - No
+class}}{SPRING BREAK - No class}}\label{spring-break---no-class}}
+
+\hypertarget{week-8---march-21---glms-i-binary-outcomes-and-logistic-regression}{%
+\subsection{Week 8 - March 21 - GLMs I: Binary outcomes and logistic
+regression}\label{week-8---march-21---glms-i-binary-outcomes-and-logistic-regression}}
+
+\emph{Readings}
+
+\begin{itemize}
+\tightlist
+\item
+  GHV 13, 15.1, 15.4
+\item
+  McElreath 10.2-10.4, 11.1
+\end{itemize}
+
+\emph{Recommended}
+
+\begin{itemize}
+\tightlist
+\item
+  McElreath 10.1
+\item
+  Battey, H. S., D. R. Cox, and M. V. Jackson. 2019. ``On the Linear in
+  Probability Model for Binary Data.'' \emph{Royal Society Open Science}
+  6 (5): 190067. \url{https://doi.org/10.1098/rsos.190067}.
+\end{itemize}
+
+\emph{Homework 4 released, due 4/1}
+
+\hypertarget{week-9---march-28---glms-ii-logistic-regression-and-marginal-effects}{%
+\subsection{Week 9 - March 28 - GLMs II: Logistic regression and
+marginal
+effects}\label{week-9---march-28---glms-ii-logistic-regression-and-marginal-effects}}
+
+\emph{Readings}
+
+\begin{itemize}
+\tightlist
+\item
+  GHV 14
+\end{itemize}
+
+\emph{Recommended} - Long, J. Scott, and Sarah A. Mustillo. 2018.
+``Using Predictions and Marginal Effects to Compare Groups in Regression
+Models for Binary Outcomes.'' \emph{Sociological Methods \& Research} 50
+(3): 1284--1320. \url{https://doi.org/10.1177/0049124118799374}. - Mize,
+Trenton. 2019. ``Best Practices for Estimating, Interpreting, and
+Presenting Nonlinear Interaction Effects.'' \emph{Sociological Science}
+6: 81--117. \url{https://doi.org/10.15195/v6.a4}.
+
+\hypertarget{week-10---april-4---glms-iii-count-outcomes-and-overdispersion}{%
+\subsection{Week 10 - April 4 - GLMs III: Count outcomes and
+overdispersion}\label{week-10---april-4---glms-iii-count-outcomes-and-overdispersion}}
+
+\emph{Readings}
+
+\begin{itemize}
+\tightlist
+\item
+  GHV 15.2-15.3, 15.8
+\item
+  McElreath 11.2, 12.1-12.2
+\end{itemize}
+
+\hypertarget{week-11---april-11---glms-iv-categorical-and-ordered-outcomes}{%
+\subsection{Week 11 - April 11 - GLMs IV: Categorical and ordered
+outcomes}\label{week-11---april-11---glms-iv-categorical-and-ordered-outcomes}}
+
+\emph{Readings}
+
+\begin{itemize}
+\tightlist
+\item
+  GHV 15.5
+\item
+  McElreath 11.3, 12.3-12.5
+\end{itemize}
+
+\emph{Homework 5 released, due 4/22}
+
+\hypertarget{week-12---april-18---clustered-data}{%
+\subsection{Week 12 - April 18 - Clustered
+data}\label{week-12---april-18---clustered-data}}
+
+\emph{Readings}
+
+\begin{itemize}
+\tightlist
+\item
+  McElreath 13-13.3, 13.5-13.6, 14-14.2
+\item
+  Bell, Andrew, Malcolm Fairbrother, and Kelvyn Jones. 2019. ``Fixed and
+  Random Effects Models: Making an Informed Choice.'' \emph{Quality \&
+  Quantity} 53 (2): 1051--74.
+  \url{https://doi.org/10.1007/s11135-018-0802-x}.
+\item
+  King, Gary, and Margaret E. Roberts. 2015. ``How Robust Standard
+  Errors Expose Methodological Problems They Do Not Fix, and What to Do
+  About It.'' \emph{Political Analysis} 23 (02): 159--79.
+  \url{https://doi.org/10.1093/pan/mpu015}.
+\end{itemize}
+
+\emph{Recommended}
+
+\begin{itemize}
+\tightlist
+\item
+  Keele, Luke, and Nathan J. Kelly. 2006. ``Dynamic Models for Dynamic
+  Theories: The Ins and Outs of Lagged Dependent Variables.''
+  \emph{Political Analysis} 14 (02): 186--205.
+  \url{https://doi.org/10.1093/pan/mpj006}.
+\item
+  De Boef, Suzanna, and Luke Keele. 2008. ``Taking Time Seriously.''
+  \emph{American Journal of Political Science} 52 (1): 184--200.
+  \url{https://doi.org/10.1111/j.1540-5907.2007.00307.x}
+\item
+  Rüttenauer, Tobias. 2019. ``Spatial Regression Models: A Systematic
+  Comparison of Different Model Specifications Using Monte Carlo
+  Experiments.'' \emph{Sociological Methods \& Research}, November,
+  004912411988246. \url{https://doi.org/10.1177/0049124119882467}.
+\item
+  Chi, Guangqing, and Jun Zhu. 2008. ``Spatial Regression Models for
+  Demographic Analysis.'' \emph{Population Research and Policy Review}
+  27 (1): 17--42. \url{https://doi.org/10.1007/s11113-007-9051-8}.
+\item
+  Dow, Malcolm M., Michael L. Burton, and Douglas R. White. 1982.
+  ``Network Autocorrelation: A Simulation Study of a Foundational
+  Problem in Regression and Survey Research.'' \emph{Social Networks} 4
+  (2): 169--200. \url{https://doi.org/10.1016/0378-8733(82)90031-4}.
+\item
+  DellaPosta, Daniel, Yongren Shi, and Michael Macy. 2015. ``Why Do
+  Liberals Drink Lattes?'' \emph{American Journal of Sociology} 120 (5):
+  1473--1511. \url{https://doi.org/10.1086/681254}.
+\end{itemize}
+
+\hypertarget{week-13---april-25---causal-inference-using-observational-data}{%
+\subsection{Week 13 - April 25 - Causal inference using observational
+data}\label{week-13---april-25---causal-inference-using-observational-data}}
+
+\emph{Readings}
+
+\begin{itemize}
+\tightlist
+\item
+  GHV 18-21
+\item
+  Cunningham p.~96-198 (Chapters 3-5),
+\end{itemize}
+
+\emph{Recommended}
+
+\begin{itemize}
+\tightlist
+\item
+  Cunningham \emph{skim} p.~241-509 (Chapters 6-9)
+\item
+  McElreath 6
+\item
+  King, Gary, and Richard Nielsen. 2019. ``Why Propensity Scores Should
+  Not Be Used for Matching.'' \emph{Political Analysis} 27 (4): 435--54.
+  \url{https://doi.org/10.1017/pan.2019.11}.
+\end{itemize}
+
+\hypertarget{week-14---may-2---student-presentations}{%
+\subsection{Week 14 - May 2 - Student
+presentations}\label{week-14---may-2---student-presentations}}
+
+\end{document}

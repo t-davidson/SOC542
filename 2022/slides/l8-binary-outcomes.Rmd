@@ -1,0 +1,599 @@
+---
+title: "SOC542 Statistical Methods in Sociology II" 
+subtitle: "Binary outcomes I"
+author: Thomas Davidson
+institute: Rutgers University
+date: March 21, 2022
+urlcolor: blue
+output:
+    beamer_presentation:
+      theme: "Szeged"
+      colortheme: "beaver"
+      fonttheme: "structurebold"
+      toc: FALSE
+      incremental: FALSE
+      fig_width: 3.5
+      fig_height: 2.5
+header-includes:
+  - \usepackage{hyperref}
+  - \usepackage{multicol}
+  - \usepackage{caption}
+  - \usepackage{booktabs}
+  - \usepackage{siunitx}
+  - \newcolumntype{d}{S[input-symbols = ()]}
+  - \captionsetup[figure]{font=scriptsize}
+  - \captionsetup[figure]{labelformat=empty}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(dev = 'pdf')
+library("knitr")
+library("formatR")
+
+opts_chunk$set(tidy.opts=list(width.cutoff=80),tidy=TRUE)
+opts_chunk$set(tidy = FALSE)
+
+knitr::knit_hooks$set(mysize = function(before, options, envir) {
+  if (before) 
+    return(options$size)
+})
+
+knitr::opts_chunk$set(
+ fig.width = 4,
+ fig.asp = 0.8,
+ out.width = "70%",
+ fig.align = "center"
+)
+
+set.seed(08901)
+
+library(ggplot2)
+library(tidyverse)
+library(latex2exp)
+library(kableExtra)
+library(modelsummary)
+library(viridis)
+library(cowplot)
+library(mice)
+library(reshape2)
+library(rstanarm)
+
+options("modelsummary_format_numeric_latex" = "plain")
+```
+
+# Course updates
+- Identify suitable paper for replication
+    - Email me your choice of replication paper by Friday 3/25
+- Homework 2 grades and comments released
+- Next homework released on Wednesday, due 4/1
+    - Logistic regression
+    - Interaction terms
+
+# Plan
+- Linear probability model
+- Logistic regression
+- Probit regression
+
+
+# Linear probability  model
+## Definition
+- A binary outcome variable $y$ consists of two possible values, 0 or 1.
+    - e.g. $y \sim Binomial(n,p)$ is a sequence of $n$ observations, where $P(y_i=1) = p$.
+- The \textbf{linear probability model (LPM)} is used to model the *probability* of binary dependent variables as a *linear* function of predictors.
+
+# Linear probability  model
+## Specification
+- The LPM is estimated using OLS:
+
+$$y = \beta_0 + \beta_1x_1 + \beta_2x_2 + ... + \beta_kx_k + u$$
+
+- Thus,
+
+$$P(y=1|x_1, x_2, ... x_k) = \beta_0 + \beta_1x_1 + \beta_2x_2 + ... + \beta_kx_k + u$$
+
+- The coefficient $\beta_i$ represents the change in probability that $y = 1$ associated with a unit-change in $x_i$, holding other regressors constant.
+
+# Linear probability  model
+## Fitting a line to a simulated binary outcome
+```{r simple-lpm1, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+N <- 100
+x <- rnorm(N)
+z <- rlogis(N, (-0.5 + 2*x), 1)
+y <- ifelse(z>0, 1, 0)
+df <- as.data.frame(cbind(y,x))
+```
+
+```{r simple-lpm2, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+ggplot(data = df, aes(x=x, y=y)) + geom_point(alpha=0.5) + geom_smooth(method = "lm", se = F) + theme_minimal()
+```
+
+
+# Linear probability model
+## Example: Diffusion of Microfinance\footnote{\tiny Data from Banerjee, A., A. G. Chandrasekhar, E. Duflo, and M. O. Jackson. 2013. “The Diffusion of Microfinance.” \textit{Science} 341 (6144): 1236498–1236498. \href{https://doi.org/10.1126/science.1236498}{Link to paper}. \href{https://dataverse.harvard.edu/dataset.xhtml?persistentId=hdl:1902.1/21538}{Harvard Dataverse link}}
+- Survey data from 75 villages in Karnataka, India
+    - Focus only on women and 72 villages
+    - Listwise deletion used to drop respondents missing key variables
+    - N = 9064
+- Dependent variable: 
+    - Membership in a micro-finance Self-Help Group (SHG), N = 3357
+- Independent variables:
+    - Age (continuous) and age squared
+    - Caste (dummy, low/high)
+- Fixed-effects:
+    - Village (dummy)
+    
+```{r load-dom, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+library(haven)
+data <- read_dta("data/individual_characteristics.dta") %>%
+    select(village, resp_gend, age, religion, caste, educ, villagenative, shgparticipate) %>%
+    filter(resp_gend == 2 & religion >= 1 & shgparticipate >= 1 & caste >= 1 &
+           village != 16 & village != 33 & village != 77) %>% # dropping men and missing (negative values)
+    mutate(caste = ifelse(caste <= 2, "low", "high"),
+           hindu = ifelse(religion == 1, 1, 0),
+           shg = ifelse(shgparticipate == 1, 1, 0),
+           native = ifelse(villagenative == 1, "native", "nonnative"),
+           educ = replace(educ, educ == 16, 0)) %>%
+    select(shg, village, age, educ, hindu, caste, native)
+```
+
+
+# Linear probability model
+## Example: Predicting Self-Help Group membership\footnote{\tiny Based on a propensity score model in Davidson, Thomas, and Paromita Sanyal. 2017. “Associational Participation and Network Expansion: Microcredit Self-Help Groups and Poor Women’s Social Ties in Rural India.” \textit{Social Forces} 95 (4): 1695–1724. https://doi.org/10.1093/sf/sox021.}
+```{r dom-lpm, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+lpm <- lm(shg ~ age + I(age^2) + caste + 
+              as.factor(village), data = data)
+```
+
+
+# Linear probability model
+## Example: Predicting Self-Help Group membership
+```{r dom-lpm-summary, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+modelsummary(lpm, stars = TRUE, gof_omit = "AIC|BIC|R2|RMSE", output = "latex", coef_omit = "as.factor*", notes = list("Village fixed-effects omitted."), 
+             coef_rename = c("age" = "Age", "I(age^2)" = "Age^2",
+                             "castelow" = "Caste (Lower)"))
+```
+
+# Linear probability model
+##  Village fixed-effects
+```{r fe, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+coefs <- as.numeric(lpm$coefficients)
+coefs <- coefs[5:75]
+idx <- unique(data$village)[-1]
+
+v_props <- data %>% group_by(village) %>% summarize(n = n(), prop = sum(shg)/n)
+prop <- v_props$prop[-1]
+temp <- as.data.frame(cbind(prop, idx, coefs))
+
+ggplot(data = temp, aes(x = prop, y = coefs)) + geom_text(aes(label=idx), alpha = 0.8, position=position_jitter(width=0.05,height=0.05)) + theme_minimal() +
+    labs(x = "Proportion SHG members", y = "Coefficient (fixed-effect)", caption = "Village 1 is reference category.")
+```
+
+# Linear probability model
+## Predicted values
+```{r dom-lpm-preds, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+Predictions <- predict(lpm)
+hist(Predictions)
+```
+
+# Linear probability model
+## Residuals
+```{r dom-lpm-resids1, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+Residuals <- lpm$residuals
+hist(Residuals)
+```
+
+# Linear probability model
+##  Predicted values and residuals
+```{r dom-lpm-resids2, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+plot(Predictions, Residuals)
+```
+
+# Linear probability model
+## Limitations
+- Unrealistic predictions
+    - Nothing constrains predictions to be probabilities bounded by [0,1] so the model can make unrealistic predictions
+- Heteroskedastic errors
+    - Requires the use of heterosekasticity-robust standard errors\footnote{We will discuss this topic in more detail in Week 12.}
+- $R^2$ no longer reliable
+    - Under what circumstances could $R^2 = 1$ be achieved with a binary outcome?
+    
+# Logistic regression
+## Addressing the limitations
+- We can address the limitations of the LPM by using a different functional form to ensure that predicted values are constrained to the $[0,1]$ range
+- To do this must extend the linear model by using a \textbf{link function} to map a linear model onto a non-linear outcome space. 
+- Such models are known as \textbf{generalized linear models (GLM)}.
+
+    
+
+# Logistic regression
+## The logit function
+- The \textbf{logit} function takes values in the range $[0,1]$ and maps them to the range $[-\infty, \infty]$
+
+$$logit(x) = log(\frac{x}{1-x})$$
+
+# Logistic regression
+## The logit function
+```{r logit, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+logit <- function(x) {return(log(x/(1-x)))}
+logit(c(0, 0.01, 0.5, 0.99, 1))
+```
+
+# Logistic regression
+## The logit function
+```{r logit2, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+plot(y= qlogis(seq(0, 1, by = 0.01)), x = seq(0, 1, by = 0.01),
+     xlab = "x", ylab = "logit(x)")
+```
+
+# Logistic regression
+## The inverse logit function
+- The \textbf{inverse logit function} reverses this transformation, mapping values back to the $[0,1]$ range:
+
+$$logit^{-1}(x) = \frac{e^x}{1 + e^x} = \frac{1}{1 + e^{-x}}$$
+
+# Logistic regression
+## The inverse logit function
+```{r ilogit, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+invlogit <- function(x) {return((exp(1)^x)/(1 + exp(1)^x))}
+invlogit(c(-2, -1, 0, 1, 10))
+```
+
+# Logistic regression
+## The inverse logit function
+```{r ilogit2, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+plot(y = plogis(seq(-10, 10, by = 0.2)), x  = seq(-10, 10, by = 0.2),
+     xlab = "x", ylab = "inverse logit(x)")
+```
+
+# Logistic regression
+- We can write the following model for a binary outcome, where $p_i = P(y_i=1|x_{1i}, x_{2i}, ..., x_{ki})$:
+
+$$logit(p_i)  = log(\frac{p_i}{1-p_i}) =  \beta_0 + \beta_1x_{1i} + \beta_2x_{2i} + ... + \beta_kx_{ki}$$
+
+- The model can be expressed in terms of $p_i$ using the inverse-logit function (also known as the logistic function):
+
+$$p_i = logit^{-1}(\beta_0 + \beta_1x_{1i} + \beta_2x_{2i} + ... + \beta_kx_{ki})$$
+
+$$p_i = \frac{1}{1 + e^{- (\beta_0 + \beta_1x_{1i} + \beta_2x_{1i} + ... + \beta_kx_{ki})}}$$
+
+# Logistic regression
+## Fitting a logistic curve to simulated data
+```{r simple-logit, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+ggplot(data = df, aes(x=x, y=y)) + geom_point(alpha=0.5) + geom_smooth(method = "glm", se = F, method.args = list(family="binomial")) + theme_minimal()
+```
+
+# Logistic regression
+## Error terms
+- OLS regression has an error-term because we assume that the outcome is normally-distributed with two parameters, $\mu$ and $\sigma^2$, i.e. $y \sim N(\mu, \sigma^2)$.
+- Binary variables follow a Bernoulli distribution,\footnote{Recall this is equivalent to $Binomial(1,p)$.} characterized by a single parameter, $p$, the probability of a success. Thus, $y \sim Bernoulli(p)$.
+- Therefore, there is *no error term in logistic regression*.
+
+# Logistic regression
+## Estimation
+- There is no direct algebraic solution to obtain such estimates (unlike OLS regression, i.e. $(X^TX)^{-1}X^Ty$).
+- In frequentist statistics, the parameters in a logistic regression (and most other GLMs) are estimated using \textbf{Maximum Likelihood Estimation (MLE)}.
+    - The MLE estimates have the same general properties as OLS estimates w.r.t standard errors, confidence intervals, and p-values.
+
+# Logistic regression
+## Maximum Likelihood Estimation
+- For logistic regression, where $\beta$ is a vector of coefficients and $X$ is a matrix of predictors, the \textbf{likehood} is written as 
+
+$$P(y|\beta, X) = \prod_{i=1}^n (logit^{-1}(X_i\beta))^{y_i} (1-logit^{-1}(X_i\beta))^{1-y_i}$$
+
+- The goal of MLE is to find the $\beta$ that maximizes this function. 
+    - It finds the parameter values most likely to have produced the observed data.
+- A *iterative* algorithm is used to find the parameters that maximize the likelihood function, typically using the logarithm of the likelihood function for computational efficiency.
+    - Unlike OLS, models can sometimes fail to converge on an appropriate solution. This can be an issue when trying to fit complex models.
+
+# Logistic regression
+## Estimation in R
+We can easily estimate this using the `glm` function in R. The `family` argument is used to select the appropriate model.
+```{r logit-mle, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+logit.mle <- glm(shg ~ age + I(age^2) + caste + 
+                     as.factor(village), 
+                 data = data, 
+                 family = binomial(link = "logit"))
+logit.mle$converged # Has model converged?
+logit.mle$iter # How many MLE iterations used?
+```
+
+# Logistic regression
+## Comparison with the LPM
+```{r logit-mle-output, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+modelsummary(list("LPM"=lpm, "Logistic"=logit.mle), stars = TRUE, gof_omit = "AIC|BIC|R2|RMSE", output = "latex", coef_omit = "as.factor*", notes = list("Village fixed-effects omitted."), 
+             coef_rename = c("age" = "Age", "I(age^2)" = "Age^2",
+                             "castelow" = "Caste (Lower)"))
+```
+
+# Logistic regression
+## Bayesian estimation
+- Logistic regression can alternatively be estimated using Bayesian methods.
+    - We can use the same MCMC approach as used for OLS regression.
+- Unlike MLE, Bayesian estimation does not converge on a single maximum likelihood estimate of $\beta$, but produces a posterior distribution.
+- If a *uniform prior* is used, the posterior density is proportional to the likelihood function and the *mode* is equal to the maximum likelihood estimate.
+    - Typically, we can do better by using more informative priors.
+    
+# Logistic regression
+## Bayesian estimation in R
+```{r logit-stan, echo = TRUE, mysize=TRUE, size='\\footnotesize', warning = F}
+logit.bayes <- stan_glm(shg ~ age + I(age^2) + caste + 
+                            as.factor(village), 
+                        data = data, 
+                        family = binomial(link = "logit"), 
+                        refresh = 0, chains = 1, iter = 5000)
+```
+\tiny Note: Bayesian estimation can be considerably slower than MLE. The model requires more iterations than the default to ensure convergence, likely due to the nested structure of the data (more informative priors would likely help).
+
+# Logistic regression
+## Comparing Maximum Likelihood and Bayesian estimates\footnote{\tiny For comparability, 95\% confidence/credibility intervals are shown below coefficients.}
+```{r comparison-mle-bayes, echo = FALSE, mysize=TRUE, size='\\footnotesize', warning = F}
+modelsummary(list("MLE"=logit.mle, "Bayes"=logit.bayes), stars = F, gof_omit = "AIC|BIC|ELPD s.e.|LOOIC s.e.|RMSE|F|LOOIC", output = "latex", coef_omit = "as.factor*", notes = list("Village fixed-effects omitted."), statistic = "conf.int", 
+             coef_rename = c("age" = "Age", "I(age^2)" = "Age^2",
+                             "castelow" = "Caste (Lower)"))
+```
+
+
+<!--Note: Default statistic in modelsummary is the standard error. Bayesian coefficients do not have a standard error and so statistic must be specified as conf.int, otherwise the function produces an error. See https://stackoverflow.com/questions/67141525/best-way-to-present-results-of-rstanarm-output-->
+
+
+# Logistic regression
+## Interpretation: Terminology
+- If an outcome occurs with probability $p$, the \textbf{odds} of the outcome are defined as $\frac{p}{1-p}$.
+    - If $p = 0.5$, the odds $= \frac{0.5}{1-0.5} = 1$. If $p = \frac{2}{3}$, the odds $\approx 2$.
+- The \textbf{log odds} is the natural logarithm of the odds
+    - This is also known as the \textbf{logit} function, $log(\frac{p}{1-p})$
+- An \textbf{odds ratio} is the ratio of two odds.
+    - $OR(p,q) = \frac{\frac{p}{1-p}}{\frac{q}{1-q}}$
+- Odds ratios can be used as a way to communicate changes in the probability scale:
+
+$$OR(0.6, 0.8) = \frac{\frac{0.6}{1-0.6}}{\frac{0.8}{1-0.8}} = \frac{1.5}{4} = 0.375$$
+
+# Logistic regression
+## Interpretation: Log-odds
+- Since the outcome can be expressed as $log(\frac{p}{1-p})$, the coefficients in the regression output are \textbf{log odds}.
+    - Where $\beta_{age} = 0.3$, a 1 year increase is associated with a 0.3 increase in the log-odds of SHG membership.
+    - $\beta_{caste} = 0.315$, implying that belonging to a lower caste group versus a higher caste group changes the log-odds of SHG membership by 0.315.
+    
+# Logistic regression
+## Interpretation: Odds-ratios
+- We can get the \textbf{odds ratio} by exponentiating the coefficients
+    - $OR(age) = exp(0.3) = 1.35$. A 1 year increase in age is associated with a 34% increase in the odds of SHG membership.
+    - $OR(caste) = \frac{Odds(SHG=1|lower-caste)}{Odds(SHG=1|higher-caste)} = exp(0.315) = 1.37$. This implies that low caste residents are more likely to belong to SHGs (a 37% increase in the odds of SHG membership).
+    
+<!--A useful post explaining why we get odds ratios and not just odds when we exponentiate: https://stats.stackexchange.com/questions/361529/why-are-exponentiated-logistic-regression-coefficients-considered-odds-ratios (see replies)-->
+
+# Logistic regression
+## Interpretation: Intuition
+- Why do we get an odds ratio and not an odds when we exponentiate a log odds?
+
+
+$$exp(\beta_{caste}) = exp(\beta^*_{caste_{low}}-\beta^*_{caste_{high}})$$
+$$= exp(log(odds(p|caste_{low})) - log(odds(p|caste_{high})))$$
+$$= \frac{exp(log(odds(p|caste_{low}))}{exp(log(odds(p|caste_{high})))}$$
+
+$$= \frac{odds(p|caste_{low})}{odds(p|caste_{high})}$$
+
+# Logistic regression
+## Interpretation: The divide-by-4 rule
+- The divide-by-4 rule provides a quick way to assess the effects of predictors in a logistic regression:
+    - The logistic curve is steepest at the center, where $\beta_0 + \beta X = 0$ and $logit^{-1}(\beta_0 + \beta X) = 0.5$. The slope (or the derivative of the logistic function) is maximized. 
+    - At this point, $\frac{\beta e^0}{(1+e^0)^2} = \frac{\beta}{(1+1)^2} = \beta/4$. 
+- $\beta/4$ is the *maximum* difference in $P(y=1)$ corresponding to a unit change in $x$.
+    - This provides an simple approximation for the *maximum effect of a predictor*.
+- For example, $\beta_{Age}/4 = 0.3/4 = 0.075$. Thus, the maximum effect of a 1-year results in a maximum 7.5% increase in the probability of SHG membership.
+
+# Logistic regression
+## Confidence intervals
+- The standard formula for calculating confidence intervals assumes normality. This assumption is violated by logistic regression so standard (Wald) confidence intervals are incorrect.\footnote{\tiny In practice, the two approaches often produce very similar results, as the following example shows.}
+- Instead, confidence intervals for GLMs are calculated by using information from the likelihood function using the \textbf{profile likelihood} approach.
+    - Note: Profile intervals are considerably slower to compute than Wald intervals.
+- For Bayesian models, we can construct credible intervals using the posterior distribution in the same fashion as OLS models.
+
+# Logistic regression
+## Confidence intervals
+The `conf.int` function in R allows us to calculate the correct confidence intervals (in this case for the effect of age). `conf.int` default provides standard confidence intervals. The intervals are exponentiated to get odds ratios.
+```{r confint, echo = TRUE, mysize=TRUE, size='\\footnotesize', warning = F}
+round(exp(confint.default(logit.mle)[2,]),4)
+round(exp(confint(logit.mle))[2,],4)
+```
+
+<!-- This code can be run to manually calculate default confidence intervals.
+SE_age <- summary(logit.mle)$coefficients[2,][2]
+lower <- round(exp(beta_age-(1.96*SE_age)),3)
+upper <- round(exp(beta_age+(1.96*SE_age)),3)
+print(paste("Standard CI for age: ",lower, upper))
+-->
+
+# Logistic regression
+## Model fit: Log-likelihood
+- The \textbf{log-likelihood} of a model is defined as 
+
+$$\sum_{i=1}^n log(p_i)y_i + log(1-p_i)(1-y_i)$$
+
+- If $y_i = 1$, we add $log(p_i)$, otherwise we add $log(1-p_i)$.
+- It is always negative.\footnote{\tiny Recall $log_e(1) = 0$.} A higher score indicates a better fit
+    - But like $R^2$, adding more variables tends to increase the score.
+- A related measure known as \textbf{deviance} is simply $-2$ times the log-likelihood.
+
+# Logistic regression
+## Model fit: Log-likelihood
+We can calculate the log-likelihood using the formula above or the `logLik` function:
+```{r loglik, echo = TRUE, mysize=TRUE, size='\\footnotesize', warning = F}
+y <- data$shg
+pred_probs <- predict(logit.mle, type = "response")
+sum(log(pred_probs)*y + log(1 - pred_probs)*(1-y))
+print(logLik(logit.mle))
+```
+
+# Logistic regression
+## Model fit: Log-likelihood
+```{r loglik2, echo = FALSE, mysize=TRUE, size='\\footnotesize', warning = F}
+m.village <- glm(shg ~ as.factor(village), 
+                 data = data, 
+                 family = binomial(link = "logit"))
+m.caste <- glm(shg ~  caste + 
+                     as.factor(village), 
+                 data = data, 
+                 family = binomial(link = "logit"))
+m.age <- glm(shg ~ age + I(age^2) + 
+                     as.factor(village), 
+                 data = data, 
+                 family = binomial(link = "logit"))
+
+m.religion <- glm(shg ~ age + I(age^2) + caste + hindu +
+                     as.factor(village), 
+                 data = data, 
+                 family = binomial(link = "logit"))
+modelsummary(list("Village" = m.village, "Caste" = m.caste, "Age" = m.age, "Full"=logit.mle, "+Religion" = m.religion), stars = FALSE, gof_omit = "AIC|BIC|R2|RMSE|F|Num.Obs", output = "latex", coef_omit = "as.factor*", notes = list("Village fixed-effects omitted."), 
+             coef_rename = c("age" = "Age", "I(age^2)" = "Age^2",
+                             "castelow" = "Caste (Lower)", "hindu" = "Hindu"))
+```
+
+# Logistic regression
+## Model fit: Log-likelihood (Bayesian)
+We can use the same formula to calculate the log-likelihood for a Bayesian model.\footnote{\tiny The standard `logLik` function does not work for Bayesian models.} Do you notice any problems with such an approach?
+```{r loglik-bayes1, echo = TRUE, mysize=TRUE, size='\\footnotesize', warning = F}
+pred_probs.bayes <- predict(logit.bayes, type = "response")
+sum(log(pred_probs.bayes)*y + log(1 - pred_probs.bayes)*(1-y))
+```
+
+<!-- Removing this part, I don't think it has a clear interpretation.
+# Logistic regression
+## Model fit: Log-likelihood (Bayesian)
+To better propagate uncertainty, we need to use the entire posterior distribution. We could calculate a log-likelihood for each posterior sample.
+```{r loglik-bayes2, echo = TRUE, mysize=TRUE, size='\\footnotesize', warning = F}
+posterior_pred_probs <- posterior_epred(logit.bayes, type = "response")
+LLs <- c()
+for (i in 1:dim(posterior_pred_probs)[1]) {
+    LLs[i] <- sum(
+        log(posterior_pred_probs[i,])*y +
+        log(1 - posterior_pred_probs[i,])*(1-y)
+                  )
+}
+median(LLs)
+```
+
+# Logistic regression
+## Model fit: Log-likelihood (Bayesian)
+```{r loglik-bayes3, echo = FALSE, mysize=TRUE, size='\\footnotesize', warning = F}
+hist(LLs, breaks = 100)
+abline(v = median(LLs), col = "red", title = "Posterior LL")
+```
+-->
+
+# Logistic regression
+## Model fit: Log-likelihood (Bayesian)
+To incorporate the uncertainty in the posterior distribution, we can take the average log-likelihood of each point over all posterior samples $S$, known as the \textbf{log-pointwise-predictive-density}.\footnote{\tiny See McElreath p. 210}
+```{r lppd, echo = TRUE, mysize=TRUE, size='\\footnotesize', warning = F}
+S <- dim(posterior_pred_probs)[1]
+n <- dim(posterior_pred_probs)[2]
+LLs <- matrix(nrow = n, ncol = S)
+for (i in 1:S) {
+    LLs[,i] <- 
+        posterior_pred_probs[i,]*y +
+        (1 - posterior_pred_probs[i,])*(1-y)
+}
+sum(log(rowSums(LLs)/S))
+```
+
+# Logistic regression
+## Model fit: Log-likelihood (Bayesian)
+- In this case, the estimates using `predict` and `posterior_predict` are almost identical.
+- However, you should always use the full posterior distribution when computing any summary statistics from Bayesian models.
+
+# Logistic regression
+## Model fit: $R^2$ and fraction correctly predicted
+- $R^2$ is no longer a useful measure of fit for the same reason as the LPM.
+- A simple fit measure is the *fraction of cases correctly predicted*, where $\hat{y_i} = 1$ if $p_i > 0.5$ and $\hat{y_i} = 0$ if $p_i \leq 0.5$, but this approach throws out information about the predicted probabilities.
+
+# Logistic regression
+## Model fit: Pseudo-$R^2$
+- There are several different approaches to construct \textbf{pseudo-$R^2$} statistics. These measures approximate an $R^2$ by ranging between 0 and 1, but do are not equivalent.\footnote{\tiny See this \href{https://stats.oarc.ucla.edu/other/mult-pkg/faq/general/faq-what-are-pseudo-r-squareds/}{blog post} for a discussion of several different measures.}
+- One of the more common variants is McFadden's pseudo-$R^2$:
+
+$$R^2 = 1 - \frac{LL(M_{full})}{LL(M_{intercept})}$$
+
+- This is the standard formula for $R^2$, where the log-likelihood of an intercept-only model as the total sum of squares and the fully parameterized model is the sum of squared errors.
+
+# Logistic regression
+## Model fit: McFadden's pseudo-$R^2$
+The result is similar to the $R^2$ obtained from the LPM.
+```{r mcfadden, echo = TRUE, mysize=TRUE, size='\\footnotesize', warning = F}
+logit.mle.i <- glm(shg ~ 1, 
+                 data = data, 
+                 family = binomial(link = "logit"))
+
+pR2 <- 1 - (logLik(logit.mle)[1]/logLik(logit.mle.i)[1])
+print(round(pR2,3))
+print(round(summary(lpm)$r.squared, 3))
+```
+
+# Logistic regression
+## Model fit: Bayesian held-out likelihood
+- For Bayesian models, we can use the `loo` function to calculate a held-out likelihood score using the entire posterior distribution.
+    - The `elpd_loo` score provides an approximation of the LOO-CV expected log-pointwise predictive density.
+- This will be slightly more conservative (lower) than the in-sample log-likelihood.
+    
+# Logistic regression
+## Model fit: Bayesian held-out likelihood
+```{r loo, echo = TRUE, mysize=TRUE, size='\\footnotesize', warning = F}
+print(loo(logit.bayes))
+```
+
+
+# Probit regression
+- The \textbf{probit} regression model is similar to logistic regression but uses a cumulative normal function $\Phi$ instead of the inverse logistic function:
+
+$$P(y=1|X) = \Phi(X\beta)$$
+
+- Historically, probit has been preferred in some cases for computational reasons, but the two models tend to produce similar results.\footnote{\tiny See this \href{https://blog.stata.com/2016/01/07/probit-or-logit-ladies-and-gentlemen-pick-your-weapon/}{blog post} for an example of a comparison using Monte Carlo simulation.}
+- Like logistic regression, probit regression can be estimated using MLE or Bayesian approaches.
+
+# Probit regression
+## Probit (red) and logistic (blue) curves
+```{r probit-curve, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+ggplot(data = df, aes(x=x, y=y)) + geom_point(alpha=0.5) + geom_smooth(method = "glm", se = F, method.args = list(family=binomial(link="logit"))) + geom_smooth(method = "glm", se = F,color = "red", method.args = list(family=binomial(link="probit"))) + theme_minimal()
+```
+
+# Probit regression
+## Estimation
+The only change to the model is the link function.
+```{r probit-mle, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+probit.mle <- glm(shg ~ age + I(age^2) + caste + 
+                     as.factor(village), 
+                  data = data, 
+                  family = binomial(link = "probit"))
+```
+
+# Probit regression
+## Comparison with logistic regression
+```{r probit-mle-output, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+modelsummary(list("Logistic"=logit.mle, "Probit"=probit.mle), stars = TRUE, gof_omit = "AIC|BIC|RMSE", output = "latex", coef_omit = "as.factor*", notes = list("Village fixed-effects omitted."), 
+             coef_rename = c("age" = "Age", "I(age^2)" = "Age^2",
+                             "castelow" = "Caste (Lower)"))
+```
+
+# Probit regression
+## Interpretation
+- The coefficients in a probit regression are more difficult to interpret than OLS or logistic regression.
+- In general, positive coefficients indicate increases in the predicted probability of the outcome, while negative coefficients indicate decreases.\footnote{\tiny \href{https://stats.oarc.ucla.edu/stata/output/probit-regression/}{See the Stata blog for further discussion.}}
+
+# Summary
+- LPM
+    - Estimate using OLS
+    - Easy to estimate and interpret, but can make bad predictions
+- Logistic regression
+    - Logistic function used to apply linear model to non-linear outcome
+    - Interpret log-odds and odds-ratios
+    - Estimate using MLE or Bayes
+- Probit regression
+    - Cumulative normal distribution as link
+    - Similar fit to logistic but more difficult to interpret
+        
+# Next week
+- Logistic regression continued
+    - Predictions and marginal effects
+    - Interaction terms

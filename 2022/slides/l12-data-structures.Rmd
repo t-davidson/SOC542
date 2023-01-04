@@ -1,0 +1,573 @@
+---
+title: "SOC542 Statistical Methods in Sociology II" 
+subtitle: "Data structures"
+author: Thomas Davidson
+institute: Rutgers University
+date: April 25, 2022
+urlcolor: blue
+output:
+    beamer_presentation:
+      theme: "Szeged"
+      colortheme: "beaver"
+      fonttheme: "structurebold"
+      toc: FALSE
+      incremental: FALSE
+      fig_width: 3.5
+      fig_height: 2.5
+header-includes:
+  - \usepackage{hyperref}
+  - \usepackage{multicol}
+  - \usepackage{caption}
+  - \usepackage{booktabs}
+  - \usepackage{siunitx}
+  - \newcolumntype{d}{S[input-symbols = ()]}
+  - \captionsetup[figure]{font=scriptsize}
+  - \captionsetup[figure]{labelformat=empty}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(dev = 'pdf')
+library("knitr")
+library("formatR")
+library(ggplot2)
+library(tidyverse)
+library(latex2exp)
+library(kableExtra)
+library(modelsummary)
+library(viridis)
+library(cowplot)
+library(mice)
+library(reshape2)
+library(haven)
+# library(huxtable) # Causes problems knitting, including ! LaTeX Error: Environment centerbox undefined.
+
+opts_chunk$set(tidy.opts=list(width.cutoff=80),tidy=TRUE)
+opts_chunk$set(tidy = FALSE)
+
+knitr::knit_hooks$set(mysize = function(before, options, envir) {
+  if (before) 
+    return(options$size)
+})
+
+knitr::opts_chunk$set(
+ fig.width = 4,
+ fig.asp = 0.8,
+ out.width = "70%",
+ fig.align = "center"
+)
+
+kable <- function(data) {
+  knitr::kable(data, digits = 3) %>% 
+    kable_styling(position = "center")
+}
+
+set.seed(14850)
+
+options("modelsummary_format_numeric_latex" = "plain")
+```
+
+
+# Course updates
+- Presentations next week
+    - 10 minutes to present replication project
+        - Introduction
+        - Main replication
+        - Sensitivity checks
+        - Bayesian replication
+        - Conclusions
+
+# Plan
+- Violations of regression assumptions
+- Robust and clustered standard errors
+- Fixed effects
+- Random effects
+- Space, time and social structure
+
+# Violations of regression assumptions
+## IID and heteroskedasticity
+- Our approach to regression modeling has been based on the assumption that our data are independently and identically distributed
+    - e.g. Random samples from a known population
+- In practice, this assumption is often violated
+    - Groups with different distributions
+    - Non-independent observations
+- OLS assumes that residuals are homoskedastic, but observed data often have heteroskedastic structures.
+    - This is particularly common if data are sampled from different groups with variation in the underlying data generation process.    
+
+
+# Violations of regression assumptions
+## Impact on standard errors
+- Confidence intervals that are too narrow too narrow
+- More likely to commit Type I errors (false positives) by incorrectly rejecting the null hypothesis
+- Inaccurate description of a plausible range of effect sizes
+
+# Violations of regression assumptions
+## Robust and clustered standard errors
+- Adjust standard errors to account for violations of assumptions
+    - \textbf{Robust}/\textbf{Heteroskedasticity consistent} standard errors
+    - \textbf{Clustered standard errors} can be used to account for particular types of grouping
+
+# Robust and clustered standard errors
+## Intuition
+- Variance component of the model is *inconsistent* due to heteroskedasticity or other model misspecification
+    - This implies that we will not converge on the true population parameter, even with large samples.
+- Corrections can be applied to variance components using a \textbf{sandwich} estimator.\footnote{See King and Roberts 2015 for further technical discussion.}
+
+
+```{r load-data, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+gss <- read_dta("data/gss2020panel_r1a.dta") %>% zap_labels()
+
+gss2020 <- gss %>% select(realrinc = realrinc_2, age = age_2, sex = sex_2) %>%
+                           drop_na() %>% mutate(sex = as.factor(sex))
+
+# Three waves: 2016, 2018, 2020.
+# Samples of 2016 & 2018 respondents were reinterviewed in 2020
+```
+
+# Robust and clustered standard errors
+## Estimating a simple model: Income as a function of age and sex (GSS 2020)
+```{r run-model, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+m <- lm(realrinc ~ age + sex, data = gss2020)
+```
+
+# Heteroskedastic residuals
+```{r resid-plot, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+library(broom)
+library(scales)
+fitted_data <- augment(m, data = gss2020)
+ggplot(fitted_data, aes(x = .fitted, y = .resid)) + 
+  geom_point(aes(color = sex)) +
+  geom_smooth(method = "lm") + labs(x = "Predicted value", y = "Residual", color = "sex") + theme_minimal()
+```
+
+
+# Heteroskedastic residuals
+```{r resid-plot2, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+# Using a LOESS regression shows heteroskedasticity more clearly
+ggplot(fitted_data, aes(x = .fitted, y = .resid)) + 
+  geom_point(aes(color = sex)) +
+  geom_smooth() + labs(x = "Predicted value", y = "Residual", color = "sex") + theme_minimal()
+```
+
+
+# Robust and clustered standard errors
+## Calculation in R
+There is no need to re-estimate the model. Robust standard errors can be calculated using`sandwich::vcocHC`. The `lmtest:coeftest` function allows us to easily apply the function and format the adjusted model for presentation.\footnote{\href{https://grantmcdermott.com/better-way-adjust-SEs/}{Grant McDermott's blog} has an excellent walkthrough of standard error adjustments using this function.}
+```{r robust-standard-errors, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+library(sandwich)
+library(lmtest)
+m.r <- coeftest(m, vcov = vcovHC)
+```
+
+# Robust and clustered standard errors
+## Clustering by sex
+We can use the same function to apply other kinds of standard error correction. For example, we could cluster the errors by sex (although this is not warranted in this case).
+```{r clustered-standard-errors, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+m.r.g <- coeftest(m, vcov = vcovCL(m, cluster = ~ sex))
+```
+
+# Robust and clustered standard errors
+```{r table1, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+modelsummary(list("OLS" = m, "OLS (robust) " = m.r, "OLS (clustered)" = m.r.g),stars = TRUE, gof_omit = "AIC|BIC|RMSE|F|R2") # TODO: Add
+```
+
+# Robust and clustered standard errors
+## Caveats
+- Robust and clustered standard errors have become extremely popular and are often the default approach in applied econometrics
+    - Stata makes it particularly easy to specify them: `reg x y, robust`
+- But standard error corrections are not a panacea and do not address underlying issues with model misspecification, as King and Roberts (2015) demonstrate.
+
+# Fixed effects
+- \textbf{Fixed effects} are a useful tool for dealing with unobservables and reducing the threat of omitted variable bias when data have a grouping structure.
+    - We previously used fixed-effects to account for any unexplained village-level factors when using the Diffusion of Microfinance dataset.
+- Adding dummy variables for each group "soaks up" *between-group* variation, allowing us to estimate *within-group* effects.
+
+
+# Fixed effects
+- A fixed-effects model can be written like a standard regression model. $\gamma$ is a vector of coefficients, one dummy variable for each group.
+
+$$y_i = \beta_1x_i + \gamma_{j} + u_i$$
+
+- It is common to drop the intercept from these models, although it is not required. 
+
+# Fixed effects
+## Pooling
+- \textbf{Pooling} refers to how observations are pooled together to estimate averages.
+- Considering data with a grouped structure,
+    - Standard regression approaches imply \textbf{complete pooling} since all available data to estimate a population mean.
+        - Any variation between groups is effectively ignored.
+    - Fixed-effects regression implies \textbf{no pooling} as a separate mean is estimated for each group.
+        - No information is shared across groups. Assumption that variation between groups is effectively infinite.
+
+# Data and Methodology
+- GSS panel data
+    - Sample of 2016 and 2018 respondents were re-interviewed in 2020 (online)
+    - Formatted data so each observation is one person-year
+    
+# Data and Methodology
+- Outcome
+    - `natcrime`: Are we spending too much, about right, or too little on halting the rising crime rate?
+    - Dichotomized (1 = too little, 0 = too much/about right)
+- Predictors
+    - Sex, age, race, political ideology
+- Fixed effects
+    - Survey year
+    - Region
+- Model
+    - Linear probability model, listwise deletion to drop missing observations
+    
+```{r fe-data-setup, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+ids <- 1:nrow(gss)
+gss.multi <- gss %>% select(age_1a, age_1b, age_2,
+                            sex_2,
+                            realrinc_1a, realrinc_1b, realrinc_2,
+                            region_1a, region_1b, region_2,
+                            polviews_1a, polviews_1b, polviews_2,
+                            race_1a, race_1b, race_2,
+                            natcrime_1a, natcrime_1b, natcrime_2) %>%
+    mutate(id = ids)
+
+# Now to create a single column for each variable and separate subsets for 
+# 2016, 2018, and 2020. Eac respondent has 2 obs.
+gss16_20 <- gss.multi %>% drop_na(realrinc_1a, realrinc_2)
+gss16 <- gss16_20 %>% select(id, age = age_1a, sex = sex_2, race = race_1a,
+                              realrinc = realrinc_1a, region = region_1a, 
+                              polviews = polviews_1a, natcrime = natcrime_1a
+                              ) %>% mutate(year = 2016)
+gss20a <- gss16_20 %>% select(id, age = age_2, sex = sex_2, race = race_1a,
+                              realrinc = realrinc_2, region = region_2, 
+                              polviews = polviews_2, natcrime = natcrime_2
+                              ) %>% mutate(year = 2020)
+
+gss18_20 <- gss.multi %>% drop_na(realrinc_1b, realrinc_2)
+gss18 <- gss18_20 %>% select(id, age = age_1b, sex = sex_2, race = race_1b,
+                              realrinc = realrinc_1b, region = region_1b, 
+                              polviews = polviews_1b, natcrime = natcrime_1b
+                              ) %>% mutate(year = 2018)
+gss20b <- gss18_20 %>% select(id, age = age_2, sex = sex_2, race = race_1b,
+                              realrinc = realrinc_2, region = region_2, 
+                              polviews = polviews_2, natcrime = natcrime_2
+                              ) %>% mutate(year = 2020)
+
+gss.new <- bind_rows(gss16, gss18, gss20a, gss20b) %>% drop_na() %>%
+    mutate(sex = as.factor(sex), race = as.factor(race), region = as.factor(region),
+           polviews = as.factor(ifelse(polviews > 5, "Conservative", 
+                             ifelse(polviews < 3, "Liberal", "Moderate"))),
+           natcrime = ifelse(natcrime == 1, 1, 0),
+           ) %>% mutate(polviews = relevel(polviews, ref = "Moderate"),
+                        year = as.factor(year))
+```
+
+# Fixed effects
+## Implementation in R
+We can easily specify fixed effects models using the `fixest` package.\footnote{\tiny By default this model removes the main  intercept from models with fixed effects.}
+```{r fixest, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+library(fixest)
+ols <- lm(natcrime ~ sex + race + age + polviews, data = gss.new)
+fe.r <- feols(natcrime ~ sex + race + age + polviews | region, data = gss.new)
+fe.y <- feols(natcrime ~ sex + race + age + polviews | year, data = gss.new)
+fe.ry <- feols(natcrime ~ sex + race + age + polviews | region + year, data = gss.new)
+```
+
+# Fixed effects
+```{r table2, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+modelsummary(list("Pooled" = ols, "Region FE" = fe.r, "Year FE" = fe.y, "Both FE" = fe.ry), stars = TRUE, gof_omit = "AIC|BIC|RMSE|F|R2|Std.Errors")
+```
+
+# Fixed effects
+## Interpretation
+- The fixed effects have accounted for unexplained variation between regions and over time, allowing us to measure the aggregate effect of our predictors on the dependent variable.
+- In this case, there appears to be more regional variation than temporal variation
+    - Perhaps this is not surprising since we are considering the same people over time
+
+<!--  
+# Fixed effects
+## Incorporating clustered standard errors
+We can modify the arguments of `feols` to modify the way standard errors are calculated\footnote{\tiny The \href{https://cran.r-project.org/web/packages/fixest/vignettes/fixest_walkthrough.html#2_The_vcov_argument}{documentation} has a nice explainer on the different kinds of covariance structures one can specify. The post-estimation approach also works but it is trickier to feed the output into \texttt{modelsummary}. }
+```{r fixest-cluster, echo = FALSE, mysize=TRUE, size='\\footnotesize', warning = F}
+fe.ry.c <- feols(natcrime ~ sex + race + age + polviews | region + year, 
+                 cluster = ~ year + region, data = gss.new)
+```
+
+# Fixed effects
+```{r table2b, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+modelsummary(list("Region & Year FE" = fe.ry, "Region & Year FE (Clustered)" = fe.ry.c)) # TODO: Add
+```
+-->
+
+# Fixed effects
+## Limitations of fixed effects
+- No pooling
+    - No information sharing across groups, only within-group variation analyzed
+- Perfect multicollinearity
+    - Time-invariant group-level variables are perfectly correlated with fixed effects and dropped from the model
+    
+# Random effects
+## Comparing fixed and random effects
+- Consider case where we observe random variables $y$ and $x$, where observations belong to $j$ groups.
+- The fixed-effects formulation is given by
+
+$$y_i = \beta_1x_i + \gamma_{j} + u_i, u_i \sim N(0,\sigma^2_u)$$
+
+- A random-intercepts model takes a more complex formula, where each element of $\gamma_j$ is drawn from a distribution:
+
+$$y_i = \beta_0 + \beta_1x_i + \gamma_{j} + u_i$$
+
+$$ u_i \sim N(0,\sigma^2_u)$$
+$$\gamma_j \sim N(0, \sigma^2_{\gamma})$$
+
+
+<!--- In this case, $gamma_j$ has its own variance component, $\sigma^2_{\gamma}$, which offsets the population intercept.-->
+
+
+# Random effects
+## Partial pooling and shrinkage
+- The RE model considers the groups as related through a common distribution, whereas the entities in an FE model are unconnected.
+- Random effects models are characterized by \textbf{partial pooling}
+    - Information is shared among groups as intercepts are drawn from  a common distribution.
+- This tends to reduce overfitting compared to no pooling, since information in each group helps to improve estimates for every other group.
+- \textbf{Shrinkage} describes how group-level estimates are pushed towards a common mean.
+    - This is particularly helpful if there are small groups, where group means might be inaccurately estimated with a fixed effects model.
+    
+# Random effects
+## Nesting
+- Random effects models allow us to directly model more complex nested data structures
+    - e.g. Education researhers might want to consider Level 1 (student), Level 2 (classroom), Level 3 (school), Level 4 (district)
+- Unlike fixed effects, where all variance is explained by the fixed effect, variables can be incorporated at different levels
+- Shrinkage/partial pooling helps to prevent overfitting
+    
+
+# Random effects
+## A note on terminology
+- These models are referred to using a range of different names including mixed effects, random effects, and hierarchical models. Moreover, the term "fixed effects" is also used in different ways, adding to the confusion.
+- The "fixed part" or "population" component of a random effects model is the part that does not vary across groups.
+    - e.g. $y_i = \beta_0 + \beta_1x_i$
+- The "random part" varies across groups
+    - e.g. $\gamma_i$
+
+# Random effects
+## Estimation in R
+The `lme4` package can be used to estimate Maximum Likelihood random effects models in R. `lmer` function can fit a standard model; `glmer` generalizes to other link functions. The random part of the model - in this case a random intercept for region - is specified in parentheses.
+```{r lme4, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+library(lme4)
+re.r <- lmer(natcrime ~ sex + race + age + polviews + (1|region),
+             data = gss.new)
+re.r.logit <- glmer(natcrime ~ sex + race + age + polviews + (1|region),
+                    data = gss.new, family = binomial)
+```
+
+# Random effects
+## Estimating random coefficient models
+Since we have multiple observations for each respondent, we could allow each respondent to have their own intercept. This kind of model would not be possible if we used fixed-effects.
+```{r random-coef, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+re.r.id.logit <- glmer(natcrime ~ sex + race + age + polviews +
+                           (1 |region) + (1 | id), 
+                       data = gss.new, family = binomial)
+```
+
+
+# Random effects
+```{r table3, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+modelsummary(list("Region FE" = fe.r, "Region RE" = re.r, "Logit" = re.r.logit, "Logit + Resp" = re.r.id.logit), exponentiate = c(F,F,T, T), gof_omit = "AIC|BIC|RMSE|F|R2|Std.Errors|REMLcrit")
+```
+
+# View random intercepts
+The random component of the model can be extracted using the `ranef` function. This shows the point estimates for the region level deviations from the population intercept.
+```{r ranef, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+ranef(re.r)
+```
+
+# Plot random intercepts
+We can get more information by using the `broom.mixed` package:
+```{r ranef-ci, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+library(broom.mixed)
+broom.mixed::tidy(re.r, effects = "ran_vals", conf.int = TRUE) %>%
+    mutate(across(where(is.numeric), round, 3)) %>%
+    select(level, term, estimate, conf.low, conf.high) %>%
+    head(5) %>% kable()
+```
+
+# Random effects
+## Random coefficients 
+- In addition to random intercepts, we can also allow the slopes to vary by group.
+- For example, we might want to see whether the effect of sex on attitudes varies across regions.
+- Such a model includes the population coefficient, $\beta_{sex}$ and a group-level deviation $\gamma_{j,sex}$.
+
+# Random effects
+## Estimating random coefficient models
+We can easily modify the formula to include random slopes. In this case, we allow the slope of race to vary according to the region. The control argument is included due to estimation issues.\footnote{\tiny Warnings suggest potential problems with the model fit that require more detailed exploration.}
+```{r random-slope, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+rc.logit <- glmer(natcrime ~ sex + race + age + polviews + (1 + sex|region), 
+                  data = gss.new, family = binomial,
+                  control= glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)))
+```
+
+# Random effects
+```{r table4, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+modelsummary(list("Region RE" = re.r.logit, "Region RE & Race RC" = rc.logit), exponentiate = TRUE, stars = TRUE, gof_omit = "AIC|BIC|RMSE", coef_omit = "cor_*|sd_*")
+```
+
+# Random effects
+```{r table4b, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+modelsummary(list("Region RE" = re.r.logit, "Region RE & Race RC" = rc.logit), exponentiate = TRUE, stars = TRUE, gof_omit = "AIC|BIC|RMSE|Num.Obs|Log.Lik.", coef_omit = "race*|age|polviews*")
+```
+
+# Random effects
+```{r extract-coefs, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+sex.slopes <- broom.mixed::tidy(rc.logit, effects = "ran_vals", conf.int = TRUE) %>%   
+    mutate(across(where(is.numeric), round, 3)) %>%
+    filter(term == "sex2") %>%
+    select(estimate, conf.low, conf.high)
+sex.slopes %>% head(5) %>% kable()
+```
+
+# Random effects
+## Extracting random slopes
+```{r extract-coefs2, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+fixed.coef <- broom.mixed::tidy(rc.logit, effects = "fixed", conf.int = TRUE) %>%   
+    mutate(across(where(is.numeric), round, 3)) %>%
+    filter(term == "sex2") %>%
+    select(estimate)
+sex.slopes %>% mutate(sex_region = estimate + fixed.coef$estimate) %>%
+    select(sex_region) %>% head(5) %>% kable()
+```
+
+# Random effects
+## Model selection
+- There is some debate over how to decide between fixed and random effects specifications.
+- One convention is to use a test to identify whether random effects should be included over fixed effects, but this has been questioned (Bell and Jones 2019).
+- Random effects are a more flexible approach to capture complex structures (McElreath 2020), but are not as parsimonious as fixed effects specifications.
+
+
+# Random effects
+## Advanced multilevel modeling
+- Cross-level interactions can reveal relationships between different levels
+    - e.g. In a model to predict child's test scores, one could interact child-level and school-level variables
+- The "within-between" decomposition approach allows effects to be disentangled within and between units (see Bell and Jones 2019)
+- Bayesian hierarchical modeling offers a more stable approach to complex models than MLE
+    - `brms` uses the same syntax as `lme4` for model specification
+    
+# Example: Populism and social media engagement
+```{r, out.width="70%",out.height="70%", fig.align="center"}
+include_graphics("../../../example_plots/irr_populism_final.png")
+```
+
+# Example: Populism and social media engagement
+```{r, out.width="70%",out.height="70%", fig.align="center"}
+include_graphics("../../../example_plots/year_slopes_poppa_fb_likes.png")
+```
+
+# Example: Populism and social media engagement
+```{r, out.width="70%",out.height="70%", fig.align="center"}
+include_graphics("../../../example_plots/country_slopes_poppa_fb_likes.png")
+```
+
+# Example: Populism and social media engagement
+```{r, out.width="70%",out.height="70%", fig.align="center"}
+include_graphics("../../../example_plots/heatmap_slopes_popppa_fb_likes.png")
+```
+
+# Example: Populism and social media engagement
+```{r, out.width="70%",out.height="70%", fig.align="center"}
+include_graphics("../../../example_plots/country_predictions_poppa_likes_rs_cy_full.png")
+```
+
+# Example: Populism and social media engagement
+```{r, out.width="70%",out.height="70%", fig.align="center"}
+include_graphics("../../../example_plots/country_predictions_poppa_likes_rs_cy_subset.png")
+```
+
+# Space, time and social structure
+## Autocorrelation
+- Autocorrelation implies that something is correlated with itself
+- Violation of IDD assumption
+- Unlikely to be an issue when using randomly sampled cross-sectional data, but a problem in many applied settings
+
+# Space, time and social structure
+## Types of autocorrelation
+- Temporal autocorrelation is the most typical case, where measurements are correlated with time
+    - e.g. Given quarterly GDP, we expect high correlation between $GDP_t$ and $GDP_{t-1}$
+- Spatial autocorrelation implies that measurements are correlated with spatial proximity
+    - e.g. County-level GDP more similar between proximate counties than distant ones.
+- Network autocorrelation implies that measurements are correlated with network position
+    - This is typically a problem if we want to sample measurements from individuals who have some relationship with one another
+    - e.g. Children in a classroom who are friends are more likely to have similar interests than children who are not friends
+    
+# Space, time and social structure
+## When to be concerned?
+- Repeated measurements
+    - Temporal autocorrelation
+- Spatial structure to measurements
+    - Spatial autocorrelation
+- Non-random or network sampling
+    - Network autocorrelation
+    
+# Space, time and social structure
+## When to be (even more) concerned?    
+- Repeated measurements of spatial units
+    - Spatial and temporal autocorrelation
+- Repeated measurements of social networks
+    - Spatial and network autocorrelation
+
+
+# Space, time and social structure
+## Solutions
+- Standard error corrections
+    - Appropriate error structures
+- Fixed and random effects
+    - Directly model data structure
+- Data processing
+    - e.g. De-trending and de-seasoning time series variables
+- Model specification
+    - e.g. Lagged variables, differences
+- More advanced approaches
+    - ERGM and SAOM models for networks
+
+<!--
+# Space, time and social structure
+## Time series decomposition
+```{r time-series-1, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+library(timeSeries)
+t <- read.csv("data/multiTimeline.csv")
+```
+
+# Space, time and social structure
+## Time series regression
+- Definition
+
+# Space, time and social structure
+## Time series regression
+
+
+
+
+
+# Space, time and social structure
+## Autocorrelation functions
+
+# Space, time and social structure
+## Lagged variable specifications
+
+# Space, time and social structure
+## Unit roots and problematic inferences
+
+# Space, time and social structure
+# General Error Correction Model (GECM)
+-->
+
+# Space, time and social structure
+## Takeaways
+- Standard GLMs alone are often insufficient to account for the way data are structured
+- Standard error corrections are often necessary, but not a panacea
+- Fixed effects and random effects models allow structure to be modeled in different ways
+- More complex types of structure and dynamics should be directly modeled to avoid misleading inferences
+
+# Summary
+- IID assumptions often violated and data structures must be accounted for
+- A variety of statistical techniques can be used to explicitly model these structures
+    - Standard error corrections
+    - Fixed effects
+    - Random effects
+    - Advanced model specifications
