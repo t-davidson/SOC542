@@ -40,3 +40,6 @@ vignettes/*.pdf
 
 # Notes files (private info)
 notes.md
+
+# Annoying extensions
+.DS_Store
