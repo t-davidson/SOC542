@@ -43,3 +43,6 @@ notes.md
 
 # Annoying extensions
 .DS_Store
+
+# Latex log files
+.log
