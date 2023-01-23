@@ -1,7 +1,7 @@
 ---
 title: "542: Week 1 - R Review & Intro to RMarkdown"
 author: "Fred Traylor, Lab TA"
-date: "1/24/2022"
+date: "1/23/2023"
 output:
   pdf_document: default
   html_document: default
@@ -10,6 +10,7 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+library(viridis)
 options(scipen = 999)
 ```
 
@@ -21,7 +22,7 @@ This is an R Markdown document. You can embed an R code chunk like this:
 summary(cars)
 ```
 
-On the top right of the code chunk, you can press the green triangle to run every line of code in that chunk. Go ahead and try it now.
+On the top right of the code chunk, you can press the green triangle to run every line of code in that chunk. Go ahead and try it now. This shows a summary of a built-in dataset called `cars`.
 
 Clicking the grey triangle with the green bar under it, next to the green triangle, will run every code chunk that comes before this one. 
 
@@ -36,8 +37,6 @@ plot(pressure)
 ```
 
 To insert your own chunk, click on the green square with a C inside in, on the top right of this pane, or type `CTRL + ALT + I`. Go ahead and do that below, on line 40:
-
-
 
 Inside the chunk's header, give it a title that describes what's going on. In the above chunk, the title is "pressure." Titles cannot be reused within the same RMarkdown document. They also cannot have any spaces in them, so dashes and underscores can be useful to separate words. 
 
@@ -73,7 +72,7 @@ sd(a)
 
 When we rerun this chunk, we can see our values will change. 
 
-Now, let's create two more vectors of random numbers. We want the first to be centered around 10 with a standard deviation of 1. We want the second to start with a random number (mean = 5, sd = 2) and then add .2*x to it. 
+Now, let's create two more normally-distributed random variables. We want the first to be centered around 10 with a standard deviation of 1. We want the second to start with a random number (mean = 5, sd = 2) and then add .2*x to it. 
 
 ```{r}
 x = rnorm(n = 100, mean = 10, sd = 1)
@@ -125,21 +124,20 @@ cor.test(data$x, data$y)
 
 Both of these functions provided the correlation, although the second one also provided a statistical test of it. 
 
-Lastly, let's plot these two.
+Lastly, let's plot these two using `ggplot`.
 
 ```{r}
-ggplot(data,
-       aes(x = x, 
-           y = y)) +
+ggplot(data, aes(x = x,  y = y)) +
   geom_point() +
   geom_smooth(method = "lm") +
   theme_light()
 ```
 
+What does this plot indicate about the relationship between `x` and `y`?
 
 ## Data Management with the tidyverse
 
-Next, let's review some basic data management functions we'll be using. 
+Next, let's review some basic data management functions we'll be using this semester.. 
 
 We're going to use the `gapminder` package to load up our data. The Gapminder project has data on a wide variety of indicators, for most countries of the world, and for many decades. This provides a great opportunity for us to analyze development. For now, though, we'll just use a small subset of data. Run the below chunk to see what we're working with. 
 ```{r load-gapminder}
@@ -148,33 +146,24 @@ if(!require(gapminder))          # If gapminder package isn't intalled...
 
 minded <- gapminder::gapminder
 names(minded)
-
 ```
 
-With that loaded up, let's do a little bit of data management. 
+With that loaded up, let's do a little bit of data management. Make sure you run the very first code chunk (lines 8-11) to load the tidyverse
 ```{r manage-gapminder}
-
-minded %>%   # Make sure you run the very first code chunk (lines 8-11) to load the tidyverse
+minded <- minded %>%
   mutate(
-    shortyear = year - 1950,             # Starting years at 1950
-    recent = case_when(
-      year > 2000 ~ "Post 2000",         # If it is before 2000, name it "Post 2000" 
-      TRUE ~ "Pre 2000"                  # TRUE means "everything else" 
-      ),
-    newyears = case_when(
-      year %in% c(1997, 2002, 2007) ~ 1, # We can use this way to select recent years, too
-      TRUE ~ 0
-      )
-    ) %>% 
-  select(year, shortyear, recent, newyears)  # select(columns)
+    shortyear = year - 1950,    # Starting years at 1950
+    recent = ifelse(year > 2000, 
+                    "Post 2000", # Assign if condition is TRUE
+                    "Pre 2000"), # Else, assign this
+    newyears = ifelse(year %in% c(1997, 2002, 2007), # Here's another example
+      1,
+      0)) %>% 
+  rename(per_capita_GDP = gdpPercap)
 
-newminder <- minded %>%            # Create new dataset 
-  rename(gdp_cap = gdpPercap) %>%  # rename(newname = oldname)
-  select(year, gdp_cap) %>% 
-  filter(gdp_cap < 1000)           # only include rows where gdp_gap is less than 1000
-newminder
-  
-
+# Another example creating a new datast
+low_GDP <- minded  %>% filter(per_capita_GDP <= 1000) %>%
+    select(country, per_capita_GDP)
 ```
 
 You can also see we have multiple outputs from the above code chunk. We can click at the top of the output pane that dropped down to go between them. 
@@ -189,34 +178,31 @@ Last for today, let's create two graphs to remind ourselves of ggplot's capabili
 minded %>% 
   ggplot(aes(x = lifeExp)) +
   geom_histogram(bins = 25) +
-  labs(title = "Histogram of Life Expenctancy",
+  labs(title = "Histogram of Life Expectancy",
        caption = "Data: Gapminder", 
        x = "Life Expectancy (years)") +
   theme_classic()
 
 ```
 
-Here is another example of a graph, this time with five variables. 
+Here is another example of a graph with more complicated options to highlight what you can do with `ggplot`.
 ```{r graph-gapminder2}
-
 minded %>% 
   ggplot(aes(x = year,
-             y = lifeExp)) +
-  geom_jitter(aes(color = continent, 
-                 size = pop,
-                 alpha = gdpPercap)) + 
-  geom_smooth(aes(color = continent), se = F) +
+             y = lifeExp,
+             group = continent,
+             color = continent)) +
+  geom_jitter(aes(size = pop)) + 
+  geom_smooth(method = "lm", se = F) +
+  scale_color_viridis_d() +
   theme_classic() +
   labs(title = "Life Expectancy over Time",
        x = "Year",
        y = "Life Expectancy",
        caption = "Data: Gapminder",
        color = "Continent",
-       size = "Population",
-       alpha = "GDP per Capita") +
+       size = "Population") +
   theme(plot.title = element_text(hjust = .5))
-  
-
 ```
 
 
