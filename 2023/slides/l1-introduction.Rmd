@@ -62,13 +62,13 @@ library(latex2exp)
 - Lab: R and RStudio
 
 # Learning goals
-- Proficiency in data handling, analysis, and visualization using R
 - Multiple regression
-    - Conceptual understanding
+    - Conceptual and statistical background
     - Implementation in R
     - Interpretation
     - Violations assumptions and robustness
-- Understand and apply frequentist and Bayesian estimation methods
+    - Frequentist and Bayesian approaches to estimation
+- Proficiency in data handling, analysis, and visualization using R
 - Conduct original quantitative research
 
 # Course outline
@@ -92,17 +92,16 @@ library(latex2exp)
     - Appropriately specified statistical models
     - Model checking and comparison
 - Reproducibility and transparency
-    - Emphasize on well documented and reproducible analytic procedures
+    - Emphasis on reproducible and transparent analytic procedures
 - Scientific communication
     - Clear, precise summaries of statistical models using tables and visualizations
-
 
 # Course outline
 ## Assessment
 - Homework assignments (40%)
     - Four assignments, each worth 10%
 - Final paper (50%)
-    - Phase 1: Identify suitable research question, data, and methodology
+    - Phase 1: Research question, data, and methodology
     - Phase 2: Preliminary results
     - Phase 3: Submit final paper
 - Presentations (10%)
@@ -113,7 +112,7 @@ library(latex2exp)
 - *Regression and Other Stories* by Andrew Gelman, Jennifer Hill, and Aki Vehtari
     - Main textbook, covers applied OLS regression and generalized models in R
 - *Bayes Rules! An Introduction to Applied Bayesian Modeling* by Johnson, Alicia A., Miles Q. Ott, Mine Dogucu. 2021.
-    - More detailed treatment of Bayesian inference including examples in R
+    - More detailed treatment of Bayesian inference with examples in R
 
 # Course outline
 ## Recommended readings
@@ -132,7 +131,7 @@ library(latex2exp)
 - A vector is a sequence of numbers
     - e.g. We take the heights of everyone in the class and record them in vector $v$
 
-$$v = \{6.1, 5.9, 5.7, 6.0, 6.2, 5.9\}$$
+$$v = \{6.1, 5.9, 5.7, 6.0, 6.2, ..., 5.9\}$$
 
 - We typically arrange these vertically as columns in a data table.
 - We can use *indexing* to reference specific elements of the vector
@@ -166,6 +165,7 @@ M =\begin{Bmatrix}
 5.7 & 27 \\
 6.0 & 30 \\
 6.2 & 25 \\
+... & ... \\
 5.9 & 26 \\
 \end{Bmatrix}
 $$
@@ -180,7 +180,6 @@ $$
 ## Vectors and matrices in R
 ```{r, echo=TRUE}
 v <- c(1,2,3)
-u <- c(1,1,1)
 print(sum(v))
 print(prod(v))
 ```
@@ -189,23 +188,25 @@ print(prod(v))
 ## Vectors and matrices in R
 We can use `cbind` to combine vectors columnwise into a matrix. 
 ```{r, echo=TRUE}
+u <- c(1,1,1)
 M <- cbind(v,u)
 print(M[3,1]) # M[row, column]
 print(M)
 ```
 
+<!-- Removed, not needed now
 # Notation review
 ## Vectors and matrices in R
-We can transpose this matrix using `t` if we want to treat these columns as rows.
+We can *transpose* this matrix using `t` if we want to treat these columns as rows.
 ```{r, echo=TRUE}
 print(t(M))
 ```
+-->
  
 # Statistics review
 ## Random variables
-- A random variable can take on any value
-    - $x$ is a random variable
-- A random variable could refer to a single value or a vector, where $x_i$ indexes the $i^{th}$ element
+- The value of a random variable depends on the outcome of random events
+    - e.g. $x$ is a random variable representing the outcome of a series of coin tosses
 
 # Statistics review
 ## Probability distributions
@@ -224,7 +225,7 @@ print(t(M))
 
 # Statistics review
 ## Probability distributions in R
-We can easily use R to construct random variables drawn from different distributions. First, a random variable drawn from a binomial distribution can take a value of 0 or 1, where $p$ is the probability of a 1. $p = 0.5$ is equivalent to a fair coin toss. The Bernoulli distribution is a special case where $n=1$.
+A random variable drawn from a binomial distribution can take a value of 0 or 1, where $p$ is the probability of a 1. $p = 0.5$ is equivalent to a fair coin toss. The Bernoulli distribution is a special case where $n=1$.
 ```{r, echo=TRUE}
 x <- rbinom(n=1, 1, 0.5)
 print(x)
@@ -256,7 +257,7 @@ hist(x)
 
 # Statistics review
 ## Probability distributions in R
-We can also plot a *probability density function* given information about a distribution.
+A *probability density function* provides a more general representation of the probability of observing particular random draws.
 ```{r, echo = FALSE}
 ggplot(data.frame(x = c(-5, 5)), aes(x = x)) +
 stat_function(fun = dnorm) + theme_minimal() + labs(y="Probability density", x= "")
@@ -276,7 +277,7 @@ stat_function(fun = dunif) + theme_minimal() + labs(y="Probability density", x= 
 - The expected value of a constant $x=c$ is $c$. E.g. ${\mathbb E}[2] = 2$
 - The expected value of a random variable is its mean.
     - e.g. If $x$ represents a vector of values drawn from a normal distribution, our best guess as to the value of any one realization $x_i$ is $\mu$.
-- We will discuss expectations more when we cover regression, e.g. ${\mathbb E}[y|x]$
+- We can use expectations notation to represent relationships between variables, e.g. ${\mathbb E}[y|x]$
 
 # Statistics review
 ## Expectations as weighted averages
@@ -297,7 +298,7 @@ $$
 - Classical statistics is based upon the assumption that our observations $x$ are drawn from an underlying population.
 - In a simple random sample, we draw $n$ instances of a random variable from the population
     - These draws are assumed to be *independent* and *identically distributed* (IID)
-- For example, a hypothetical population might be adults residing in the United States and a sample would be a randomly selected subset of these adults.
+- For example, a hypothetical population might be adults residing in the United States and a sample would be a randomly sampled subset of these adults.
 
 # Statistics review
 ## Means
@@ -305,7 +306,7 @@ $$
 
 $$\mu_x = \frac{1}{N}\Sigma_{i=1}^Nx_i = \frac{\Sigma_{i=1}^Nx_i}{N}$$
 
-- The sample mean $\bar{x}$ is defined by the following equation. Note that $n$ is lowercase to denote $n \subseteq N$
+- The sample mean $\bar{x}$ is defined by the following equation. $n$ is lowercase to denote $n \subseteq N$
 
 $$\bar{x} = \frac{1}{n}\Sigma_{i=1}^nx_i = \frac{\Sigma_{i=1}^nx_i}{n}$$
 
@@ -322,7 +323,7 @@ $$\sigma_{\bar{x}}^2 = \frac{1}{n-1}\Sigma(x_i-\bar{x})^2$$
 
 # Statistics review
 ## Standard deviation
-- Variance is difficult to interpret. The standard deviation is a scaled measure of variance. It is typically denoted using $\sigma$. In the population it is equal to
+- Variance is difficult to interpret. The standard deviation is a scaled measure of variance, typically denoted using $\sigma$. In the population it is equal to
 
 $$\sigma_x = \sqrt{\sigma^2_x} = \sqrt{\frac{1}{N}\Sigma(x_i-\mu)^2}$$
 
@@ -343,10 +344,10 @@ $$var(\bar{x}) = \sigma^2_{\bar{x}} = \frac{\sigma^2_x}{N}$$
 
 # Statistics review
 ## Simulating the sampling distribution
-We can draw five random samples from a normal distribution and compare the sample means to the expectations.
+We can simulate the sample mean of 1000 normal distributions with the same population parameters and compare the sample means to the expectations.
 ```{r, echo = TRUE}
 mu <- 100; sigma <- 10; n <- 100
-sims <- replicate(5, mean(rnorm(n, mu, sigma)))
+sims <- replicate(1000, mean(rnorm(n, mu, sigma)))
 print(round(mean(sims),2)) # E[mu] = 100
 print(round(var(sims),2)) # E[sigma^2/n] = 1
 ```
@@ -354,7 +355,7 @@ print(round(var(sims),2)) # E[sigma^2/n] = 1
 # Statistics review
 ## The Law of Large Numbers
 - When sample size is large, $\bar{x}$ is close to $\mu_x$ with a high probability
-- A large IID sample can therefore be used to approximate the sampling distribution
+- A large IID sample can therefore approximate the sampling distribution
     - Such samples are *asymptotic* because approximations become exact in the limit as $n \rightarrow \infty$
 - Under such conditions, $\bar{x}$ is considered a *consistent* estimator for $\mu_x$
     
@@ -370,7 +371,7 @@ print(mean(large.sample))
 # Statistics review
 ## The Central Limit Theorem
 - CLT: The distribution of $\bar{x}$ is well approximated by a normal distribution when $n$ is large
-- This is approximately true even if $x$ are not normally distributed
+    - This is approximately true even if $x$ are not normally distributed
 
 # Statistics review
 ```{r, echo = FALSE}
@@ -404,13 +405,13 @@ ggplot(sims2, aes(x)) +        # Draw histogram with density
 
 # Statistics review
 ## Standard error of the sample mean
-- The standard error of the sample mean is defined as the sample standard deviation divided by the square root of $N$.
+- The standard error of the sample mean is defined as the sample standard deviation divided by the square root of $n$.
 
 $$SE_{\bar{x}} = \frac{\sigma_{\bar{x}}}{\sqrt{n}}$$
 
 
 - The standard error is used to communicate *uncertainty* since we cannot observe the true population mean $\mu$ but only the sample mean $\bar{x}$.
-- Theoretically, it is the standard deviation of the sampling distribution.
+- Theoretically, the standard error is the *standard deviation of the sampling distribution*.
 
 # Statistics review
 ## Standard error as standard deviation of the sampling distribution
@@ -438,11 +439,11 @@ print(sd(x)/sqrt(N)) # sample SE
 
 # Statistics review
 ## Confidence intervals
-- The standard error is often used to define a confidence interval. By convention, a $95\%$ confidence interval has lower and upper bounds of
+- The standard error is used to define a confidence interval. By convention, a $95\%$ confidence interval has lower and upper bounds of
 
 $$[\bar{x}-1.96SE_{\bar{x}},\bar{x}+1.96SE_{\bar{x}}]$$
 
-- When $n$ is large, a $95\%$ confidence interval around $\bar{x}$ contains the true value $\mu_x$ in $95\%$ of all possible random samples.
+- When $n$ is large, the $95\%$ confidence interval around $\bar{x}$ contains the true value $\mu_x$ in $95\%$ of all possible random samples.
 
 # Statistics review
 ## Confidence intervals in R
@@ -608,7 +609,7 @@ t.test(x, y)
     
 # Statistics review
 ## Sign and magnitude errors
-- Gelman, Hill and Vehtari draw attention to two kinds of errors that are often overlooked:
+- Gelman, Hill and Vehtari draw attention to two kinds of errors that are often overlooked but can lead to profoundly incorrect inferences:
     - Sign errors: the sign of a relationship is incorrect
         - e.g. We observe a positive relationship between $x$ and $y$ when the true relationship is negative
     - Magnitude errors: the observed effect is severely over- or under-estimated
@@ -659,15 +660,15 @@ $$SE_{\rho} = \sqrt{\frac{1-\rho^2}{n-2}}$$
 
 
 # Why R?
-
--   Free and open-source
-- Multiple uses
-    -   A statistical programming language
-        -  Many cutting-edge approaches now implemented in R before Stata
-    -   Alongside Python, it is one of the main programming languages used by data scientists
-        - Unfortunately, Stata does not have such flexibility
+- Free and open-source
+- Versatile
+    - Statistical computing (`lm`, `glm`, `rstanarm``)
+    - Data manipulation (`tidyverse`)
+    - Visualization (`ggplot`)
+    - General purpose programming
 -   A very active developer community
-    - Lots of cool packages
+    - Lots of cool packages with regular updates
+    - New statistical and econometric packages 
     
 # Why R?
 
@@ -685,19 +686,22 @@ include_graphics('temp.jpg')
     -   Run code in the console or in scripts
     -   Easy to view data, objects in memory, plots
     -   Easy to create output such as papers or slides
-    -   Terminal interface
-    -   Integrations including Github and Python
+    -   Integration with Github
 
 # RMarkdown
 ## Overview
--   RMarkdown is an interactive coding environment
+-   RMarkdown is an interactive coding environment 
     -   RMarkdown documents can combine text, LaTeX code, R code, and any output.
-    - Write in Markdown or Visual Editor
     -   These slides are rendered using RMarkdown
     -   You will be using RMarkdown for your homework assignments and hopefully your papers
     
 # Next lecture
 - Ordinary Least Squares regression with two variables
+
+# Lab 1
+- RStudio and RMarkdown
+- Manipulating random variables
+- Intro to `tidyverse` and `ggplot` for data manipulation and visualization
     
 
     
