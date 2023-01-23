@@ -1,0 +1,222 @@
+---
+title: "542: Week 1 - R Review & Intro to RMarkdown"
+author: "Fred Traylor, Lab TA"
+date: "1/24/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+options(scipen = 999)
+```
+
+# R Markdown
+
+This is an R Markdown document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+On the top right of the code chunk, you can press the green triangle to run every line of code in that chunk. Go ahead and try it now.
+
+Clicking the grey triangle with the green bar under it, next to the green triangle, will run every code chunk that comes before this one. 
+
+These two functions can make it easy to run and rerun large segments of code without having to highlight them specifically. 
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+To insert your own chunk, click on the green square with a C inside in, on the top right of this pane, or type `CTRL + ALT + I`. Go ahead and do that below, on line 40:
+
+
+
+Inside the chunk's header, give it a title that describes what's going on. In the above chunk, the title is "pressure." Titles cannot be reused within the same RMarkdown document. They also cannot have any spaces in them, so dashes and underscores can be useful to separate words. 
+
+After the title, we have options. Note that the `echo = FALSE` parameter was added to `pressure` to prevent printing of the R code that generated the plot. Clicking the gear in the top right of the chunk gives you the options for it. You can rename the chunk and tell it what output to use. 
+
+For this class, we'll be using RMarkdown for the homework assignments, so we want to see the code that we use. Click that gear and tell it to "Show code and output" or simply add `echo=FALSE` to `echo=TRUE` in the chunk's header. 
+
+## So what is R Markdown?
+
+Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>. It's also what I used to make the slides from the Bootcamp back in August. 
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. Go ahead and click the button at the top. It'll run and compile everything into a pdf for us to view. You can then find it in the files pane to open it up. It'll have the same name as this file except with a .html ending. 
+
+You can also click the drop-down arrow next to Knit and select to knit it as a PDF or as a Word Document. This requires some more software to be added in, so we'll wait a little later to do that. 
+
+
+## R Script vs RMarkdown
+
+Last semester, we used R Script (aka .R files) to do our work. This semester, we'll be using RMarkdown (aka .Rmd files). R Script is great for running analysis, but deprioritizes text. (Remember how we'd have to comment out any notes we had?) 
+
+RMarkdown works the opposite: Text is its primary function, and you have to tell it when to run code. This is great for reports where you want to add your analysis, results, and graphs without having to copy and paste. 
+
+
+# R Basics Review
+
+Let's start by creating a vector of random numbers. 
+
+```{r}
+a <- rnorm(n = 10, mean = 100, sd = 10)
+mean(a)
+sd(a)
+```
+
+When we rerun this chunk, we can see our values will change. 
+
+Now, let's create two more vectors of random numbers. We want the first to be centered around 10 with a standard deviation of 1. We want the second to start with a random number (mean = 5, sd = 2) and then add .2*x to it. 
+
+```{r}
+x = rnorm(n = 100, mean = 10, sd = 1)
+y = rnorm(n = 100, mean = 5, sd = 2) + .2*x
+```
+
+We can use R's built in functions to get summary statistics of these two vectors. 
+
+```{r}
+mean(x)
+sd(x)
+summary(x)
+
+mean(y)
+sd(y)
+summary(y)
+```
+
+
+Now, let's put these two into a tibble, a type of dataframe with special properties. 
+
+```{r}
+data <- tibble(x, y)
+head(data)
+```
+
+## Data Analysis Review
+
+With our two vectors in the tibble `data`, we can perform several statistical tests. 
+
+First, let's see if the two have different means with a t-test. 
+
+```{r}
+t.test(data$x, data$y)
+```
+
+Quick review:
+  - What are the means of the two variables?
+  - What are the null and alternative hypotheses of this test? 
+  - How do we know whether the means are different? (3 ways)
+  
+
+We can also see if they are correlated with each other. 
+
+```{r}
+cor(data$x, data$y)
+cor.test(data$x, data$y)
+```
+
+Both of these functions provided the correlation, although the second one also provided a statistical test of it. 
+
+Lastly, let's plot these two.
+
+```{r}
+ggplot(data,
+       aes(x = x, 
+           y = y)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  theme_light()
+```
+
+
+## Data Management with the tidyverse
+
+Next, let's review some basic data management functions we'll be using. 
+
+We're going to use the `gapminder` package to load up our data. The Gapminder project has data on a wide variety of indicators, for most countries of the world, and for many decades. This provides a great opportunity for us to analyze development. For now, though, we'll just use a small subset of data. Run the below chunk to see what we're working with. 
+```{r load-gapminder}
+if(!require(gapminder))          # If gapminder package isn't intalled...
+  install.packages("gapminder")  # ... Install it
+
+minded <- gapminder::gapminder
+names(minded)
+
+```
+
+With that loaded up, let's do a little bit of data management. 
+```{r manage-gapminder}
+
+minded %>%   # Make sure you run the very first code chunk (lines 8-11) to load the tidyverse
+  mutate(
+    shortyear = year - 1950,             # Starting years at 1950
+    recent = case_when(
+      year > 2000 ~ "Post 2000",         # If it is before 2000, name it "Post 2000" 
+      TRUE ~ "Pre 2000"                  # TRUE means "everything else" 
+      ),
+    newyears = case_when(
+      year %in% c(1997, 2002, 2007) ~ 1, # We can use this way to select recent years, too
+      TRUE ~ 0
+      )
+    ) %>% 
+  select(year, shortyear, recent, newyears)  # select(columns)
+
+newminder <- minded %>%            # Create new dataset 
+  rename(gdp_cap = gdpPercap) %>%  # rename(newname = oldname)
+  select(year, gdp_cap) %>% 
+  filter(gdp_cap < 1000)           # only include rows where gdp_gap is less than 1000
+newminder
+  
+
+```
+
+You can also see we have multiple outputs from the above code chunk. We can click at the top of the output pane that dropped down to go between them. 
+
+Also notice that, above each of these outputs, it shows the type of data (in this case tibbles) and the dimensions. 
+
+## Graphing with `ggplot2`
+
+Last for today, let's create two graphs to remind ourselves of ggplot's capabilities. 
+
+```{r graph-gapminder}
+minded %>% 
+  ggplot(aes(x = lifeExp)) +
+  geom_histogram(bins = 25) +
+  labs(title = "Histogram of Life Expenctancy",
+       caption = "Data: Gapminder", 
+       x = "Life Expectancy (years)") +
+  theme_classic()
+
+```
+
+Here is another example of a graph, this time with five variables. 
+```{r graph-gapminder2}
+
+minded %>% 
+  ggplot(aes(x = year,
+             y = lifeExp)) +
+  geom_jitter(aes(color = continent, 
+                 size = pop,
+                 alpha = gdpPercap)) + 
+  geom_smooth(aes(color = continent), se = F) +
+  theme_classic() +
+  labs(title = "Life Expectancy over Time",
+       x = "Year",
+       y = "Life Expectancy",
+       caption = "Data: Gapminder",
+       color = "Continent",
+       size = "Population",
+       alpha = "GDP per Capita") +
+  theme(plot.title = element_text(hjust = .5))
+  
+
+```
+
+
