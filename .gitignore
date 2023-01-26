@@ -45,4 +45,4 @@ notes.md
 .DS_Store
 
 # Latex log files
-.log
+*.log
