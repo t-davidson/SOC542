@@ -1,7 +1,7 @@
 ---
 title: '542: Week 2 - Regression Review'
 author: "Fred Traylor, Lab TA"
-date: "1/31/2022"
+date: "1/30/2023"
 output:
   pdf_document: default
   html_document: default
@@ -51,7 +51,7 @@ getwd()
 rawanes2020 <- read_csv("lab_data/anes_timeseries_2020_csv_20220210.csv")
 ```
 
-We're then going to extract four variables that measure feelings toward the two Presidential and two Vice Presidential candiates. These are called Feeling Thermometers. From the questionnaire: 
+We're then going to extract four variables that measure feelings toward the two Presidential and two Vice Presidential candidates. These are called Feeling Thermometers. From the questionnaire: 
 
 > I’d like to get your feelings toward some of our political leaders and other people who are in the news these days. I’ll read the name of a person and I’d like you to rate that person using something we call the feeling thermometer. Ratings between 50 degrees and 100 degrees mean that you feel favorable and warm toward the person. Ratings between 0 degrees and 50 degrees mean that you don’t feel favorable toward the person and that you don’t care too much for that person. You would rate the person at the 50 degree mark if you don’t feel particularly warm or cold toward the person. If we come to a person whose name you don’t recognize, you don’t need to rate that person. Just tell me and we’ll move on to the next one. (p. 91-92)
 
@@ -69,8 +69,6 @@ anes2020 <- rawanes2020 %>%
          thermo_harris = ifelse(thermo_harris %in% c(-9, -4, 998, 999), NA, thermo_harris),
          thermo_pence = ifelse(thermo_pence %in% c(-9, -4, 998, 999), NA, thermo_pence)) %>% 
   drop_na()
-
-
 ```
 
 ## Summary Statistics 
@@ -133,12 +131,6 @@ modelsummary(mod1, stars = T,
              gof_omit =  'DF|Deviance|RMSE|AIC|BIC|Log') 
 ```
 
-To show the t-value, we change the command to include `statistic = 'statistic'`. 
-```{r}
-modelsummary(mod1, statistic = 'statistic', stars = T,
-             gof_omit =  'DF|Deviance|RMSE|AIC|BIC|Log')
-```
-
 We can also ask to see the confidence intervals instead by including ` statistic = 'conf.int'`. (We can also specify the size using `conf_level = .##`. The default is 95%.) 
 
 ```{r regression_ci}
@@ -147,7 +139,7 @@ modelsummary(mod1, stars = T,
              gof_omit =  'DF|Deviance|RMSE|AIC|BIC|Log')
 ```
 
-To see everything together, we need to do some more advanced work. Feel free to move around the pieces inside the curly brackets (`{}`), which tell modelsummary where to put each piece. 
+To see everything together, including the t-statistics, we need to do some more advanced work. Feel free to move around the pieces inside the curly brackets (`{}`), which tell modelsummary where to put each piece. 
 
 ```{r modelsummary_all}
 modelsummary(mod1, 
@@ -156,7 +148,7 @@ modelsummary(mod1,
              gof_omit =  'DF|Deviance|RMSE|AIC|BIC|Log')
 ```
 
-We'll play around more with modelsummary later in the semester, and rarely do we need to include *all* of this info at once, so no need to remember it. 
+We'll play around more with modelsummary later in the semester, and rarely do we need to include *all* of this info at once, so no need to remember it. Indeed, some of the information here is redundant and the table has become a little too cluttered.
 
 # Predictions
 After running a regression, we often want to use it to predict a specific value. Recalling that our regression equation is $y = a + bx$, we can substitute our intercept for $a$ and our Biden coefficient for $b$, giving us the new equation, $thermo\_harris = 4.854 + 0.885*thermo\_biden$. Using this equation, we can plug in any point we want for the value of Biden and get a predicted value for Harris.  
@@ -170,35 +162,31 @@ While it is possible to type in the coefficients and intercept ourselves, any ch
 In this case, we can directly access the coefficients in the `mod1` object. We can then use indexing to access the relevant elements. It can be helpful to `View(mod1)` first, and then look through the coefficients tab to find the specific item of value. 
 
 Let's predict somebody's feelings toward Harris based on their feelings toward Biden being 70. 
-
+Run each line of this chunk separately and inspect the output.
 ```{r predict-byhand}
 new_biden <- 70
-
-4.703533 + 0.887159 *new_biden
+4.703533 + 0.887159 * new_biden
 
 mod1$coefficients
 
 mod1$coefficients[1] + mod1$coefficients[2]*new_biden
 
 mod1$coefficients[["(Intercept)"]] + mod1$coefficients[["thermo_biden"]]*new_biden # better
-
 ```
 
-R also has the `predict()` function, which does the same thing. Just note, though, that the new thermo_biden must be in the form of a data frame. While annoying for one value, it means we can easily calculate multiple predicted values at once.
+R also has the `predict()` function, which does the same thing. Just note, though, that the new `thermo_biden` must be in the form of a data frame. While annoying for one value, it means we can easily calculate multiple predicted values at once.
 ```{r predict-function}
 new_biden = data.frame(thermo_biden = 70)
 
 pred <- predict(mod1, new_biden)
 print(pred)
-
 ```
 
-```{r predict_mulitple}
+```{r predict_multiple}
 three_thermo_bidens = data.frame(thermo_biden = seq(0,100, 10))
 
 three_thermo_bidens$predictions <- predict(mod1, three_thermo_bidens)
 print(three_thermo_bidens)
-
 ```
 
 
@@ -206,7 +194,6 @@ print(three_thermo_bidens)
 How far are these predicted points from the actual values for Harris, though? Looking at our dataset, we can see that it averages 70, a little bit away from the predicted value above (66.8).
 
 ```{r biden70}
-
 biden70 <- anes2020 %>% 
   select(thermo_biden, thermo_harris) %>% 
   filter(thermo_biden == 70)
@@ -235,7 +222,6 @@ anes2020$resid <- residuals(mod1)
 anes2020 %>% 
   select(thermo_biden, thermo_harris, predicted, resid) %>% 
   head()
-
 ```
 Note that $thermo\_harris - predicted = resid$.
 
@@ -274,7 +260,7 @@ So we can see that, as predicted increased, residual decreases. This is due to b
 
 Let's replicate my analyses above, this time looking at feelings toward Trump and Pence. 
 
-Below are code shells; take a few minutes to plug in the appropriate variables and compare. 
+You have been provided with most of the code, you just need to plug in the appropriate variables and compare. 
 
 ## Data Visualization 
 
@@ -297,9 +283,7 @@ ggMarginal(p1, type = "density")
 
 Complete the function below to analyze feelings toward Trump and feelings toward Pence. 
 ```{r tp_model, eval=FALSE, include=FALSE}
-mod2 <- lm(,   
-           data = )  
-
+mod2 <- lm()  
 ```
 
 ## Comparing the Two Models
@@ -314,7 +298,6 @@ modelsummary(list(mod1, mod2),
 ### Predictions and Residuals 
 
 Create predicted values and residuals from this analysis
-
 ```{r tp_resid, eval=FALSE, include=FALSE}
 anes2020$tp_predicted <-
 anes2020$tp_resid <- 
