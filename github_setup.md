@@ -43,6 +43,14 @@ Return to RStudio and click the `File` tab at the top of the page and select `Ne
 
 You will see a window pop up and then you will return to RStudio. If you look in the `Files` pane you should see the files from the course. You should also see a tab titled `Git` at the top. Now, whenever there is an update to the course, all you need to do is click the downwards facing green arrow to "pull" the files onto your computer.
 
+## On projects
+
+Over the course of the semester you will likely have multiple different Github repositories (main course repo, homeworks, papers).
+
+The simplest way to open a project is to open the `.RProj` file located in each folder.
+
+You can learn more about projects in the *R for Data Science* book: https://r4ds.had.co.nz/workflow-projects.html
+
 ## Using Github for homework assignments
 
 Each homework assignment will be a separate Github repository, where each student has a personal version. You will need to clone this repository using the same process as in Step 6. You can then submit your solutions by committing changes and pushing them to your repository.
