@@ -112,7 +112,7 @@ $$\rho(x,y) = \frac{\frac{1}{n-1}\Sigma(x_i-\bar{x})(y_i-\bar{y})}{\sigma_x\sigm
 - The sample correlation is also a consisent estimator of the population correlation.
 
 # Generating correlated variables
-We can use `mvrnorm` to generate a set of variables defined by their means and a variance-covariance matrix $\Sigma$. In this case, $\mu_x =20$ and $\mu_y = 5$ and
+We can use `mvrnorm` from the `MASS` package to generate a set of variables defined by their means and a variance-covariance matrix $\Sigma$. In this case, $\mu_x = 4$ and $\mu_y = 1$ and
 $$
 \Sigma =\begin{Bmatrix}
 var(x) & cov(x,y) \\
@@ -120,7 +120,6 @@ cov(y,x) & var(y) \\
 \end{Bmatrix}
 $$
 
-where the diagonal entries denote variance and the off-diagonals denote covariance.
 
 ```{r, echo=TRUE, , mysize=TRUE, size='\\footnotesize' }
 n <- 1000
@@ -304,10 +303,10 @@ $$\hat{y} = \hat{\beta_0} + \hat{\beta_1}x + \hat{u}$$
 
 $$\hat{\beta_1} = \frac{\sum_{i=1}^n(x_i-\bar{x})(y_i-\bar{y})}{\sum_{i=1}^n(x_i-\bar{x})^2} = \frac{cov(x,y)}{\sigma^2(x)}$$
 
-- The estimator of the intercept $\beta_0$ can be derived from $\hat{\beta_1}$:
+- The estimator of the intercept $\hat{\beta_0}$ is derived from $\hat{\beta_1}$:
 
 
-$$\beta_0 = \bar{y} - \beta_1\bar{x}$$
+$$\hat{\beta_0} = \bar{y} - \hat{\beta_1}\bar{x}$$
 
 # Predicted values and residuals
 - $x$ and $y$ are vectors where $x_i$ and $y_i$ correspond to the $i^{th}$ elements of each vector.
@@ -390,17 +389,16 @@ $$SSR = \sum_{i=1}^n (y_i-\hat{\beta_0} - \hat{\beta_1}x_i)^2 $$
 
 # Minimizing the sum of the squared residuals
 Let's simulate the residuals using some other possible coefficients, $\beta_1$.
-```{r, echo= TRUE}
-coefs <- c(S-0.3, S-0.2, S-0.1, S, S+0.1, S+0.2, S+0.3)
+```{r, echo= TRUE, mysize=TRUE, size='\\footnotesize'}
+b <- 0.244 # Our estimate of beta1
+coefs <- c(b-0.3, b-0.2, b-0.1, b, b+0.1, b+0.2, b+0.3)
 
-i <- 1
 results <- c()
 for (beta1 in coefs) {
-    beta0 <- mean(df$y) - beta1*mean(df$x) # define intercept
-    u <- df$y - beta0 - beta1*df$x # calculate residuals
-    ssr <- round(sum(u^2), 2) # calculate ssr
-    results[i] <- ssr
-    i <- i + 1
+    beta0 <- mean(df$y) - beta1*mean(df$x) # get intercept
+    u <- df$y - beta0 - beta1*df$x # get residuals
+    ssr <- round(sum(u^2), 2) # calculate SSR
+    results <- append(results, ssr) # store result
 }
 ```
 
@@ -502,22 +500,20 @@ p <- S$coefficients[8]
 
 - First, we want to look at the estimated coefficients. These are our estimates for the intercept and the slope.
 - $\hat{\beta_0}$ 
-    - `r round(beta0,3)`
+    - `r round(beta0,5)`
 - $\hat{\beta_1}$ 
-    - `r round(beta1,3)`
+    - `r round(beta1,5)`
 
-# Is $\beta_1$ statistically significant?
+# Is $\hat{\beta_1}$ statistically significant?
 - Standard errors communicate uncertainty around our estimate of $\beta_1$
 - The standard error of $\beta_1$ is defined as
 
-$$\hat{SE}_{\hat{\beta_1}} = \sqrt{\frac{\hat{\sigma}}{\sum (x_i-\bar{x})^2}}$$
+$$SE_{\hat{\beta_1}} = \sqrt{\frac{\hat{\sigma}}{\sum (x_i-\bar{x})^2}}$$
 where
 
 $$\hat{\sigma} = \frac{1}{n-2}\sum{\hat{u_i}^2} = \frac{1}{n-2}SSR$$
 
-$\hat{\sigma} = \sqrt{\frac{SSR}{}}$
-
-# Is $\beta_1$ statistically significant?
+# Is $\hat{\beta_1}$ statistically significant?
 We can manually calculate the standard error and verify that it matches the regression output
 ```{r, echo=TRUE, mysize=TRUE, size='\\footnotesize'}
 sigma2 <- (1/(n-2)) * sum((model$residuals)^2)
@@ -528,37 +524,35 @@ print(round(SE_beta, 5))
 round(SE_beta,5) == round(summary(model)$coefficients[4],5)
 ```
 
-# Is $\beta_1$ statistically significant?
+# Is $\hat{\beta_1}$ statistically significant?
 - Standard errors can then be used to calculate confidence intervals for a chosen significance threshold
     - The conventional critical value for 95\% confidence intervals is $1.96$ (see last lecture)
-    - $[\hat{\beta_1}-1.96\hat{SE_{\hat{\beta_1}}}, \hat{\beta_1}+1.96\hat{SE_{\hat{\beta_1}}}]$
+    - $[\hat{\beta_1}-1.96SE, \hat{\beta_1}+1.96SE]$
+- We can plug the numbers from our regression into this formula to get the following interval: [`r interval`]
 - To test for statistical significance, we can check the following:
     - Does the interval contain zero?
-- We can plug the numbers from our regression into this formula to get the following interval
-    - Our coefficient is `r round(beta1, 3)` and standard error is `r round(SE,3)`
-    - This yields the following interval: [`r interval`]
 
-# Is $\beta_1$ statistically significant?
+# Is $\hat{\beta_1}$ statistically significant?
 - t statistic is obtained by dividing coefficient by its standard error
     - $t = \frac{\hat{\beta_1}}{\hat{SE}_{\hat{\beta_1}}}$
-    - Thus, the statistic from our regression `r round(t,3)` is equal to `r round(beta1,3)`/ `r round(SE,3)`.
+    - Thus, the t statistic from our regression `r round(t,3)` is equal to `r round(beta1,3)`/ `r round(SE,3)`.
 - Quick rule of thumb for statistical significance
     - Is coefficient more than two times the standard error?
 
-# Is $\beta_1$ statistically significant?
+# Is $\hat{\beta_1}$ statistically significant?
 - Using the t statistic, we can then look up the p-value
     - Probability of observing $t$ given Student t distribution (see last lecture)
 - In this case, our p-value is extremely small so it is expressed using scientific notation: `r p`
     
-# Is $\beta_1$ statistically significant?
-- Generally, smaller p-values indicate stronger statistical significance and increase our confidence in the result
+# Is $\hat{\beta_1}$ statistically significant?
 - Conventional thresholds and stars
     - $p < 0.10^{+/.}$: \st{Trending towards significance} Not significant\footnote{\tiny{Convention for reporting p-values differ across fields. I recommend avoiding interpreting anything above $p < 0.05$.}}
     - $p > 0.05$: Not significant
     - $p < 0.05^{*}$: Statistically significant
     - $p < 0.01^{**}$: Statistically significant
     - $p < 0.001^{***}$: Statistically significant
-    
+- Generally, smaller p-values indicate stronger statistical significance and increase our confidence in the result, but the differences between these categories are still somewhat arbitrary
+
 # Problems with p-values
 - Don't communicate effect size
     - Magnitude matters! Statistically significant but substantively insignificant?
@@ -571,6 +565,29 @@ round(SE_beta,5) == round(summary(model)$coefficients[4],5)
 - Subject to abuse and bad for science
     - Publication bias, fishing, and p-hacking
 - But eliminating p-values entirely is no panacea!
+
+# Estimating $\beta_0$ and $\beta_1$ using `stan_glm()`
+We can also run the same model using Bayesian estimation.
+```{r, echo=TRUE, mysize=TRUE, size='\\footnotesize'}
+library(rstanarm)
+model2 <- stan_glm(y ~ x, data = df)
+```
+
+# Comparing `lm` and `stan_glm`
+Let's compare the coefficients across the two models. We can see that they are very close. We will discuss the differences in these approaches more next week.
+```{r, echo=TRUE, mysize=TRUE, size='\\footnotesize'}
+print(model$coefficients) # lm
+print(model2$coefficients) # stan_glm
+```
+
+<!--
+# Comparing `lm` and `stan_glm`
+We can also compare the standard deviations of the residuals, $\sigma$. The results are almost identical, showing that both models fit the data well.
+```{r, echo=TRUE, mysize=TRUE, size='\\footnotesize'}
+sigma(model)
+sigma(model2)
+```
+-->
 
 # Next week
 - Introduction to Bayesian statistics
