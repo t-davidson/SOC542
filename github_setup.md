@@ -17,7 +17,9 @@ I strongly recommend browsing the resources below and familiarizing yourself wit
 
 1. Set up an account on Github https://github.com (we will be using the free version so no need to pay).
 
-2. Install Git on your computer following instructions here https://github.com/git-guides/install-git
+2. Install Git on your computer following instructions here https://github.com/git-guides/install-git.
+
+Please note that the instructions vary depending on your operating system. 
 
 3. Now you have Git on your computer. You need to run a command in R to associate it with the account you set up in Step 1.
 
