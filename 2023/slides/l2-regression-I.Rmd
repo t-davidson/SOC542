@@ -1,0 +1,579 @@
+---
+title: "SOC542 Statistical Methods in Sociology II" 
+subtitle: "Ordinary Least Squares Regression I"
+author: Dr. Thomas Davidson
+institute: Rutgers University
+date: January 30, 2023
+urlcolor: blue
+output:
+    beamer_presentation:
+      theme: "Szeged"
+      colortheme: "beaver"
+      fonttheme: "structurebold"
+      toc: false
+      incremental: false
+header-includes:
+  - \usepackage{hyperref}
+  - \usepackage{multicol}
+  - \usepackage{caption}
+  - \usepackage{soul}
+  - \captionsetup[figure]{font=scriptsize}
+  - \captionsetup[figure]{labelformat=empty}
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(dev = 'pdf')
+library("knitr")
+library("formatR")
+
+opts_chunk$set(tidy.opts=list(width.cutoff=80),tidy=TRUE)
+opts_chunk$set(tidy = FALSE)
+
+knitr::knit_hooks$set(mysize = function(before, options, envir) {
+  if (before) 
+    return(options$size)
+})
+
+# See https://benjaminlouis-stat.fr/en/blog/2020-05-21-astuces-ggplot-rmarkdown/
+knitr::opts_chunk$set(
+ fig.width = 4,
+ fig.asp = 0.8,
+ out.width = "70%",
+ fig.align = "center"
+)
+
+set.seed(08901)
+
+library(ggplot2)
+library(tidyverse)
+library(latex2exp)
+library(MASS)
+```
+
+
+# Plan
+- Course updates
+- Bivariate statistics review
+- Ordinary least squares regression
+- Lab: Simple regression in R / Github
+
+
+# Course updates
+## Homework 1
+- Homework 1 released today, due Friday at 5pm
+    - Statistics review
+    - Simple OLS regression
+- Download and submit using Github Classroom
+
+# Expected mean and variance of two random variables
+- The expected mean of the sum of two random variables is
+
+$$E[x + y] = E[x] + E[y] = \mu_x + \mu_y$$
+
+- The expected variance is the sum of the variances plus twice their covariance
+
+$$var(x+y) = var(x) + var(y) + 2cov(x,y)$$
+
+- If $x$ and $y$ are independent then $cov(x,y) = 0$ and $var(x+y) = var(x) + var(y)$
+
+
+# Covariance
+- Covariance is the a measure of the joint variability of two random variables
+- The expectation of the covariance between $x$ and $y$ is
+
+$$cov(x,y) = E[xy]-E[x]E[y]$$
+
+- For a population, the covariance is 
+
+$$cov(x,y) = \frac{1}{N}\Sigma(x_i-\mu_x)(y_i-\mu_y)$$
+
+
+- Sample covariance is defined as
+
+
+$$cov(x,y)_s = \frac{1}{n-1}\Sigma(x_i-\bar{x})(y_i-\bar{y})$$
+
+
+- In a large sample, the sample covariance is close to the population covariance with high probability (\textbf{consistency}).
+
+$$cov(x,y)_s \xrightarrow{p} cov(x,y)$$
+
+# Correlation
+- Correlation is a scaled version of covariance. We divide the covariance by the product of the standard deviations.
+
+$$\rho(x,y) = \frac{\frac{1}{n-1}\Sigma(x_i-\bar{x})(y_i-\bar{y})}{\sigma_x\sigma_y} =  \frac{cov(x,y)}{\sigma_x\sigma_y}$$
+
+
+- The letter $\rho$ is typically used to refer to correlation. The correlation coefficient ranges from -1 to 1. 
+- The sample correlation is also a consisent estimator of the population correlation.
+
+# Generating correlated variables
+We can use `mvrnorm` to generate a set of variables defined by their means and a variance-covariance matrix $\Sigma$. In this case, $\mu_x =20$ and $\mu_y = 5$ and
+$$
+\Sigma =\begin{Bmatrix}
+var(x) & cov(x,y) \\
+cov(y,x) & var(y) \\
+\end{Bmatrix}
+$$
+
+where the diagonal entries denote variance and the off-diagonals denote covariance.
+
+```{r, echo=TRUE, , mysize=TRUE, size='\\footnotesize' }
+n <- 1000
+mu <- c(4,1) # vector of means, x and y
+sigma <- rbind(c(4, 1), # variance of x, covariance of x and y
+               c(1, 1)) # covariance of y and x, variance of y
+M <- mvrnorm(n=n, mu=mu, Sigma = sigma)
+```
+\tiny Unlike `rnorm` where we specify a random variable using a mean and standard deviation, `mvrnorm` uses the mean and variance.
+
+
+# Sample statistics
+The sample is large so the sample means and variances are close to the population values.
+```{r, echo=TRUE, , mysize=TRUE, size='\\footnotesize'}
+df <- as.data.frame(M)
+colnames(df) <- c("x", "y")
+print(mean(df$x)) # sample mean of x
+print(var(df$x)) # sample variance of x
+print(mean(df$y)) # sample mean of y
+print(var(df$y)) # sample variance of y
+```
+
+# Calculating covariance
+We can calculate the sample covariance using the formula above. I verify the calculating by comparing it to the output of the built-in `cov` function.
+```{r, echo=TRUE, , mysize=TRUE, size='\\footnotesize'}
+covariance <- (1/(n-1))*sum((df$x-mean(df$x))*(df$y-mean(df$y)))
+print(covariance)
+round(covariance,3) == round(cov(df$x,df$y),3)
+```
+
+# Calculating correlation
+We can do the same for correlation. Note here that I use the `cov` function in the numerator.
+```{r, echo=TRUE, , mysize=TRUE, size='\\footnotesize'}
+correlation <- cov(df$x, df$y) / (sd(df$x)*sd(df$y))
+print(correlation)
+round(correlation,3) == round(cor(df$x, df$y),3)
+```
+
+# Plotting the relationship
+```{r, echo=TRUE, mysize=TRUE, size='\\footnotesize'}
+ggplot(data = df, aes(x = x, y = y)) + geom_point(alpha = 0.3) +
+    theme_minimal()
+```
+
+# Adding regression line $\hat{y} = \hat{\beta_0} + \hat{\beta_1x} + \hat{u}$.
+```{r, echo=FALSE, mysize=TRUE, size='\\footnotesize'}
+ggplot(data = df, aes(x = x, y = y)) + geom_point(alpha = 0.2) + theme_minimal() + geom_smooth(method = "lm", se = FALSE)
+```
+
+
+# Properties of the regression line
+- The population regression line $y = \beta_0 + \beta_1x + u$ is defined by two parameters, the slope and intercept.
+    - $\beta_0$ and $\beta_1$ are known as \textbf{coefficients}.
+
+# Plotting the regression line
+```{r, echo=FALSE, mysize=TRUE, size='\\footnotesize'}
+S <- round(cor(df$x,df$y)*(sd(df$y)/sd(df$x)), 3)
+I <- round(mean(df$y) - S*mean(df$x), 3)
+ggplot(data = data.frame(x = -1:2, y = -1:2), aes(x=x, y=y)) + geom_point(alpha=0) + geom_abline(aes(slope = S, intercept = I)) +
+
+    annotate("text", x = 0.5, y = 0.5, label = paste("y = ", I, " + ", S, "x"), size = 3) +  theme_minimal()
+```
+
+# Interpreting the intercept
+- The intercept defines the value of $y$ when $x = 0$.
+- Where $x = 0$, $\beta_0x = \beta_10 = 0$, thus
+
+$$y = \beta_0 + 0 = \beta_0$$
+
+- Hence, the intercept is a *constant*.
+
+# Plotting the intercept
+```{r, echo=FALSE, mysize=TRUE, size='\\footnotesize'}
+ggplot(data = data.frame(x = -1:2, y = -1:2), aes(x=x, y=y)) + geom_point(alpha=0) + geom_abline(aes(slope = S, intercept = I)) +
+
+    annotate("text", x = 0.5, y = 0.5, label = paste("y = ", I, " + ", S, "x"), size = 3) + 
+    geom_hline(yintercept=I, linetype = "dashed") + 
+    annotate("text", x = 1.5, y = round(S-0.5, 3), label = paste("y = ", I), size = 3) + theme_minimal()
+```
+
+
+# Interpreting the slope
+- The slope defines the relationship between change in $x$ and $y$, where $\Delta$ is used to denote change:
+
+$$\beta_1 = \frac{\Delta y}{\Delta x}$$
+
+- $\beta_1$ denotes the expected *change* in $y$ following a 1-unit change in $x$
+    - e.g. What effect does an additional year of education have on lifetime income?
+- If $\beta_1 < 0$ then the relationship is negative ($y$ decreases as $x$ increases)
+
+
+# Interpreting the slope
+```{r, echo=FALSE, mysize=TRUE, size='\\footnotesize'}
+ggplot(data = data.frame(x = -1:2, y = -1:2), aes(x=x, y=y)) + geom_point(alpha=0) + geom_abline(aes(slope = S, intercept = I)) +
+
+    annotate("text", x = 0.5, y = 1, label = paste("y = ", I, " + ", S, "x"), size = 3) + 
+    geom_hline(yintercept=I, linetype = "dashed") +
+    geom_segment(aes(x=1, xend=1, y=-1, yend=S+I), colour="red") + # vertical
+    geom_segment(aes(x=-1, xend=1, y=S+I, yend=S+I), colour="red") + # horizontal
+   theme_minimal()
+```
+
+# Interpreting the slope
+```{r, echo=FALSE, mysize=TRUE, size='\\footnotesize'}
+ggplot(data = data.frame(x = -1:2, y = -1:2), aes(x=x, y=y)) + geom_point(alpha=0) + geom_abline(aes(slope = S, intercept = I)) +
+
+    annotate("text", x = 0.5, y = 1, label = paste("y = ", I, " + ", S, "x"), size = 3) + 
+    geom_hline(yintercept=I, linetype = "dashed") +
+    geom_segment(aes(x=1, xend=1, y=-1, yend=S+I), colour="red") + # vertical
+    geom_segment(aes(x=-1, xend=1, y=S+I, yend=S+I), colour="red") + # horizontal
+    annotate("text", x = 0.5, y = -0.5, label = paste("x = 1, y = ", I, " + " , S, " = ", I+S), size = 3, color = "red") + 
+   theme_minimal()
+```
+
+# Slope as a comparison: a unit change in $x$
+```{r, echo=FALSE, mysize=TRUE, size='\\footnotesize'}
+ggplot(data = data.frame(x = -1:2, y = -1:2), aes(x=x, y=y)) + geom_point(alpha=0) + geom_abline(aes(slope = S, intercept = I)) +
+
+    annotate("text", x = 0.5, y = 1, label = paste("y = ", I, " + ", S, "x"), size = 3) + 
+    geom_hline(yintercept=I, linetype = "dashed") +
+    geom_segment(aes(x=1, xend=1, y=-1, yend=S+I), colour="red") + # vertical
+    geom_segment(aes(x=-1, xend=1, y=S+I, yend=S+I), colour="red") + # horizontal
+    geom_segment(aes(x=2, xend=2, y=-1, yend=(2*S)+I), colour="red", linetype = "dotted") + # vertical
+    geom_segment(aes(x=-1, xend=2, y=(2*S)+I, yend=(2*S)+I), colour="red", linetype = "dotted") + # horizontal
+    annotate("text", x = 1, y = 0.7, label = paste("x = 2, y = ", I, " + " , S*2, " = ", I+(S*2)), size = 3, color = "red") + 
+    annotate("text", x = 0.5, y = -0.5, label = paste("x = 1, y = ", I+S), size = 3, color = "red") + 
+   theme_minimal()
+```
+
+# Slope as a comparison: a unit change in $x$
+```{r, echo=FALSE, mysize=TRUE, size='\\footnotesize'}
+ggplot(data = data.frame(x = -1:2, y = -1:2), aes(x=x, y=y)) + geom_point(alpha=0) + geom_abline(aes(slope = S, intercept = I)) +
+
+    annotate("text", x = 0.5, y = 1, label = paste("y = ", I, " + ", S, "x"), size = 3) + 
+    geom_hline(yintercept=I, linetype = "dashed") +
+    geom_segment(aes(x=1, xend=1, y=-1, yend=S+I), colour="red") + # vertical
+    geom_segment(aes(x=-1, xend=1, y=S+I, yend=S+I), colour="red") + # horizontal
+    geom_segment(aes(x=2, xend=2, y=-1, yend=(2*S)+I), colour="red", linetype = "dotted") + # vertical
+    geom_segment(aes(x=-1, xend=2, y=(2*S)+I, yend=(2*S)+I), colour="red", linetype = "dotted") + # horizontal
+    geom_segment(aes(x=-0.5, xend=-0.5, y=S+I, yend=(2*S)+I), colour="blue") +
+    annotate("text", x = 1, y = 0.7, label = paste("x = 2, y = ", I, " + " , S*2, " = ", I+(S*2)), size = 3, color = "red") + 
+    annotate("text", x = 0.5, y = -0.5, label = paste("x = 1, y = ", I+S), size = 3, color = "red") + 
+    annotate("text", x = -0.3, y = 0.35, label = ((2*S)+I)-(S+I) , size = 3, color = "blue") + 
+   theme_minimal()
+```
+
+# Reading the regression line
+```{r, echo=FALSE, mysize=TRUE, size='\\footnotesize'}
+ggplot(data = df, aes(x = x, y = y)) + geom_point(alpha = 0.4) + theme_minimal() + geom_smooth(method = "lm", se = FALSE) +
+    geom_segment(aes(x=4, xend=4, y=min(y), yend=(4*S)+I), colour="red", linetype = "dotted") + # vertical
+    geom_segment(aes(x=min(x), xend=4, y=(4*S)+I, yend=(4*S)+I), colour="red", linetype = "dotted") + # horizontal
+    annotate("text", x = 3.5, y = (3.5*S)+I+3.5, label = paste("x = 4, y = ", I, " + " , S, "*4", " = ", I+(S*4)), size = 4, color = "red")
+```
+
+
+# Ordinary least squares regression (Population model)
+- The population ordinary least squares (OLS) regression equation is defined as:
+
+$$y = \beta_0 + \beta_1x + u$$
+
+
+- We can also write this as an expectation 
+
+
+$$E[y|x] = \beta_0 + \beta_1x$$
+
+
+- $u$ is known as the \text{error term} and captures all factors that affect $y$ but are not accounted for by $x$.
+
+
+# Ordinary least squares regression (sample model)
+- The sample analogue is
+
+$$\hat{y} = \hat{\beta_0} + \hat{\beta_1}x + \hat{u}$$
+
+- The $\hat{}$ symbol (pronounced "hat") is used to denote an \textbf{estimate}. We use the observed data from $x$ and $y$ to calculate estimates of underlying population quantities.
+
+
+# Defining the coefficients $\beta_1$ and $\beta_0$
+- The OLS estimator of $\beta_1$ is
+
+$$\hat{\beta_1} = \frac{\sum_{i=1}^n(x_i-\bar{x})(y_i-\bar{y})}{\sum_{i=1}^n(x_i-\bar{x})^2} = \frac{cov(x,y)}{\sigma^2(x)}$$
+
+- The estimator of the intercept $\beta_0$ can be derived from $\hat{\beta_1}$:
+
+
+$$\beta_0 = \bar{y} - \beta_1\bar{x}$$
+
+# Predicted values and residuals
+- $x$ and $y$ are vectors where $x_i$ and $y_i$ correspond to the $i^{th}$ elements of each vector.
+- We can use the regression equation to calculate the \textbf{predicted value} of $y_i$ as a linear function of $x_i$:
+
+$$\hat{y_i} = \hat{\beta_0} + \hat{\beta_1}x_i$$
+
+- The \textbf{residual} is the difference between the observed value of $y_i$ and the predicted value. It measures variation in $y_i$ that is not explained by $x$.
+
+$$\hat{u_i} = y_i - \hat{\beta_0} - \hat{\beta_1}x_i = y_i - \hat{y_i}$$
+
+- Thus, $y_i = \hat{y_i} + \hat{u_i}$.
+
+# Visualizing residuals
+```{r, echo=FALSE, mysize=TRUE, size='\\footnotesize'}
+df$resids <- df$y - I - S*df$x
+df$preds <- I + S*df$x
+pos.resids <- df %>% filter(resids > 1)
+neg.resids <- df %>% filter(resids < -1)
+ggplot(data = df, aes(x = x, y = y)) + geom_point(alpha = 0.3) + theme_minimal() + geom_smooth(method = "lm", se = FALSE) +
+    geom_segment(aes(x=pos.resids[1,]$x, xend=pos.resids[1,]$x, y=pos.resids[1,]$preds, yend=pos.resids[1,]$y), colour="red") +
+    geom_segment(aes(x=neg.resids[1,]$x, xend=neg.resids[1,]$x, y=neg.resids[1,]$preds, yend=neg.resids[1,]$y), colour="red") +
+    geom_segment(aes(x=pos.resids[5,]$x, xend=pos.resids[5,]$x, y=pos.resids[5,]$preds, yend=pos.resids[5,]$y), colour="red") +
+    geom_segment(aes(x=neg.resids[5,]$x, xend=neg.resids[5,]$x, y=neg.resids[5,]$preds, yend=neg.resids[5,]$y), colour="red") +
+    geom_segment(aes(x=pos.resids[10,]$x, xend=pos.resids[10,]$x, y=pos.resids[10,]$preds, yend=pos.resids[10,]$y), colour="red") +
+    geom_segment(aes(x=neg.resids[10,]$x, xend=neg.resids[10,]$x, y=neg.resids[10,]$preds, yend=neg.resids[10,]$y), colour="red") +
+    labs(caption = TeX("Red lines show difference between observed $y$ and fitted value $\\hat{y}$"))
+```
+
+
+# Least squares
+- This model is know as \textbf{least squares} regression because it minimizes the sum of the squared residuals.
+
+$$SSR = \sum_{i=1}^n (y_i-\hat{y_i})^2 = \sum_{i=1}^n\hat{u_i}^2$$
+
+# $\bar{x}$ is the least squares estimator of $\mu_x$
+- Consider a random variable $x$. For each value of $x$, $x_i - \alpha$ is the prediction error.
+
+$$\sum_{i=1}^n (x_i-\alpha{})^2$$
+
+
+- The sample average $\bar{x}$ is the estimator $\alpha$ that minimizes the \textbf{sum of squared errors (SSE)}.
+
+# $\bar{x}$ is the least squares estimator of $\mu_x$
+Let's generate a random variable and calculate the SSE using $\alpha = \bar{x}$
+```{r, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+x <- rnorm(n=100, mean = 5, sd = 1)
+xbar <- mean(x)
+print(xbar)
+print(sum((x-xbar)^2))
+```
+
+# $\bar{x}$ is the least squares estimator of $\mu_x$
+Now let's compare the results when alternative values of $\alpha$ are used.
+```{r, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+SSE <- function(x, alpha) {
+    result <- sum((x-alpha)^2)
+    return(round(result, 3))
+}
+
+print(paste("alpha = xbar = ", round(xbar,3), 
+                ", SSE = ", SSE(x, xbar)))
+
+for (alpha in 3:7) {
+    print(paste("alpha = ", alpha, 
+                ", SSE = ", SSE(x, alpha)))
+}
+```
+
+
+# $\beta_0$ and $\beta_1$ minimize the SSR
+- For a single sample, $\bar{y}$ is the least squares \textbf{estimator} of $\mu_y$.
+- For two variables, $\hat{y}$ is the least squares \textbf{estimator} of $y$ because it minimizes the \textbf{sum of the squared residuals (SSR)}:
+
+$$SSR = \sum_{i=1}^n (y_i-\hat{y_i})^2 = \sum_{i=1}^n\hat{u}^2$$
+
+- By substitution,
+
+$$SSR = \sum_{i=1}^n (y_i-\hat{\beta_0} - \hat{\beta_1}x_i)^2 $$
+
+# Minimizing the sum of the squared residuals
+Let's simulate the residuals using some other possible coefficients, $\beta_1$.
+```{r, echo= TRUE}
+coefs <- c(S-0.3, S-0.2, S-0.1, S, S+0.1, S+0.2, S+0.3)
+
+i <- 1
+results <- c()
+for (beta1 in coefs) {
+    beta0 <- mean(df$y) - beta1*mean(df$x) # define intercept
+    u <- df$y - beta0 - beta1*df$x # calculate residuals
+    ssr <- round(sum(u^2), 2) # calculate ssr
+    results[i] <- ssr
+    i <- i + 1
+}
+```
+
+
+# Minimizing the sum of the squared residuals
+```{r}
+head(data.frame(coefs = coefs, results = results), n=7)
+```
+
+# Model fit and $R^2$
+- \textbf{$R^2$} is a measure of the ratio of the variance of $\hat{y}$ to the variance of $y_i$
+
+$$R^2 = \frac{\sum_{i=1}^n(\hat{y_i}-\bar{y})^2}{\sum_{i=1}^n(y_i-\bar{y})^2} = \frac{ESS}{TSS}$$
+
+- We can also write it as a fraction of the unexplained variance:
+
+$$R^2 = 1 - \frac{SSR}{TSS}$$
+
+- $R^2$ has a range of [0,1] where higher values indicate more variance explained. It is often common to have models with very low values of $R^2$.
+
+# Mean squared error
+- An alternative measure of fit is the \textbf{mean squared error (MSE)}, defined as 
+
+$$MSE = \frac{1}{n}\sum_{i=1}^n(y_i-\hat{y_i})^2$$
+
+- MSE is often used to evaluate the predictive performance of statistical models with continuous outcomes.
+
+# OLS assumptions
+- $x$ and $y$ are independently and identically distributed (IID).
+    - The sample $x$ must contain some variability. Specifically, $var(x) > 0$. 
+    - Large outliers are unlikely.
+- The conditional distribution of $u$ given $x$ has a mean of zero.
+    - Errors are independent $E[u_i|x_i] = E[u_i] = 0$.
+    - Errors have constant variance $var(u_i) = \sigma^2$.
+    - Errors are uncorrelated.
+    
+# Violating the large outlier assumption
+Observe how a large outlier can pull down the entire regression line.
+```{r, echo=FALSE, mysize=TRUE, size='\\footnotesize'}
+outlier <- as.data.frame(list(x = 40, y = -40, resids  = 1 - I - S*40, preds = I + S*40))
+df2 <- bind_rows(df, outlier)
+ggplot(data = df, aes(x = x, y = y)) + geom_point(data = df2, alpha = 0.4) + theme_minimal() +
+    geom_smooth(method = "lm", se = FALSE, linetype = "dashed", color = "blue") +
+geom_smooth(data = df2, method = "lm", se = FALSE, linetype = "dashed", color = "red")
+```
+
+# $E[u_i|x_i] = 0$
+```{r, echo=FALSE, mysize=TRUE, size='\\footnotesize'}
+ggplot(data = df, aes(x = x, y = resids)) + geom_point(alpha = 0.4) + theme_minimal() +
+    geom_smooth(method = "lm", se = FALSE, linetype = "dashed", color = "blue")
+```
+
+
+# Homoskedasticity and heteroskedasticity
+- The $E[u|x] = E[u] = 0$ implies \textbf{homoskedasticity}
+    - The variance of $u_i$ is equal for all values of $x_i$, $var(u_i) = \sigma^2$.
+- \textbf{Heteroskedasticity} exists when this assumption is violated. 
+    - It can result in inefficient point estimates and biased standard errors.
+
+
+# The Gauss-Markov Theorem
+- If these assumptions hold and the errors are homoskedastic, the OLS estimator $\hat{\beta_1}$ is \textbf{BLUE}: the \textbf{Best Linear conditionally Unbiased Estimator}.
+- \textbf{Best} implies that $\hat{\beta_1}$ is the best of all possible linear conditionally unbiased estimators.
+    - $\hat{\beta_1}$ produces the smallest mean squared error of all possible estimators $\tilde{\beta_1}$.
+- \textbf{Linear} requires the dependent variable $y$ to be a linear function of the parameters in the model.
+    - This does *not* require the relationship between $x$ and $y$ to be linear. e.g. $y = 1 + 2x^2$ is linear in parameters.
+- \textbf{conditionally Unbiased} implies $E[\hat{\beta_1}] = \beta_1$. 
+    - The expectation of the estimated coefficient $\hat{\beta_1}$ is equal to the population parameter $\beta_1$ after conditioning on $x$.
+
+# Summary
+- OLS regression is used when we assume $y$ can be modeled as a linear combination of parameters.
+- We assume a population model, $y = \beta_0 + \beta_1x + u$.
+- We use a sample of data to estimate the relationship between $y$ and $x$ in the population.
+- The equation $\hat{y_i} = \hat{\beta}_0 + \hat{\beta}_1x_i + \hat{u_i}$ minimizes the sum of the squared residuals.
+- If the sample is IID and the errors are unrelated to $x$, we can assume that $\hat{\beta_1}$ is the best estimator of $\beta_1$.
+
+# Estimating $\beta_0$ and $\beta_1$ using `lm()`
+```{r, echo=TRUE, mysize=TRUE, size='\\footnotesize'}
+model <- lm(y ~ x, data = df)
+```
+
+# Estimating $\beta_0$ and $\beta_1$ using `lm()`
+```{r, echo=TRUE, mysize=TRUE, size='\\footnotesize'}
+summary(model)
+```
+
+# Interpreting the results
+```{r, echo=FALSE}
+beta0 <- model$coefficients[[1]]
+beta1 <- model$coefficients[[2]]
+S <- summary(model)
+SE <- S$coefficients[4]
+t <- S$coefficients[6]
+lower <- as.character(round(beta1-1.96*SE,3))
+upper <- as.character(round(beta1+1.96*SE,3))
+interval <- paste(lower, upper, sep=",")
+p <- S$coefficients[8]
+```
+
+- First, we want to look at the estimated coefficients. These are our estimates for the intercept and the slope.
+- $\hat{\beta_0}$ 
+    - `r round(beta0,3)`
+- $\hat{\beta_1}$ 
+    - `r round(beta1,3)`
+
+# Is $\beta_1$ statistically significant?
+- Standard errors communicate uncertainty around our estimate of $\beta_1$
+- The standard error of $\beta_1$ is defined as
+
+$$\hat{SE}_{\hat{\beta_1}} = \sqrt{\frac{\hat{\sigma}}{\sum (x_i-\bar{x})^2}}$$
+where
+
+$$\hat{\sigma} = \frac{1}{n-2}\sum{\hat{u_i}^2} = \frac{1}{n-2}SSR$$
+
+$\hat{\sigma} = \sqrt{\frac{SSR}{}}$
+
+# Is $\beta_1$ statistically significant?
+We can manually calculate the standard error and verify that it matches the regression output
+```{r, echo=TRUE, mysize=TRUE, size='\\footnotesize'}
+sigma2 <- (1/(n-2)) * sum((model$residuals)^2)
+denom <- sum((df$x - mean(df$x))^2)
+SE_beta <- sqrt(sigma2/denom)
+
+print(round(SE_beta, 5))
+round(SE_beta,5) == round(summary(model)$coefficients[4],5)
+```
+
+# Is $\beta_1$ statistically significant?
+- Standard errors can then be used to calculate confidence intervals for a chosen significance threshold
+    - The conventional critical value for 95\% confidence intervals is $1.96$ (see last lecture)
+    - $[\hat{\beta_1}-1.96\hat{SE_{\hat{\beta_1}}}, \hat{\beta_1}+1.96\hat{SE_{\hat{\beta_1}}}]$
+- To test for statistical significance, we can check the following:
+    - Does the interval contain zero?
+- We can plug the numbers from our regression into this formula to get the following interval
+    - Our coefficient is `r round(beta1, 3)` and standard error is `r round(SE,3)`
+    - This yields the following interval: [`r interval`]
+
+# Is $\beta_1$ statistically significant?
+- t statistic is obtained by dividing coefficient by its standard error
+    - $t = \frac{\hat{\beta_1}}{\hat{SE}_{\hat{\beta_1}}}$
+    - Thus, the statistic from our regression `r round(t,3)` is equal to `r round(beta1,3)`/ `r round(SE,3)`.
+- Quick rule of thumb for statistical significance
+    - Is coefficient more than two times the standard error?
+
+# Is $\beta_1$ statistically significant?
+- Using the t statistic, we can then look up the p-value
+    - Probability of observing $t$ given Student t distribution (see last lecture)
+- In this case, our p-value is extremely small so it is expressed using scientific notation: `r p`
+    
+# Is $\beta_1$ statistically significant?
+- Generally, smaller p-values indicate stronger statistical significance and increase our confidence in the result
+- Conventional thresholds and stars
+    - $p < 0.10^{+/.}$: \st{Trending towards significance} Not significant\footnote{\tiny{Convention for reporting p-values differ across fields. I recommend avoiding interpreting anything above $p < 0.05$.}}
+    - $p > 0.05$: Not significant
+    - $p < 0.05^{*}$: Statistically significant
+    - $p < 0.01^{**}$: Statistically significant
+    - $p < 0.001^{***}$: Statistically significant
+    
+# Problems with p-values
+- Don't communicate effect size
+    - Magnitude matters! Statistically significant but substantively insignificant?
+- Don't communicate uncertainty
+    - Confidence intervals are preferable
+- Null hypothesis significance testing (NHST) not always informative
+    - Is it reasonable to assume $\hat{\beta_1} = 0$ if $p \geq 0.05$?
+- Multiple comparisons
+    - Risk of false positive increases if conducting multiple tests\footnote{\tiny Bonferroni corrections recommended (but not common in sociology). Correction: Where $\alpha$ is the chosen significance threshold and $T$ is the number of tests, the Bonferroni corrected threshold is $\frac{\alpha}{T}$, e.g. $\frac{0.05}{20} = 0.0025$ }
+- Subject to abuse and bad for science
+    - Publication bias, fishing, and p-hacking
+- But eliminating p-values entirely is no panacea!
+
+# Next week
+- Introduction to Bayesian statistics
+
+# Lab
+- Estimating and interpreting bivariate OLS regression using R
