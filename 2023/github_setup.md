@@ -3,9 +3,9 @@
 
 ## Why Git and Github?
 
-Git and Github provide an excellent way to organize and share code and other files related to statistical research projects. Git is primarily a version control system, which allows you to track the history of your files and to share them with others. It allows you to easily synchronize files on your computer with those in stored in the cloud on Github. For example, I can push new lectures to Github and you can pull them onto your computer with a click of a button.
+Git is a version control system that enables you to track the history of your files and to share them with others. Github  is a cloud-based platform that allows you to share these files and easily synchronize them. For example, I can push new lectures to Github and you can pull them onto your computer with a click of a button.
 
-We use Github in this class for several reasons. First, it is a convenient way to share course materials. Second, it will help you to manage and keep track of your projects, which can easily become unwieldy. Third, it will encourage you to develop a reproducible workflow, helping to improve transparency in social scientific research.
+There are several benefits of these tools. First, it is a convenient way to share course materials and assignments. Second, it will help you to manage and keep track of your projects, which can easily become unwieldy. Third, it will encourage you to develop a reproducible workflow, helping to improve transparency in social scientific research. Fourth, the open-source software we will be using in class is all maintained via Github. Knowledge of how the platform works will make it easier for you to understand this software and potentially contribute to it.
 
 Github is not intended for storage of large files. You should use another service like Google Drive or Box for this purpose. And be careful what you share. By default, most repositories are public, so ensure not to share sensitive data or credentials.
 
@@ -19,7 +19,7 @@ I strongly recommend browsing the resources below and familiarizing yourself wit
 
 2. Install Git on your computer following instructions here https://github.com/git-guides/install-git.
 
-Please note that the instructions vary depending on your operating system. 
+Please note that the instructions vary depending on your operating system.
 
 3. Now you have Git on your computer. You need to run a command in R to associate it with the account you set up in Step 1.
 
@@ -45,6 +45,10 @@ Return to RStudio and click the `File` tab at the top of the page and select `Ne
 
 You will see a window pop up and then you will return to RStudio. If you look in the `Files` pane you should see the files from the course. You should also see a tab titled `Git` at the top. Now, whenever there is an update to the course, all you need to do is click the downwards facing green arrow to "pull" the files onto your computer.
 
+## Using Github for homework assignments
+
+We will be using something called Github Classroom for the homework assignments.Each homework assignment will be a separate Github repository, where each student gets a personal version. You will need to clone this repository using the same process as in Step 6. You can then submit your solutions by committing changes and pushing them to your repository.
+
 ## On projects
 
 Over the course of the semester you will likely have multiple different Github repositories (main course repo, homeworks, papers).
@@ -52,10 +56,6 @@ Over the course of the semester you will likely have multiple different Github r
 The simplest way to open a project is to open the `.RProj` file located in each folder.
 
 You can learn more about projects in the *R for Data Science* book: https://r4ds.had.co.nz/workflow-projects.html
-
-## Using Github for homework assignments
-
-Each homework assignment will be a separate Github repository, where each student has a personal version. You will need to clone this repository using the same process as in Step 6. You can then submit your solutions by committing changes and pushing them to your repository.
 
 ## Resources
 
