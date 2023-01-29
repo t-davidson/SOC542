@@ -45,8 +45,6 @@ Return to RStudio and click the `File` tab at the top of the page and select `Ne
 
 You will see a window pop up and then you will return to RStudio when the process is completed. If you look in the `Files` pane you should see the files from the course. You should also see a tab titled `Git` at the top. Now, whenever there is an update to the course, all you need to do is click the downwards facing green arrow to "pull" the files onto your computer.
 
-Now you can simply pull the changes from the course website on your computer every week with a click of a button!
-
 ## Using Github for homework assignments
 
 We will be using something called Github Classroom for the homework assignments.Each homework assignment will be a separate Github repository, where each student gets a personal version. You will need to clone this repository using the same process as in Step 6. You can then submit your solutions by committing changes and pushing them to your repository.
