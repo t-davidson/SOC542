@@ -41,9 +41,11 @@ Follow the instructions here: https://happygitwithr.com/rstudio-git-github.html
 
 6. Finally, you can use Github to get the latest version of all the course files (including this one!) on your computer.
 
-Return to RStudio and click the `File` tab at the top of the page and select `New Project...` from the dropdown. This will open up the project wizard. Click the `Version Control` option then `Git`. Paste the URL for this project (https://github.com/t-davidson/SOC542) into the Repository URL box and select an appropriate directory to store it (this is where the files will all live). When you're read, click `Create Project`
+Return to RStudio and click the `File` tab at the top of the page and select `New Project...` from the dropdown. This will open up the project wizard. Click the `Version Control` option then `Git`. Paste the URL for this project (https://github.com/t-davidson/SOC542) into the Repository URL box and select an appropriate directory to store it (this is where the files will all live). When you're ready, click `Create Project`
 
-You will see a window pop up and then you will return to RStudio. If you look in the `Files` pane you should see the files from the course. You should also see a tab titled `Git` at the top. Now, whenever there is an update to the course, all you need to do is click the downwards facing green arrow to "pull" the files onto your computer.
+You will see a window pop up and then you will return to RStudio when the process is completed. If you look in the `Files` pane you should see the files from the course. You should also see a tab titled `Git` at the top. Now, whenever there is an update to the course, all you need to do is click the downwards facing green arrow to "pull" the files onto your computer.
+
+Now you can simply pull the changes from the course website on your computer every week with a click of a button!
 
 ## Using Github for homework assignments
 
