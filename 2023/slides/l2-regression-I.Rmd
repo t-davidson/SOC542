@@ -344,11 +344,12 @@ $$SSR = \sum_{i=1}^n (y_i-\hat{y_i})^2 = \sum_{i=1}^n\hat{u_i}^2$$
 
 # $\bar{x}$ is the least squares estimator of $\mu_x$
 - Consider a random variable $x$. For each value of $x$, $x_i - \alpha$ is the prediction error.
+- The \textbf{sum of squared errors (SSE)} is thus
 
 $$\sum_{i=1}^n (x_i-\alpha{})^2$$
 
 
-- The sample average $\bar{x}$ is the estimator $\alpha$ that minimizes the \textbf{sum of squared errors (SSE)}.
+- The sample average $\bar{x}$ is the estimator $\alpha$ that minimizes the SSE.
 
 # $\bar{x}$ is the least squares estimator of $\mu_x$
 Let's generate a random variable and calculate the SSE using $\alpha = \bar{x}$
@@ -388,13 +389,16 @@ $$SSR = \sum_{i=1}^n (y_i-\hat{y_i})^2 = \sum_{i=1}^n\hat{u}^2$$
 $$SSR = \sum_{i=1}^n (y_i-\hat{\beta_0} - \hat{\beta_1}x_i)^2 $$
 
 # Minimizing the sum of the squared residuals
-Let's simulate the residuals using some other possible coefficients, $\beta_1$.
+Let's return to our regression model and consider what happens to the errors if we vary the coefficient by multiples of a tiny increment $\zeta$.
 ```{r, echo= TRUE, mysize=TRUE, size='\\footnotesize'}
-b <- 0.244 # Our estimate of beta1
-coefs <- c(b-0.3, b-0.2, b-0.1, b, b+0.1, b+0.2, b+0.3)
+b <- 0.244 # estimate of beta1
+z <- 0.005 # set zeta
 
-results <- c()
-for (beta1 in coefs) {
+coefs <- c() # vector of modified coefficients
+results <- c() # vector of results
+for (i in seq(-10,10)) { # for integers from -10 to 10
+    beta1 <- b+i*z # obtain new coef
+    coefs <- append(coefs, beta1) # store coef
     beta0 <- mean(df$y) - beta1*mean(df$x) # get intercept
     u <- df$y - beta0 - beta1*df$x # get residuals
     ssr <- round(sum(u^2), 2) # calculate SSR
@@ -404,8 +408,11 @@ for (beta1 in coefs) {
 
 
 # Minimizing the sum of the squared residuals
-```{r}
-head(data.frame(coefs = coefs, results = results), n=7)
+```{r, echo = FALSE}
+d <- data.frame(coefs = coefs, results = results)
+ggplot(aes(x = coefs, y = results), data = d) +
+    geom_line() + theme_minimal() + geom_vline(xintercept = b, linetype = "dashed", color = "blue") +
+    labs(x = "Coefficient", y = "Sum of squared residuals")
 ```
 
 # Model fit and $R^2$
@@ -566,6 +573,7 @@ round(SE_beta,5) == round(summary(model)$coefficients[4],5)
     - Publication bias, fishing, and p-hacking
 - But eliminating p-values entirely is no panacea!
 
+<!--
 # Estimating $\beta_0$ and $\beta_1$ using `stan_glm()`
 We can also run the same model using Bayesian estimation.
 ```{r, echo=TRUE, mysize=TRUE, size='\\footnotesize'}
@@ -580,7 +588,7 @@ print(model$coefficients) # lm
 print(model2$coefficients) # stan_glm
 ```
 
-<!--
+
 # Comparing `lm` and `stan_glm`
 We can also compare the standard deviations of the residuals, $\sigma$. The results are almost identical, showing that both models fit the data well.
 ```{r, echo=TRUE, mysize=TRUE, size='\\footnotesize'}
