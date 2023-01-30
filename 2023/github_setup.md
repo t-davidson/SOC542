@@ -19,21 +19,23 @@ I strongly recommend browsing the resources below and familiarizing yourself wit
 
 2. Install Git on your computer following instructions here https://github.com/git-guides/install-git.
 
-Please note that the instructions vary depending on your operating system.
+Please note that the instructions vary depending on your operating system. If you are using MacOS then you may have Github installed already. 
 
 3. Now you have Git on your computer. You need to run a command in R to associate it with the account you set up in Step 1.
 
 Luckily there is an R package to help you do this All you need to do is install the following package and run this command in the R console (replacing the username and email address).
 
 ```
+install.package("usethis")
 library(usethis)
-use_git_config(user.name = “t-davidson", user.email = “thomas.davidson@rutgers.edu”)
+use_git_config(user.name = "t-davidson", user.email = "thomas.davidson@rutgers.edu")
 ```
 
-4. At this point Git is set up on your computer, but we still need to perform a final step to connect to Github.
+4. At this point Git is set up on your computer.  Proceed to Step 5, but if you find you have an access or permission error then you may need to complete this step:
+
 Follow these instructions to generate and store an access token: https://happygitwithr.com/https-pat.html
 
-5. You’re nearly there! Now we need to check that everything is working. This will also be a chance to learn core Git/Github functionality.
+5. (OPTIONAL) You should have Github set up now! I recommend trying to set up a repository to test it out and learn some core functionality, but you can skip to Step 6.
 
 You will set up a new repository on the Github website, clone it using RStudio, then commit and push a change, before verifying it on the website.
 
@@ -47,13 +49,13 @@ You will see a window pop up and then you will return to RStudio when the proces
 
 ## Using Github for homework assignments
 
-We will be using something called Github Classroom for the homework assignments.Each homework assignment will be a separate Github repository, where each student gets a personal version. You will need to clone this repository using the same process as in Step 6. You can then submit your solutions by committing changes and pushing them to your repository.
+We will be using something called Github Classroom for the homework assignments. Each homework assignment will be a separate Github repository, where each student gets a personal version. You will need to clone this repository using the same process as in Step 6. You can then submit your solutions by committing changes and pushing them to your repository.
 
 ## On projects
 
 Over the course of the semester you will likely have multiple different Github repositories (main course repo, homeworks, papers).
 
-The simplest way to open a project is to open the `.RProj` file located in each folder.
+The simplest way to open a project is to open the `.RProj` file located in each folder or to use the dropdown menu in RStudio to open projects.
 
 You can learn more about projects in the *R for Data Science* book: https://r4ds.had.co.nz/workflow-projects.html
 
