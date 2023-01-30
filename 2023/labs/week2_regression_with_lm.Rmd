@@ -28,7 +28,7 @@ if(!require(cowplot))          # If cowplot package isn't installed...
   install.packages("cowplot")  # Install it
 library(cowplot)
 
-if(!require(ggExtra))          # If cowplot package isn't installed...
+if(!require(ggExtra))          # If ggExtra package isn't installed...
   install.packages("ggExtra")  # Install it
 library(ggExtra)
 
@@ -93,7 +93,7 @@ p1 <- ggplot(anes2020, aes(x = thermo_biden, y = thermo_harris)) +
   theme(plot.title = element_text(hjust = .5)) +
   theme_light()
 
-ggMarginal(p1, type = "density")
+ggMarginal(p1, type = "densigram")
 ```
 
 # OLS Regression
@@ -114,7 +114,7 @@ Looking at our summary table, our R-squared is very high (.765), suggesting that
 
 ## Statistical Significance of Coefficients
 
-There are three ways we can see if the coefficient in our model (year) is significant.
+There are three ways we can see if the coefficient in our model (Biden) is significant.
 1. P-value: The p-value is very low. We can see this in the first print-out that it is very close to zero. We can see the stars attached to it in both the `summary()` output. We can also use `stars = T` to have `modelsummary()` display it.  
 
 2. T-value: The t-value is 158.3. The t-statistic is calculated as the ratio of the coefficient to the standard error ($t = b/se$).  In this case, it is $.887 / .005 = 158.3$. A value larger than 2 (or less than -2) points to a p-value less than .05, and significance only increases from there. 
@@ -261,6 +261,8 @@ So we can see that, as predicted increased, residual decreases. This is due to b
 Let's replicate my analyses above, this time looking at feelings toward Trump and Pence. 
 
 You have been provided with most of the code, you just need to plug in the appropriate variables and compare. 
+
+Make sure you change the chunk options to say`include = TRUE`. 
 
 ## Data Visualization 
 
