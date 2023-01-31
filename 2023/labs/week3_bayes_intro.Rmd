@@ -1,7 +1,7 @@
 ---
 title: "Week 3 - Bayesian Regression"
 author: "Fred Traylor, Lab TA"
-date: "2/4/2022"
+date: "2/6/2023"
 output:
   pdf_document: default
   html_document: default
@@ -12,15 +12,8 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(rstanarm)
 library(viridis)
-
-if(!require(latex2exp))          # If latex2exp package isn't intalled...
-  install.packages("latex2exp")
 library(latex2exp)
-
-if(!require(tidybayes))          # If tidybayes package isn't intalled...
-  install.packages("tidybayes")
 library(tidybayes)
-
 ```
 
 We're going to be using the `kidiq` dataset. A subset of data from the National Longitudinal Survey of Youth. You can read a little more about it here: https://mc-stan.org/rstanarm/reference/rstanarm-datasets.html
@@ -30,7 +23,7 @@ data(kidiq)
 ggplot(kidiq,
        aes(x = mom_iq,
            y = kid_score)) +
-  geom_point() 
+  geom_point() + theme_minimal()
 ```
 
 # OLS model
@@ -43,6 +36,15 @@ summary(model_ols)
 
 
 # Bayesian regression with `stan_glm`
+<!--TD: I think this example does too much. There is a lot to unpack!
+
+Begin with a simple example w/o any modifications. e.g. use all defaults for function options except `prior = NULL` and `prior_intercept = NULL`
+
+Introduce the other arguments below in following examples (let's not worry about family for now). Although this might make the models slightly less comparable (e.g. iter and chains may differ, I think it will be better to incrementally introduce some of the options)
+
+Modify text accordingly.
+-->
+
 We will use the `stan_glm` function from `rstanarm` to estimate a series of regression models using the Bayesian approach and will consider how the choice of prior affects the results. 
 
 The `family` argument in the code below specifies the type of model. In this case, `gaussian(link = "identity")` corresponds to an OLS model. We will see how this argument is used to specify different kinds of models later in the course.
@@ -206,11 +208,12 @@ d %>%
   theme_light() + 
   theme(legend.position = "none",
         panel.grid.major.y = element_blank())
-  
+# TD: Pedantic, but is there a way to get alpha to only apply to density
+# Currently it also applies to the error bars and makes them a little hard to see...
 ```
 
 Here's another example of a way we can express the uncertainty contained in the estimates.
-```{r post-model-viz3}
+```{r post-model-viz3, warning=F}
 d %>%
   ggplot() +
   stat_gradientinterval(aes(
@@ -271,12 +274,12 @@ print(bayes_weak_pp)
 pp_check(bayes_weak_pp) + theme_tidybayes()
 ```
 
-This shows how Bayesian models are generative, as we can still make predictions from the priors without having seen any data. We can see how the distributions are extremely wide, showing the uncertainty captured by the prior. The posterior shown above is clearly a much more accurate summary of the data.
+This shows how Bayesian models are generative, as we can still make predictions from the priors without having seen any data. We can see how the distributions are extremely wide since the model has not been able to learn anything from the data. The posterior shown above is clearly a much more accurate summary of the data.
 
 
 # Replication with Fewer Observations  
 
-Above, we saw that there were only miniscule differences between the OLS the Bayesian models. Let's see what happens if we repeat the above exercizes with fewer observations. 
+Above, we saw that there were only minuscule differences between the OLS the Bayesian models. Let's see what happens if we repeat the above exercises with fewer observations. 
 
 ```{r small_comp_mods}
 small_kidiq <- slice_sample(kidiq, n = 50)
