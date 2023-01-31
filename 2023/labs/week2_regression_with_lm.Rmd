@@ -19,18 +19,8 @@ knitr::opts_chunk$set(
 options(scipen = 999)
 
 library(tidyverse)
-
-if(!require(modelsummary))          # If modelsummary package isn't installed...
-  install.packages("modelsummary")  # Install it
 library(modelsummary)
-
-if(!require(cowplot))          # If cowplot package isn't installed...
-  install.packages("cowplot")  # Install it
 library(cowplot)
-
-if(!require(ggExtra))          # If ggExtra package isn't installed...
-  install.packages("ggExtra")  # Install it
-library(ggExtra)
 
 ```
 
@@ -85,15 +75,13 @@ Let's take a look at these data. And especially, let's look at the relationship 
 I also saved the plot and ran it through the function `ggExtra::ggMarginal()` to add a density plot to the axes, showing us a distribution of the two variables separately as well as together. 
 
 ```{r data-viz}
-p1 <- ggplot(anes2020, aes(x = thermo_biden, y = thermo_harris)) +
+ggplot(anes2020, aes(x = thermo_biden, y = thermo_harris)) +
   geom_jitter(shape=1) + geom_smooth() + 
   labs(title = "Feelings toward Biden and Harris",
        x = "Feelings toward Biden", y = "Feelings Toward Harris",
        caption = "Data: ANES 2020 Post-Election Survey") +
   theme(plot.title = element_text(hjust = .5)) +
   theme_light()
-
-ggMarginal(p1, type = "densigram")
 ```
 
 # OLS Regression
@@ -269,15 +257,13 @@ Make sure you change the chunk options to say`include = TRUE`.
 Complete the graph with the appropriate variable names. 
 
 ```{r tp_viz, eval=FALSE, include=FALSE}
-p1 <- ggplot(anes2020, aes(x = , y = )) +
+ggplot(anes2020, aes(x = , y = )) +
   geom_jitter() +
   labs(title = "Feelings toward Trump and Pence",
        x = "Feelings toward Trump", y = "Feelings Toward Pence",
        caption = "Data: ANES 2020 Post-Election Survey") +
   theme(plot.title = element_text(hjust = .5)) +
   theme_light()
-
-ggMarginal(p1, type = "density")
 ```
 
 
