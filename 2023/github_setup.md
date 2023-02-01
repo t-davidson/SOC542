@@ -51,6 +51,18 @@ You will see a window pop up and then you will return to RStudio when the proces
 
 We will be using something called Github Classroom for the homework assignments. Each homework assignment will be a separate Github repository, where each student gets a personal version. You will need to clone this repository using the same process as in Step 6. You can then submit your solutions by committing changes and pushing them to your repository.
 
+### How to commit changes to the homework
+
+- Save the files you want to update
+- Navigate to the Git tab in RStudio and click the check-box for the file then click `Commit`
+- A dialogue box will open. Add a short message to the `Commit message` box, then click the `Commit` button again.
+- Finally, click the `Push` button with the upwards arrow to send the change to your cloud-based repository
+- Visit the Github webpage for your homework repository and you should see your commit message next to the file name, showing it is updated.
+
+You can commit as many times as you want. I recommend testing this process our before your final submission.
+
+For the final submission, please use the commit message indicated at the bottom of the `.Rmd` file to confirm.
+
 ## On projects
 
 Over the course of the semester you will likely have multiple different Github repositories (main course repo, homeworks, papers).
