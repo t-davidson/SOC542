@@ -14,6 +14,7 @@ library(rstanarm)
 library(viridis)
 library(latex2exp)
 library(tidybayes)
+set.seed(08901)
 ```
 
 We're going to be using the `kidiq` dataset. A subset of data from the National Longitudinal Survey of Youth. You can read a little more about it here: https://mc-stan.org/rstanarm/reference/rstanarm-datasets.html
@@ -36,14 +37,6 @@ summary(model_ols)
 
 
 # Bayesian regression with `stan_glm`
-<!--TD: I think this example does too much. There is a lot to unpack!
-
-Begin with a simple example w/o any modifications. e.g. use all defaults for function options except `prior = NULL` and `prior_intercept = NULL`
-
-Introduce the other arguments below in following examples (let's not worry about family for now). Although this might make the models slightly less comparable (e.g. iter and chains may differ, I think it will be better to incrementally introduce some of the options)
-
-Modify text accordingly.
--->
 
 We will use the `stan_glm` function from `rstanarm` to estimate a series of regression models using the Bayesian approach and will consider how the choice of prior affects the results. 
 
@@ -54,13 +47,8 @@ Let's start with a uniform or "flat" prior. This assumes we are completely ignor
 Running this will print information showing the output of the Hamiltonian Monte Carlo estimation procedure. In this case, we use a single chain with 2000 iterations. The first 1000 are used to optimize the model, the second 1000 to get estimates from the posterior.
 ```{r no-prior}
 bayes_uniform <- stan_glm(kid_score ~ mom_iq, data = kidiq,
-                          family = gaussian(link = "identity"), 
                           prior = NULL,
-                          prior_intercept = NULL,
-                          seed = 12345,  # Seed makes it reproducible by starting with same random number each time 
-                          chains = 1,    # How many chains? 
-                          iter = 2000,   # How many total iterations?
-                          warmup = 1000) # How many of those are to optimize the model first?
+                          prior_intercept = NULL)
 ```
 
 We can view a short summary of the results by printing the model object.
@@ -91,7 +79,7 @@ Note: `rstanarm` discards the "warmup" samples used to calibrate the HMC algorit
 ```{r trace}
 plot(bayes_uniform, "trace", pars = "mom_iq") + 
   labs(y = TeX("$\\beta_1$"), 
-       x = "Iteration") 
+       x = "Iteration") + theme_tidybayes()
 ```
 
 ## Weakly Informative Priors
@@ -100,10 +88,8 @@ Let's rerun this same model but with some slightly more informative priors. Let'
 The argument `refresh = 0` is added to avoid printing out all of the estimation information we saw in the last example.
 ```{r weak-prior}
 bayes_weak_prior <- stan_glm(kid_score ~ mom_iq, data = kidiq,
-                             family = gaussian(link = "identity"),
                              prior = normal(location = 0,   # location = mean
                                             scale = 1),     # scale = sd (not quite, but a good way to think about it)
-                             seed = 12345,  # Seed makes it reproducible
                              refresh = 0)
 print(bayes_weak_prior)
 ```
@@ -113,10 +99,8 @@ print(bayes_weak_prior)
 Let's see what happens if the priors are even stronger. Let's encode a prior that assumes a strong positive relationship between child and mother's IQ. Think for a moment about the implications of such an assumption. We can encode this by adjusting the prior on the coefficient. 
 ```{r strong-prior}
 bayes_strong_prior <- stan_glm(kid_score ~ mom_iq, data = kidiq,
-                               family = gaussian(link = "identity"),
                                prior = normal(location = 10,
                                             scale = 1),
-                               seed = 12345, 
                                refresh = 0)
 print(bayes_strong_prior)
 ```
@@ -153,8 +137,48 @@ ggplot(kidiq,
   theme_light()
 ```
 
+From this plot, we can see that the lines are nearly overlapping. 
+
+We can also view the model output using `modelsummary()`.
+
+```{r modelsummary}
+modelsummary(list("OLS" = model_ols, "Bayes Flat" = bayes_uniform,
+                  "Bayes Weak" = bayes_weak_prior, "Bayes Strong" = bayes_strong_prior),
+             gof_omit = "IC|Log.Lik")
+```
+
+The output at the bottom shows the algorithm used (sampling in this case), alongside the Posterior Sample Size (pss). Remember from earlier that we ran 4 chains, each having 2000 iterations. The first 1000 are thrown away as "warm ups," so we're left with $4*1000=4000$ iterations overall.  
+
+Note that we do not, by default, receive $r^2$, F, or other fit measures for the Bayesian models. This is because it has different values of these for each model it estimated. Fortunately, we can use the `rstanarm::bayes_R2()` function to calculate $r^2$ values for each model, then calculate the means and medians. Lastly, we'll throw that in the bottom of our `modelsummary()` output using the `add_rows` argument. 
+
+
+```{r modelsummary_r2}
+bayesrows <- data.frame(
+  
+  c("Bayes R2 (Mean)", 
+    "Bayes R2 (Median)"),
+  
+  c("", ""), # OLS Model Blanks
+  
+  c(mean(bayes_R2(bayes_uniform)),
+    median(bayes_R2(bayes_uniform))),
+  
+  c(mean(bayes_R2(bayes_weak_prior)),
+    median(bayes_R2(bayes_weak_prior))),
+  
+  c(mean(bayes_R2(bayes_strong_prior)),
+    median(bayes_R2(bayes_strong_prior)))
+)
+
+modelsummary(list("OLS" = model_ols, "Bayes Flat" = bayes_uniform,
+                  "Bayes Weak" = bayes_weak_prior, "Bayes Strong" = bayes_strong_prior),
+             gof_omit = "IC|Log.Lik", add_rows = bayesrows)
+
+```
+
+
 # Post-Estimation Visualization 
-We can visualize the uncertainity around estimates from the Bayesian models by analyzing the posterior distribution. The `gather_draws` function is used to produce a table showing the estimates of the coefficient for mom_iq produced by the MCMC estimation procedure. 
+We can visualize the uncertainty around estimates from the Bayesian models by analyzing the posterior distribution. The `gather_draws()` function is used to produce a table showing the estimates of the coefficient for `mom_iq` produced by the MCMC estimation procedure. 
 
 The `tidybayes` package has lots of useful functions for plotting these results. In this case, we can see the entire posterior distribution, along with a summary. The point indicates the *median* of the posterior distribution and the bars the 66% and 95% *highest posterior density intervals*.
 ```{r post-model-viz1}
@@ -171,11 +195,8 @@ d1 %>%
 
 We can calculate the same summaries for the other models and plot them together.
 ```{r post-model-viz2}
-d2 <- bayes_strong_prior %>% 
-  gather_draws(mom_iq)
-
-d3 <- bayes_weak_prior %>% 
-  gather_draws(mom_iq)
+d2 <- bayes_strong_prior %>% gather_draws(mom_iq)
+d3 <- bayes_weak_prior %>% gather_draws(mom_iq)
 
 d1$model <- "Uniform"
 d2$model <- "Weak"
@@ -190,11 +211,9 @@ ols_se <- o[[2, "std.error"]]
 d %>%
   ggplot() +
   stat_halfeye(aes(
-    y = model, 
-    x = .value, 
-    group = model,
-    fill = model, 
-    alpha = .75)) +
+    y = model,  x = .value, 
+    group = model, fill = model), 
+    alpha = .7) +
   geom_pointrange(aes(
     y = "OLS",
     x = ols_coef,
@@ -208,8 +227,6 @@ d %>%
   theme_light() + 
   theme(legend.position = "none",
         panel.grid.major.y = element_blank())
-# TD: Pedantic, but is there a way to get alpha to only apply to density
-# Currently it also applies to the error bars and makes them a little hard to see...
 ```
 
 Here's another example of a way we can express the uncertainty contained in the estimates.
@@ -236,7 +253,7 @@ d %>%
 ```
 
 
-# Posterior predictive checks
+## Posterior predictive checks
 One way to evaluate the performance of our models is simulate data from the posterior distribution and to compare it to the original data. This is called *posterior predictive* check. 
 
 The dark line shows the distribution of the outcome, child's IQ. The blue lines show 100 simulated draws from the posterior distribution. We can see a couple of useful takeaways here. First, the shape of the outcome is asymmetrical. Second, we can see that the density of the draws is a little to the left of the peak of the outcome.
@@ -256,18 +273,18 @@ ggpubr::ggarrange(pp_uniform, pp_weak, pp_strong,
 
 Let's compare the mean and standard deviation for samples and the data to get a better look at this. 
 ```{r posterior-check-scatter}
-pp_check(bayes_weak_prior, plotfun = "stat_2d", stat = c("mean", "sd")) + theme_tidybayes()
+pp_check(bayes_weak_prior, plotfun = "stat_2d", 
+         stat = c("mean", "sd")) + 
+  theme_tidybayes()
 ```
 
-# Prior predictive simulations
+## Prior predictive simulations
 One of the ways we can understand our priors is to use a *prior predictive simulation*. This allows us to see simulated data from our model before it has seen any data. We can easily do this by setting `prior_PD = TRUE`. 
 ```{r prior-predictive}
 bayes_weak_pp <- stan_glm(kid_score ~ mom_iq, data = kidiq,
-                          family = gaussian(link = "identity"),
                           prior = normal(location = 0,
                                          scale = 1),
                           prior_PD = TRUE,
-                          seed = 12345, 
                           refresh = 0)
 print(bayes_weak_pp)
 
@@ -285,20 +302,15 @@ Above, we saw that there were only minuscule differences between the OLS the Bay
 small_kidiq <- slice_sample(kidiq, n = 50)
 
 small_ols <- lm(kid_score ~ mom_iq, data = small_kidiq)
-small_bayes_unif <- stan_glm(kid_score ~ mom_iq, data = kidiq,
-                             family = gaussian(link = "identity"), 
-                             prior = NULL,
-                             prior_intercept = NULL,
-                             seed = 12345, refresh = 0,
-                             chains = 1, iter = 2000, warmup = 1000) 
-small_bayes_weak <- stan_glm(kid_score ~ mom_iq, data = kidiq,
-                             family = gaussian(link = "identity"),
+small_bayes_unif <- stan_glm(kid_score ~ mom_iq, data = small_kidiq,
+                             prior = NULL, prior_intercept = NULL,
+                             refresh = 0) 
+small_bayes_weak <- stan_glm(kid_score ~ mom_iq, data = small_kidiq,
                              prior = normal(location = 0, scale = 1), 
-                             seed = 12345, refresh = 0)
-small_bayes_strong <- stan_glm(kid_score ~ mom_iq, data = kidiq,
-                               family = gaussian(link = "identity"),
+                             refresh = 0)
+small_bayes_strong <- stan_glm(kid_score ~ mom_iq, data = small_kidiq,
                                prior = normal(location = 10, scale = 1),
-                               seed = 12345, refresh = 0)
+                               refresh = 0)
 
 ```
 
@@ -340,7 +352,6 @@ e %>%
        x = "Coefficient Estimate") +
   theme(legend.position = "none",
         panel.grid.major.y = element_blank())
-
 
 ```
 
