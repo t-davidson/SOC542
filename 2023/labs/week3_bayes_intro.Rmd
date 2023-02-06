@@ -14,6 +14,11 @@ library(rstanarm)
 library(viridis)
 library(latex2exp)
 library(tidybayes)
+
+library(modelsummary)
+library(broom.mixed)
+options(modelsummary_get = "broom")
+
 set.seed(08901)
 ```
 
@@ -172,7 +177,8 @@ bayesrows <- data.frame(
 
 modelsummary(list("OLS" = model_ols, "Bayes Flat" = bayes_uniform,
                   "Bayes Weak" = bayes_weak_prior, "Bayes Strong" = bayes_strong_prior),
-             gof_omit = "IC|Log.Lik", add_rows = bayesrows)
+             gof_omit = "IC|Log.Lik", 
+             add_rows = bayesrows)
 
 ```
 
@@ -199,8 +205,8 @@ d2 <- bayes_strong_prior %>% gather_draws(mom_iq)
 d3 <- bayes_weak_prior %>% gather_draws(mom_iq)
 
 d1$model <- "Uniform"
-d2$model <- "Weak"
-d3$model <- "Strong"
+d2$model <- "Strong"
+d3$model <- "Weak"
 
 d <- bind_rows(d1, d2, d3)
 
@@ -220,7 +226,7 @@ d %>%
     xmin = ols_coef - 1.96 * ols_se,
     xmax = ols_coef + 1.96 * ols_se,
     )) +
-  scale_fill_viridis_d() + 
+  scale_fill_viridis_d() +
   theme_tidybayes() +
   labs(y = "Model",
        x = "Coefficient Estimate") +
