@@ -94,11 +94,9 @@ Now that we have them created, we'll throw these into the `modelsummary()` funct
 2.  And then we can create a vector that specifies the names we had in our original models and what we would like them to be called in the output table. (Because it has to be confusing, or it wouldn't be R, this takes the form `"old_name" = "New Name"`.) This also gives us a chance to reorder the coefficients, so I've moved the intercept term to the bottom, where we would normally see it in a regression table in a published article.
 
 3.  In the `modelsummary()` function, we first include the list of our models. We could stop there and be fine. However, let's also make a few customizations: 
-
     -   Add in our coefficient names into the `coef_map` argument.
     -   Tell it to give us significance stars. 
-    -   Specify which test statistics we want. In this case, I want the standard error and t-value. I can put these into a vector so they appear on different lines. I also gave them prefixes so it's clear which is which.
-    -   Omit any "goodness-of-fit" (or "`gof`") statistics aside from the number of observations (for all models) and the $r^2$.
+    -   Omit any "goodness-of-fit" (or "`gof`") statistics aside from the number of observations (for all models) and the $r^2$ and F-statistic.
     -   Give our table a title.
 
 ```{r freq-model-comp}
@@ -116,9 +114,7 @@ coef_names <- c("hh_comp" = "Computer Ownership",
 
 modelsummary(model_list, coef_map = coef_names,
              stars = T,
-             statistic = c("s.e. = {std.error}", 
-                           "t = {statistic}"),
-             gof_omit = "IC|Log|alg|RMSE|F",
+             gof_omit = "IC|Log|alg|RMSE",
              title = "Frequentist Regression Output: County Median HH Income")
 
 ```
@@ -214,28 +210,17 @@ prior_summary(bayes_flat_mod)
 
 ## Specified Priors
 
-Let's also create a model with specified priors. In this case, I approximated locations at 1, 1, and 0, with standard deviations of 1. The intercept in my previous multivariate model was around -16, so I'll put it there. - Feel free to play around with them, too. See what'll happen if you do a model with really large priors. Or one with very precise priors (small scales).
-
-Because we have more than one independent variable, we need to save our priors in a list to add to the model.
+Let's also create a model with alternative priors. In this case, we `rstanarm` provides defaults for each prior. To use the defaults, we can just run the model without specifying any priors.
 
 ```{r bayes-prior-model}
-# Specifying priors
-myprior_coef <- normal(location = c(1,1,0),
-                       scale = c(1,1,1))
-myprior_int <- normal(location = -16, scale = 2)
-
 # Model 
 bayes_prior_mod <- stan_glm(hhinc_med_thou ~ perc_white + hs_grad + hh_comp,
                             data = counties, seed = seed,
-                            chains = 4, refresh = 0,
-                            
-                            # Adding priors here 
-                            prior = myprior_coef, 
-                            prior_intercept = myprior_int)
+                            chains = 4, refresh = 0)
 print(bayes_prior_mod, digits = 2, detail = T) 
 ```
 
-Since we specified priors in this model, let's make sure they came through correctly.
+We can look at the prior summary to see the defaults used. In this case, we can see that it used normal distributions for the intercept and coefficients, and an exponential prior for sigma.
 
 ```{r bayes-prior-sum}
 prior_summary(bayes_prior_mod)
@@ -246,7 +231,7 @@ We can also visualize our model like we did last week. First, we `gather_draws()
 ```{r bayes-gather-draws-prior}
 draws_prior <- bayes_prior_mod %>% 
   gather_draws(perc_white, hs_grad, hh_comp) %>% 
-  mutate(model = "Bayes Prior")
+  mutate(model = "Bayes Default")
 head(draws_prior)
 ```
 
@@ -268,7 +253,7 @@ Because we estimated 1000 models in each of our Bayes estimates, we also have 10
 ```{r bayes-r2}
 
 bayes_prior_r2 <- bayes_R2(bayes_prior_mod) %>% 
-  as.data.frame() %>% mutate(model = "Specified Priors")
+  as.data.frame() %>% mutate(model = "Default Priors")
 bayes_flat_r2 <- bayes_R2(bayes_flat_mod) %>% 
   as.data.frame() %>% mutate(model = "Flat Priors")
 
@@ -301,12 +286,12 @@ ggplot() +
 
 ## Model Comparison Table
 
-Finally, let's compare all three of our models we made today. We can use the `modelsummary()` function from earlier to put them all into a table.
+Finally, let's compare all three of our models we made today. We can use the `modelsummary()` function from earlier to put them all into a table. The results show how the data quickly overwhelmed the prior. In both cases, the Bayesian estimates are almost identical to those from the OLS model.
 
 ```{r compare-table, message=FALSE}
 model_list <- list("OLS Multivariate" = ols_multi, 
                    "Bayes: Flat Prior" = bayes_flat_mod, 
-                   "Bayes: Specified Prior" = bayes_prior_mod)
+                   "Bayes: Default Prior" = bayes_prior_mod)
 
 # coef_names <- c("hh_comp" = "% HH's w/Comp.",
 #                 "hs_grad" = "% HS Grad",
@@ -376,4 +361,11 @@ ggplot() +
   theme(legend.position = "none",
         plot.title = element_text(hjust = .5))
 
+```
+
+# Posterior predictive checks
+
+We can also use the Bayesian model to get a sense of how well the model fits the data.
+```{r posterior predictive check}
+pp_check(bayes_prior_mod)
 ```
