@@ -287,7 +287,7 @@ X <- cbind(Intercept,x,z)
 Betas <- solve(t(X) %*% X) %*% (t(X)  %*% y)
 print(t(Betas))
 
-m <- lm(y ~ x + x + z)
+m <- lm(y ~ x + z)
 print(m$coefficients)
 ```
 \tiny `t()` is the transpose operation, `solve()` finds the inverse of a matrix, and `%*%` is the matrix multiplication operator.
@@ -372,8 +372,6 @@ ggplot(aes(y = r2a, k), data = d) + geom_line(color = "red") + geom_point() +
 - Instead, we use posterior simulations to repeat the calculation across all samples from the posterior.
 - Bayesian $R^2$ therefore has a posterior distribution.\footnote{\tiny "Everything that depends upon parameters has a posterior distribution" - McElreath 98.} We can summarize this into a single metric using the same approach as the regression coefficients, e.g. using the median of the posterior distribution.\footnote{\tiny See GHV 170-171}
 
-
-
 # Multiple regression
 ## Significance tests: t-tests
 - Like simple linear regression, we can interpret the statistical significance of regression coefficients using the t-statistics.
@@ -385,7 +383,7 @@ $$t = \frac{\hat{\beta_k}-0}{SE(\hat{\beta_k})} = \frac{\hat{\beta_k}}{SE(\hat{\
 
 # Multiple regression
 ## Confidence interval
-- Most regression software provides a 95% confidence interval around each estimate. For $\beta_k$ this would take the following form:
+- Most regression software provides a 95% confidence interval around each estimate. For $\beta_j$ this would take the following form:
 
 $$[\hat{\beta_j}-1.96SE(\hat{\beta_j}), \hat{\beta_j} + 1.96SE(\hat{\beta_j})]$$
 
@@ -444,7 +442,7 @@ summary(m.both)
 # Multiple regression
 ## Multicollinearity
 - \textbf{Multicollinearity} occurs when a predictor $x$ is highly correlated one or more other predictors $z$.
-    - \textbf{Perfect multicollinearity} arises when $cor(x,z) = 1$ or $ -1$.
+    - \textbf{Perfect multicollinearity} arises when $cor(x,z) = 1$ or -1.
         - Usually due to some type of misspecification. e.g. accidentally including the same variable twice.
     - \textbf{Imperfect multicollinearity} means that two or more regressors are highly correlated.
 
