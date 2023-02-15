@@ -403,7 +403,7 @@ modelsummary(model_list,
                           "estimate",          # And only the estimate for the other two models
                           "estimate"),
              notes = c("+ p < 0.1, * p < 0.05, ** p < 0.01, *** p < 0.001", # Explaining the stars
-                       "Not every independent variable shown",
+                       "Not shown: Work hours, sex, degree",
                        "Reference Categories: Male, Black, Democrat"),
              coef_map = coef_names,
              gof_omit = "IC|Log|alg|pss|RMSE|F",
