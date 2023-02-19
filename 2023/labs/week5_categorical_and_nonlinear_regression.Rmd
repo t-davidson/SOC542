@@ -30,11 +30,11 @@ seed <- 08901
 
 Let's bring back our old friend, the General Social Survey!
 
-You may be wondering why we waited so long to get to it this semester. The reason is because it doesn't have as many continuous variables as we would've liked, making it hard to illustrate concepts in linear regression. But, now that we know how to incorporate dummy, indicator, and non-linear variables, it can take its rightful place as the peak in our course data-verse. 
+You may be wondering why we waited so long to get to it this semester. The reason is because it doesn't have many continuous variables, making it hard to illustrate concepts in linear regression. But, now that we know how to incorporate dummy, indicator, and non-linear variables, it can take its rightful place as the peak in our course data-verse. 
 
-We're going to work with the 2018 data. The file is currently saved in the project folder, under "lab_data." With R projects, we can save data in a folder and load it each time with only the reference to it's location within the folder relative to the RMarkdown document. In other words, the code below will work for everyone, and you won't have to find your working directory and alter it (A+ for reproducability!).
+We're going to work with the 2018 data. The file is currently saved in the project folder, under "lab_data." With R projects, we can save data in a folder and load it each time with only the reference to it's location within the folder relative to the RMarkdown document. In other words, the code below will work for everyone, and you won't have to find your working directory and alter it (A+ for reproducibility!).
 
-Today, we're going to investigate the effects that hours of work, occupational prestige, educational degree, sex, race, age,  and political party have on a person's earned income. 
+Today, we're going to investigate the effects that hours of work, occupational prestige, educational degree, sex, race, age, and political party have on a person's earned income. 
 ```{r gss-load-select}
 gss2018 <- readRDS("lab_data/GSS2018.Rds")
 
@@ -73,7 +73,7 @@ gss <- gss %>%
       ),
     weight = wtss
     ) %>% 
-  select(-hrs1, -wtss, - prestg10) %>%  # Removing the original work hours and weight variables 
+  select(-hrs1, -wtss, -prestg10) %>%  # Removing the original work hours and weight variables 
   drop_na() # Dropping rows missing on any variable
 ```
 
@@ -98,7 +98,6 @@ datasummary_balance( ~ 1,
 If you'd like to reproduce the tables from last week and create a new table for categorical data, you can run the same code, including an argument specifying that the variables you want summarized are `type = "categorical"`. The default option is `type = numeric`, so you don't have to specify it if you don't want to, but it can be nice to include. 
 
 ```{r data-sum-double-table}
-
 datasummary_skim(gss,
                  type = "numeric",
                  title = "Sample Descriptive Statistics: Continuous Variables",
@@ -108,7 +107,6 @@ datasummary_skim(gss,
                  type = "categorical",
                  title = "Sample Descriptive Statistics: Categorical Variables",
                  notes = "Data: 2018 General Social Survey")
-
 ```
 
 
@@ -118,7 +116,7 @@ datasummary_skim(gss,
 
 ## Model Specification
 
-Today, we're going to use GSS data to examine factors that might influence a person's earned annual income. We're think that a person's age will play a role in this, since people who have worked longer probably will make more money. Similarly, a person who works more hours will earn more. We also think that people with higher-prestige careers (physicians, engineers, etc) will be compensated for such prestige. Lastly, we want to account for any differences in race and sex. 
+Today, we're going to use GSS data to examine factors associated with a person's earned annual income. We're think that a person's age will play a role in this, since people who have worked longer probably will make more money. Similarly, a person who works more hours will earn more. We also think that people with higher-prestige careers (physicians, engineers, etc) will be compensated for such prestige. Lastly, we want to account for any differences by race and sex. 
 
 Let's start with a simple model that only include three continuous variables and two categorical ones. Our model takes the form: $$\widehat{income} = \beta_0 + \hat{\beta}_{Age} + \hat{\beta}_{Work Hours} + \hat{\beta}_{Prestige} + \hat{\beta}_{Sex} + \hat{\beta}_{Race} + u$$
 
@@ -141,7 +139,7 @@ This is all what we've done last week, interpreting regression output for contin
 
 Note, however, that male, white, and black each have their own coefficients. Instead of having a $\hat{\beta}$ for the categories of race or sex, we create a new one for each dummy: $$\widehat{income} = \beta_0 + \hat{\beta}_{Age} + \hat{\beta}_{Work Hours} + \hat{\beta}_{Prestige} + \hat{\beta}_{Female} + \hat{\beta}_{White} + \hat{\beta}_{Other} + u$$
 
-So instead of multiplying `r round(ols1[["coefficients"]][["sexMale"]],2)` by some abstract value of `sex`, we multiply it times 1 if the person is male, and by 0 if they are male. Essentially, we're adjusting the intercept term, not the slope. 
+So instead of multiplying `r round(ols1[["coefficients"]][["sexMale"]],2)` by some abstract value of `sex`, we multiply it times 1 if the person is male, and by 0 if they are female. Essentially, we're adjusting the intercept term, not the slope. 
 
 And the same goes for race: We multiply `r round(ols1[["coefficients"]][["raceWhite"]],2)` times 1 if they are white, or by 0 if they are Black or another race, then  multiply `r round(ols1[["coefficients"]][["raceOther"]],2)` times 1 if they are "other", or by 0 if they are white or Black. 
 
@@ -160,6 +158,7 @@ For example, let's estimate a person's income, knowing that they were a 57 year-
 
 While it's possible to do this by hand, it's even easier to input the new person's information into a dataframe with these variables and `predict()` the value using R. 
 
+Try modifying the values to see how the predicted income changes.
 ```{r ols-predict}
 newperson <- data.frame(age = 57,
                         prestige = 70,
@@ -237,7 +236,7 @@ logincplot <- ggplot(gss) + geom_density(aes(logincome))
 logthouincplot <- ggplot(gss) + geom_density(aes(logthouinc))
 
 ggpubr::ggarrange(origincplot, thouincplot, logincplot, logthouincplot)
-```
+``` 
 
 Now, let's try a series of regressions to see what differences, if any, exist when we make these changes. 
 
@@ -267,7 +266,7 @@ We can see here that scaling only shifts the direction of variables, but has no 
 
 Now, let's try another transformation. This time, let's estimate the number of year's a person has been working by subtracting 18 years from their age. While we're here, let's also see what happens if we square the term. 
 
-We use a square term when we hypothesize a U-shape to the effect. That is, when we suspect the effect will *increase at an increasing rate OR decrease at an increasing rate*. 
+We use a square term when we hypothesize a U shaped or inverse-U shaped relationship. That is, when we suspect the effect will be non-linear. 
 
 ```{r data-man-trans}
 gss <- gss %>% 
@@ -278,7 +277,7 @@ gss %>%
   datasummary_skim(title = "Summary Statistics of Transformed Work Experience Variables")
 ```
 
-Let's now test out whether these two data transformations affect our models. Below I've modeled whether age, work experience (equal to $age - 18$), work experience squared are better fits in the model. Lastly, I include a model with both work experience and work experience squared. 
+Let's now test out whether these two data transformations affect our models. Below I compare age and work experience (equal to $age - 18$). Lastly, I include a model with both work experience and work experience squared. 
 
 ```{r ols-transform-age}
 
@@ -286,13 +285,11 @@ ols_age <- lm(logincome ~ age + workhrs + sex,
                    data = gss)
 ols_work <- lm(logincome ~ workexp + workhrs + sex,
                    data = gss)
-ols_worksq <- lm(logincome ~ worksq + workhrs + sex,
-                   data = gss)
 ols_work_worksq <- lm(logincome ~ workexp + worksq + workhrs + sex,
                    data = gss)
 wrkcoefs <- c("age" = "Age", "workexp" = "Work Experience",
               "worksq" = "Work Experience ^2", "sexMale" = "Male", "workhrs" = "Work Hours")
-modelsummary(list(ols_age, ols_work, ols_worksq, ols_work_worksq),
+modelsummary(list(ols_age, ols_work,  ols_work_worksq),
              coef_map = wrkcoefs, stars = T, gof_omit = "F|RMSE|Log|IC",
              title = "Effect of Data Transformations: Square Terms")
 
