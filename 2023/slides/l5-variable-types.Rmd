@@ -1,0 +1,650 @@
+---
+title: "SOC542 Statistical Methods in Sociology II" 
+subtitle: "Dummy, Categorical, and Non-Linear Variables"
+author: Thomas Davidson
+institute: Rutgers University
+date: February 20, 2023
+urlcolor: blue
+output:
+    beamer_presentation:
+      theme: "Szeged"
+      colortheme: "beaver"
+      fonttheme: "structurebold"
+      toc: false
+      incremental: false
+      fig_width: 3.5
+      fig_height: 2.5
+header-includes:
+  - \usepackage{hyperref}
+  - \usepackage{multicol}
+  - \usepackage{caption}
+  - \usepackage{booktabs}
+  - \usepackage{siunitx}
+  - \newcolumntype{d}{S[input-symbols = ()]}
+  - \captionsetup[figure]{font=scriptsize}
+  - \captionsetup[figure]{labelformat=empty}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(dev = 'pdf')
+library("knitr")
+library("formatR")
+
+opts_chunk$set(tidy.opts=list(width.cutoff=80),tidy=TRUE)
+opts_chunk$set(tidy = FALSE)
+
+knitr::knit_hooks$set(mysize = function(before, options, envir) {
+  if (before) 
+    return(options$size)
+})
+
+knitr::opts_chunk$set(
+ fig.width = 4,
+ fig.asp = 0.8,
+ out.width = "70%",
+ fig.align = "center"
+)
+
+set.seed(08901)
+
+library(ggplot2)
+library(tidyverse)
+library(latex2exp)
+library(kableExtra)
+
+options("modelsummary_format_numeric_latex" = "plain")
+```
+
+# Course updates
+- Homework 2 released after class
+    - Multivariate regression: specification, estimation, and interpretation
+    - Due next Tuesday (2/27) at 5pm via Github Classroom
+    
+# Paper propsals
+- Plan for final paper
+    - Relevant literature and research question(s)
+        - Literature review does not need to be exhaustive!
+    - Data
+        - Outcome variable
+        - Key predictors
+    - Methodology
+        - Regression approach
+- Due 7/3 at 5pm (via email)
+
+# Plan
+- Dummy variables
+- Categorical variables
+- Logarithms
+- Polynomials
+
+# Dummy variables
+## Definitions
+- A \textbf{dummy variable} is used to measure the difference between two possible states.
+- Dummy variables are binary, taking a value of either zero or one.
+- These values stand in for social categories of interest.
+    - e.g. Male/female, employed/unemployed, liberal/conservative.
+    
+# Dummy variables
+## Dummy variables as random variables
+- We can generate dummy variables using the Binomial distribution, where $P(x=1) = p$ and $P(x=0) = 1-p$.
+
+$$x \sim Binomial(N,p)$$
+
+# Dummy variables
+## A simple model
+```{r dummy-generator, echo =TRUE, mysize=TRUE, size='\\footnotesize'}
+N <- 10000
+x <- rbinom(N, 1, .4) # p = .4
+y <- 3*x + rnorm(N, 10, 1)
+m <- lm(y ~ x)
+round(m$coefficients,2)
+```
+
+# Dummy variables
+## Interpretation
+```{r simple-interpretation, echo=TRUE, mysize=TRUE, size='\\footnotesize'} 
+as.data.frame(cbind(x,y)) %>% group_by(x) %>% 
+    summarize(mean = mean(y)) %>% as.matrix()
+```
+
+
+# Dummy variables
+## Interpretation
+- The coefficient represents the expected difference in the outcome when $x = 1$ compared to $x = 0$.
+- Consider the following population model, predicting income as a function of union membership. 
+
+$$Income = \beta_0 + \beta_1 Union + u$$
+
+-  $\beta_1$ represents the expected difference in income for union members compared to non-union members.
+- The dummy variable also impacts the meaning of the intercept $\beta_0$, which is the average income for non-unionized workers.
+
+
+# Dummy variables
+## Example: Union wage returns
+```{r union-returns, echo=TRUE, mysize=TRUE, size='\\footnotesize'} 
+gss <- haven::read_dta("../../2022/labs/lab-data/GSS2018.dta")
+
+data <- gss %>% select(realrinc, union, sex) %>%
+    drop_na(realrinc, union) %>%
+    mutate(union_dummy = ifelse(union == 1, "U", "nU"),
+           sex = ifelse(sex == 1, "Male", "Female"))
+
+u.reg <- lm(realrinc ~ union_dummy, data = data)
+print(u.reg)
+```
+
+# Dummy variables
+## Example: Union wage returns
+```{r union-returns-2, echo=TRUE, mysize=TRUE, size='\\footnotesize'} 
+means <- data %>% group_by(union_dummy) %>% 
+    summarize(m = mean(realrinc))
+print(means)
+mean.nonunionized <- means %>% filter(union_dummy == "nU")
+print(mean.nonunionized$m + u.reg$coefficients[2])
+```
+
+
+# Dummy variables
+## Reference category
+- The interpretation of the model depends on which value we assign to 1 or 0.
+    - The value assigned to 0 is known as the \textbf{reference category}.
+- For a statistical perspective, the choice is arbitrary. 
+- But often there are theoretical reasons for selecting a certain reference category and the choices encode certain assumptions about the social world.\footnote{\scriptsize See Johfre and Freese (2021) for further discussion of reference categories.}
+
+# Dummy variables
+## Reversing the reference category
+```{r reverse, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+x.rev <- ifelse(x, 0, 1)
+m2 <- lm(y ~ x.rev)
+round(m2$coefficients,2)
+```
+
+# Dummy variables
+## Removing the reference category
+If we estimate a model with no intercept then we get a separate parameter for each category.
+```{r no-intercept, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+u.reg.ni <- lm(realrinc ~ 0 + union_dummy, data = data)
+print(coefficients(u.reg.ni))
+
+diff <- coefficients(u.reg.ni)[2] - coefficients(u.reg.ni)[1]
+print(diff[[1]])
+
+print(coefficients(u.reg)[2])
+```
+
+# Dummy variables
+## Removing the reference category
+- In the model with no intercept we get a separate coefficient for each category.
+- The difference between these coefficients is equivalent to the dummy variable in the model with the intercept.
+
+$$\beta_{Union} =  \beta_{NoUnion}^* - \beta_{Union}^*$$
+
+# Dummy variables
+## Multiple dummy variables
+- A multiple regression model can include more than one dummy variable.
+- The interpretation of each coefficient is now the difference *holding other variables at their means*.
+- The intercept is the mean value of the outcome when all dummy variables are zero.
+
+
+# Dummy variables
+## Multiple dummy variables
+This model of union wage returns includes a dummy variable for sex. What is the reference category and how can we interpret the intercept?
+```{r multiple-dummies, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+u.reg2 <- lm(realrinc ~ union_dummy + sex, data = data)
+print(u.reg2)
+```
+
+<!-- Commented out some more advanced material. Interesting but may get a little confusing.
+# Dummy variables
+## Model specification and priors
+- McElreath discusses an alternative method of specifying dummy variables called \textbf{index variables}. 
+- Consider the simple model, where $\beta_0$ represents the average income for non-unionized workers.
+
+$$Income = \beta_0 + \beta_1 Union + u$$
+
+- Consider $\beta_0$. Do we expect the posterior distribution to be the same if we reverse the reference category? What does this imply about the prior on $\beta_0$?
+
+# Dummy variables
+## Model specification and priors
+- There are two problems that arise when trying to determine the prior for $\beta_0$:
+    1. $\beta_0$ is the average income for the reference group. It is not clear what a reasonable expection is.
+    2. We assume more uncertainty about one of the groups:
+        - The predicted income of non-unionized workers requires a single parameter, $\beta_0$, whereas the predicted income of unionized workers requires two parameter, $\beta_0$ and $\beta_1$.
+- In practice, these issues tend to "wash out" if we have a lot of data.
+
+# Dummy variables
+## Model specification and priors
+- McElreath recommends estimating the following model without an intercept:
+
+
+$$Income = \beta_1^* Union + \beta_2^* NonUnion + u$$
+
+- Here the $*$ denotes that $\beta_1^* \neq \beta_1$ in the previous model.
+- $\beta_1^*$ is the average income for unionized workers and $\beta_2^*$ is the average income for non-unionized workers.
+    - The prior on either coefficient is now more straightforward to define.
+    
+
+# Dummy variables
+## Model specification and priors
+- We can get the typical dummy estimate directly from this model:
+
+
+$$\beta_1 =  \beta_1^* - \beta_2^*$$
+
+
+- In a Bayesian regression, the posterior distribution for $\beta_1$ can be obtained by taking the difference between the posterior distributions (McElreath refers to this as a *contrast*).
+    
+
+# Dummy variables
+## Model specification and priors
+```{r index-var, echo = TRUE, mysize=TRUE, size='\\footnotesize', warning=FALSE}
+library(rstanarm)
+data$union_dummy <- as.factor(data$union_dummy)
+sm1 <- stan_glm(realrinc ~ union_dummy,  data = data, 
+                family = "gaussian", chains =1 , refresh = 0)
+sm2 <- stan_glm(realrinc ~ 0 + union_dummy,  data = data, 
+                family = "gaussian", chains =1 , refresh = 0)
+sm1$coefficients
+sm2$coefficients
+```
+\tiny Note: `as.factor()` is used to specify that `z` should be treated as a variable composed of two discrete categories.
+
+# Dummy variables
+## Recovering the difference
+```{r diff, echo=TRUE, mysize=TRUE, size='\\footnotesize'}
+library(tidybayes)
+posterior <- sm2 %>% spread_draws(union_dummynU, union_dummyU)
+posterior$contrast <- posterior$union_dummyU - posterior$union_dummynU
+head(posterior)
+print(median(posterior$contrast))
+```
+
+# Dummy variables
+## Recovering the difference
+We can do the same in frequentist models, but it is unnecessary since there are no priors and additional calculations are required to test whether the difference is statistically significant.
+```{r freq-version, echo=TRUE, mysize=TRUE, size='\\footnotesize'}
+m.d <- lm(realrinc ~ union_dummy, data = data)
+print(coefficients(m.d)[2]) # dummy coefficient
+m.i <- lm(realrinc ~ 0 + union_dummy, data = data)
+diff <- coefficients(m.i)[2] - coefficients(m.i)[1]
+print(diff) # diff
+```
+-->
+
+
+
+# Categorical variables
+## More than two categories
+- \textbf{Categorical variables} are a generalization of dummy variables to more than two categories.
+    - e.g. Race/ethnicity, highest level of education, region.
+- Categories can be \textbf{ordinal}, indicating some type of numerical ranking, or \textbf{nominal}.
+
+
+# Categorical variables
+## Categorical variables as dummy variables
+```{r cat-gen, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+cats <- sample(c("a", "b", "c"), 10000, replace=TRUE,
+               prob=c(0.2, 0.2, 0.6))
+print(cats[1:10])
+
+a <- ifelse(cats == "a", 1,0)
+b <- ifelse(cats == "b", 1,0)
+c <- ifelse(cats == "c", 1,0)
+y <- 0.3*b + rnorm(N)
+```
+
+# Categorical variables
+## Reference categories and regression results
+The only difference between these models is the order. By default, the last value will be used as the reference category.
+```{r ref-cats, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+m4 <- lm(y ~ a + b + c)
+m5 <- lm(y ~ c + a + b)
+m6 <- lm(y ~ b + c + a)
+```
+
+
+# Categorical variables
+## Reference categories and regression results
+```{r ref-cats-sum, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+library(modelsummary)
+modelsummary(list(m4, m5, m6), star = TRUE, gof_omit = "Log|AIC|BIC|F", stars = TRUE, output = "latex")
+```
+
+# Categorical variables
+## Interpretation
+- Let's assume we run a survey in North America and find out respondents' country of residence. We want to estimate the following model, using USA as a reference category:
+
+$$Income = \beta_0 + \beta_1Canada + \beta_2Mexico + u$$
+
+- $\beta_0$ represents the average income for respondents in the USA.
+- $\beta_1$ represents the expected difference between Canada and the USA.
+- $\beta_2$ represents the expected difference between Mexico and the USA.
+
+
+# Categorical variables
+## Degrees of freedom
+- Each additional category uses up a degree of freedom in our model.
+    - Be careful when including variables with many categories (e.g. state of residence)
+- Sometimes it may be defensible to treat *ordinal* variables as if they are continuous.
+    - This only uses one degree of freedom.
+    - Unit increases should be constant for all values and have a linear interpretation.
+        - e.g. We have categories $a$, $b$, and $c$ we could translate these values to the sequence $1$, $2$, $3$. In this case, $b-a = c-b$.
+        
+# Categorical variables
+## Encoding and categorical variables
+- Categorical data in surveys is often coded as numeric. This can lead to misleading results since we might consider *nominal* categories as *ordinal*. Consider the example below using the region variable in the GSS.
+
+```{r gss-cats, echo=TRUE, mysize=TRUE, size='\\footnotesize'}
+coefficients(lm(realrinc ~ region, data = gss))
+```
+
+
+# Categorical variables
+## Encoding and categorical variables
+- We can fix this by casting the variable as a factor.
+```{r gss-cats2, echo=TRUE, mysize=TRUE, size='\\footnotesize'}
+gss$region <- as.factor(gss$region)
+coefficients(lm(realrinc ~ region, data = gss))
+```
+
+<!--
+# Categorical variables
+## Fixed effects
+- Categorical variables are sometimes considered as \textbf{fixed effects}.
+- Roughly speaking, fixed effects are used like controls soak up variance in a model in order to compare across units.
+
+
+$$Income = \beta_0 + \beta_1Female + \gamma State + u$$
+
+- Here $\gamma$ is a $50-1$ length vector of coefficients, representing the difference in income between each state and a reference state.
+- $\beta_0$ is the average income for men in the reference state.
+- $\beta_1$ can therefore be interpreted as the expected difference in income between males and females, net of differences between states.
+-->
+
+# Non-linear variables
+## Specifying non-linearities
+- Recall that OLS regression is linear *in parameters*.
+- This does not require that predictors or outcomes vary in a linear way.
+- We will consider how logarithms and polynomials allow us to specify non-linear relationships between variables.
+
+# Logarithms
+## Logarithms and the exponential function
+- The \textbf{exponential function} raises a *base* $b$ is raised to a power\footnote{\scriptsize Note how this differs from the power function, where we raise $x$ to a specified power. E.g. $power(x, 2) = x^2$} $x$.
+
+$$exp(x) = b^x$$
+
+- The \textbf{logarithm} is the *inverse* of exponentiation.
+$$log_b(b^x) = x$$
+
+
+# Logarithms
+## Logarithms and the exponential function
+- Here are some examples of common bases:
+
+$$log_2(2^{4}) = 4$$
+
+$$log_{10}(10^4) = 4$$
+
+- The \textbf{natural logarithm} uses the constant $e \approx 2.71828$ as its base:
+
+$$log_e(e^4)  = 4$$
+
+
+
+# Logarithms
+## Logarithms and exponents
+- We can easily verify this in R using the `log` function with specified bases:
+
+```{r log-examples, echo = TRUE, mysize=TRUE, size='\\footnotesize'} 
+log(2^4, base = 2)
+log(10^4, base = 10)
+log(exp(1)^4)
+```
+
+- The default base is $e$. Thus, `exp(1)` $= e^1 = e$.
+
+# Logarithms
+## Graphing logarithms
+```{r log-graph, echo = FALSE, mysize=TRUE, size='\\footnotesize'} 
+x <- 1:1000
+lx <- log(x)
+lx2 <- log(x, base = 2)
+lx10 <- log(x, base = 10)
+df <- as.data.frame(cbind(x, lx, lx2, lx10))
+colnames(df) <- c("x", "e", "2", "10")
+
+library(reshape2)
+library(viridis)
+
+df <- melt(df, id.vars = c("x"))
+colnames(df) <- c("x", "base", "logarithm")
+ggplot(aes(x=x,y = logarithm, group = base, color = base), data = df) + 
+    geom_line() + scale_color_viridis_d() + theme_minimal()
+```
+
+# Logarithms
+## When to use logarithms
+- Use logarithms when
+    - All values of $x$ are positive
+    - $x$ has a wide range (e.g. income)
+- Interpretation
+    - Logarithms allow us to transform variables to measure differences in *magnitude* and sometimes *percentages*.
+- Specification
+    - Logarithms can induce normality and reduce variance for if a variable has a \textbf{log normal} distribution.
+
+# Logarithms
+## A unit increase of $log_{10}$
+```{r log-linear, echo = FALSE, mysize=TRUE, size='\\footnotesize'} 
+ggplot(aes(x=x, y = logarithm, group = base, color = base), data = df %>% filter(base == "10")) + 
+    geom_line() + scale_color_viridis_d() + theme_minimal() + scale_x_log10()
+```
+
+# Logarithms
+## A unit increase of $log_{10}$
+```{r log-linear-2, echo = FALSE, mysize=TRUE, size='\\footnotesize'} 
+ggplot(aes(x=x, y = logarithm, group = base, color = base), data = df %>% filter(base == "10")) + 
+    geom_line() + scale_color_viridis_d() + theme_minimal() + scale_x_log10() +
+    geom_segment(aes(x=1, xend=10, y=1, yend=1), colour="red") + 
+    geom_segment(aes(x=10, xend=10, y=0, yend=1), colour="red") + 
+    geom_segment(aes(x=1, xend=100, y=2, yend=2), colour="red", linetype = "dashed") + 
+    geom_segment(aes(x=100, xend=100, y=0, yend=2), colour="red", linetype = "dashed")
+```
+
+# Logarithms
+## The log-normal distribution
+```{r lnorm, echo = FALSE, mysize=TRUE, size='\\footnotesize'} 
+x <- rlnorm(1000, meanlog = 1, sdlog = 1)
+ggplot(aes(x=x), data = as.data.frame(x)) + geom_density() + theme_minimal() + labs(caption = "Log  Normal(1,1)")
+```
+\tiny Draws generated using `rlnorm()`.
+
+# Logarithms
+## The natural logarithm of the log normal distribution
+```{r n-ln, echo = FALSE, mysize=TRUE, size='\\footnotesize'} 
+ggplot(aes(x=log(x)), data = as.data.frame(x)) + geom_density() + theme_minimal() + labs(caption = "Log  Normal(1,1)")
+```
+
+# Logarithms
+## The distribution of 2018 GSS respondent income (`realinc`)
+```{r gss-inc, echo = FALSE, mysize=TRUE, size='\\footnotesize', warning = FALSE} 
+realrinc <- gss$realrinc %>% as.numeric() %>% as.data.frame()
+colnames(realrinc) <- c("realrinc")
+ggplot(aes(x=realrinc), data = realrinc) + geom_density() + theme_minimal()
+```
+
+# Logarithms
+## The distribution of 2018 GSS respondent income (`realinc`), natural log
+```{r log-gss-inc, echo = FALSE, mysize=TRUE, size='\\footnotesize', warning = FALSE} 
+realrinc <- gss$realrinc %>% as.numeric() %>% as.data.frame()
+colnames(realrinc) <- c("realrinc")
+ggplot(aes(x=log(realrinc)), data = realrinc) + geom_density() + theme_minimal()
+```
+
+# Logarithms
+## Logarithms and regression
+- Logarithms of predictors (\textbf{Linear-log models})
+    - If we include $log_e(x)$ as a predictor, $\beta_i$ now represents the expected change associated with a unit increase in $log_e(x)$
+    
+# Logarithms
+## Logarithms as predictors
+Here $\beta_1$ represents the effect of a one-unit increase in height *on a logarithmic scale*.
+```{r log-reg-1, echo = FALSE, mysize=TRUE, size='\\footnotesize', warning = FALSE} 
+l1 <- lm(realrinc ~ log(height), data = gss)
+print(l1)
+```
+    
+# Logarithms
+## Logarithms and regression  
+- Logarithms of outcomes (\textbf{Log-linear models})
+    - If the outcome is $log_e(y)$. For any variable $x$, $\beta_i$ represents the expected change in $log_e(y)$ associated with a unit change in $x$.
+    
+# Logarithms
+## Logarithms as outcomes
+Here $\beta_1$ represents the effect of a one-unit increase in height on the *logarithm* of income. Note the difference in the coefficient compared to the previous model.
+```{r log-reg-2, echo = FALSE, mysize=TRUE, size='\\footnotesize', warning = FALSE} 
+l2 <- lm(log(realrinc) ~ height, data = gss)
+print(l2)
+```
+    
+# Logarithms
+## Logarithms and regression
+- Logarithms of predictors *and* outcomes (\textbf{Log-log models})
+    - If both $x$ and $y$ are entered into the model as logarithms, $\beta_i$ represents the expected change in $log_e(y)$ associated with a unit change in $log_e(x)$
+    - Equivalently, this corresponds to the expected percentage change in $y$ as a result of a 1% change in $x$. Hence, such coefficients can be interpreted as \textbf{elasticities}.
+    
+    
+# Logarithms
+## Log-log models
+Here $\beta_1$ represents the effect of a one-unit increase in *logarithm* of height on the *logarithm* of income. A 1% increase in height is associated with a 4% increase in income.
+```{r log-reg-3, echo = FALSE, mysize=TRUE, size='\\footnotesize', warning = FALSE} 
+l3 <- lm(log(realrinc) ~ log(height), data = gss)
+print(l3)
+```
+
+# Logarithms
+## Log-log models
+We can still incorporate untransformed variables into these models. Here the coefficient for `sex` can be interpreted as the *difference in the expected logarithm of income* between male and female respondents.
+```{r log-reg-4, echo = FALSE, mysize=TRUE, size='\\footnotesize', warning = FALSE}
+l4 <- lm(log(realrinc) ~ log(height) + sex, data = gss)
+print(l4)
+```
+
+# Logarithms
+## Model comparison
+```{r log-fit, echo = FALSE, mysize=TRUE, size='\\footnotesize', warning = FALSE}
+modelsummary(list("Log x" = l1, 
+                  "Log y" = l2, 
+                  "Log-log" = l3,
+                  "Log-log+" = l4), 
+             gof_omit = "Log|AIC|BIC|RMSE", stars = TRUE, output = "latex")
+```
+
+
+
+# Polynomials
+## Definitions
+- \textbf{Polynomial} regression expresses non-linear relationships between continuous predictors in a linear model by adding exponents of $x$.
+- The expected value of $y$ is expressed as an $k^{th}$ degree polynomial:
+
+$$y = \beta_0 + \beta_1 x + \beta_2 x^2 + \beta_3 x^3 + ... + \beta_k x^k + u$$
+
+- Generally, we use a restricted form, such as the quadratic model:
+
+$$y = \beta_0 + \beta_1 x + \beta_2 x^2 + u$$
+
+# Polynomials
+## Quadratic functions and parabolas
+```{r parabola, echo = FALSE, mysize=TRUE, size='\\footnotesize', warning = FALSE} 
+x <- seq(-10,10,by = 0.05)
+y <- 2 + -3*x + 2*x^2
+df <- as.data.frame(cbind(x,y))
+ggplot(aes(x, y), data = df) + geom_line() + theme_minimal()
+```
+\centering $y = 2 + -3x + 2x^2$.
+
+# Polynomials
+## When to use polynomial regression
+- We add polynomials to capture non-linear relationships. For example, we might expect a non-linear relationship between age and income. We could express this using the following model:
+
+$$Income = \beta_0 + \beta_1Age + \beta_2Age^2 + u$$
+
+
+- The effect of age is now decomposed into two coefficients:
+    - $\beta_1$ captures the linear relationship between age and income. 
+    - $\beta_2$ captures a non-linear association between age and income.
+- The coefficients do not have a simple interpretation.
+    - Consider whether we can change $Age$ while holding $Age^2$ constant.
+
+
+# Polynomials
+## Age and Age-Squared
+```{r age-age2, echo = FALSE, mysize=TRUE, size='\\footnotesize', warning = FALSE}
+age <- 18:65
+age2 <- (18:65)^2
+d <- as.data.frame(cbind(age, age2))
+ggplot(aes(x = age, y = age2), data = d) + 
+    geom_line() + geom_line(aes(x = age)) + theme_minimal() + labs(y = TeX("$Age^2$"), x = "Age") 
+```
+
+# Polynomials
+## Income and age
+```{r inc-age1, echo = FALSE, mysize=TRUE, size='\\footnotesize', warning = FALSE} 
+ggplot(aes(x = age, y = log(realrinc)), data = gss %>% filter(age < 89 & realrinc < 1E5)) + 
+    geom_point(alpha = 0.5) + geom_smooth(method = "lm", color = "red") + labs(caption = "Age < 89 and income < 1E5. OLS fitted line.") + theme_minimal()
+```
+
+# Polynomials
+## Income and age
+```{r inc-age2, echo = FALSE, mysize=TRUE, size='\\footnotesize', warning = FALSE} 
+ggplot(aes(x = age, y = log(realrinc)), data = gss %>% filter(age < 89 & realrinc < 1E5)) + 
+    geom_point(alpha = 0.5) + geom_smooth() + geom_smooth(method = "lm", color = "red") + labs(caption = "Age < 89 and income < 1E5. OLS & LOESS fitted lines.") + theme_minimal()
+```
+
+# Polynomials
+## Income and age
+```{r inc-age-models, echo = FALSE, mysize=TRUE, size='\\footnotesize', warning = FALSE}
+gss$age2 <- gss$age^2
+gss$age3 <- gss$age^3
+gss$age4 <- gss$age^4
+m1 <- lm(log(realrinc) ~ age, data = gss %>% filter(age < 89))
+m2 <- lm(log(realrinc) ~ age + age2, data = gss %>% filter(age < 89))
+m3 <- lm(log(realrinc) ~ age + age2 + age3, data = gss %>% filter(age < 89))
+m4 <- lm(log(realrinc) ~ age + age2 + age3 + age4, data = gss %>% filter(age < 89))
+modelsummary(list(m1, m2, m3, m4), gof_omit = "Log|AIC|BIC|F|RMSE", stars = TRUE, output = "latex")
+```
+
+# Polynomials
+## Predictions
+```{r inc-age-preds, echo = FALSE, mysize=TRUE, size='\\footnotesize', warning = FALSE}
+pred.data <- data.frame(age = 18:88, age2 = (18:88)^2, age3 = (18:88)^3, age4 = (18:88)^4)
+m1.preds <- predict.lm(m1, pred.data)
+m2.preds <- predict.lm(m2, pred.data)
+m3.preds <- predict.lm(m3, pred.data)
+m4.preds <- predict.lm(m4, pred.data)
+preds <- as.data.frame(cbind(m1.preds, m2.preds, m3.preds, m4.preds))
+colnames(preds) <- c("Age", "Age2", "Age3", "Age4")
+preds.m <- melt(preds)
+ggplot(aes(y = value, x = rep(18:88, 4), group = variable, color = variable), data = preds.m) + geom_line() + scale_color_viridis_d() + theme_minimal() + labs(y = "Log Income", x = "Age", color = "Highest polynomial")  + theme(legend.text=element_text(size=8),
+                                                                                                                                                                                                                                   legend.title = element_text(size=10))
+
+```
+\tiny Predicted values from OLS models. Income measured using realrinc. Respondents under 89 only.
+
+# Polynomials
+## When to use polynomial regression
+- A second-order polynomial (e.g. $Age^2$) is sufficient to capture non-linearity.
+    - In this case, there is evidence of a curvilinear relationship between age and income.\footnote{\scriptsize For an example of polynomials used in a different context, see Dokshin, Fedor A. 2016. “Whose Backyard and What’s at Issue? Spatial and Ideological Dynamics of Local Opposition to Fracking in New York State, 2010 to 2013.” \textit{American Sociological Review} 81 (5): 921–48.}
+- Higher-order polynomial terms can improve model fit and capture more complex non-linearities but *use up degrees of freedom* and become difficult to interpret.
+    
+
+# Next week
+## Interaction terms
+- What is an interaction?
+- How to specify an interaction
+- How to interpret an interaction
+
+# Lab
+- Regression models using the General Social Survey
