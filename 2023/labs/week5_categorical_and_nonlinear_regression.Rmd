@@ -95,7 +95,7 @@ datasummary_balance( ~ 1,
 
 
 
-If you'd like to reproduce the tables from last week and create a new table for categorical data, you can run the same code, including an argument specifying that the variables you want summarized are `type = "categorical"`. The default option is `type = numeric`, so you don't have to specify it if you don't want to, but it can be nice to include. 
+If you'd like to reproduce the tables from last week (including with unique values, medians, minimums, and maximums), and create a new table for categorical data, you can run the same code, including an argument specifying that the variables you want summarized are `type = "categorical"`. The default option is `type = numeric`, so you don't have to specify it if you don't want to, but it can be nice to include. 
 
 ```{r data-sum-double-table}
 datasummary_skim(gss,
@@ -145,9 +145,9 @@ And the same goes for race: We multiply `r round(ols1[["coefficients"]][["raceWh
 
 Noting that these are all in reference to whatever category was dropped (we'll get to that more in a bit), we can finish our interpretation as follows:
 
-4. `sexFemale`: A person who is `Male` can expect to make $`r round(ols1[["coefficients"]][["sexMale"]],2)` compared to a person who is `Female`. 
-5. `raceWhite`: A person who is `White` can expect to make $`r round(ols1[["coefficients"]][["raceWhite"]],2)` compared to a person who is `Black`. 
-6. `raceOther`:A person who is `Other` can expect to make $`r round(ols1[["coefficients"]][["raceOther"]],2)` compared to a person who is `Black`. 
+4. `sexMale`: A person who is `Male` can expect to make $`r round(ols1[["coefficients"]][["sexMale"]],2)` compared to a person who is `Female`. 
+5. `raceOther`:A person who is `Other` (race) can expect to make $`r round(ols1[["coefficients"]][["raceOther"]],2)` compared to a person who is `Black`. 
+6. `raceWhite`: A person who is `White` can expect to make $`r round(ols1[["coefficients"]][["raceWhite"]],2)` compared to a person who is `Black`. 
 
 
 ## Prediction
@@ -158,7 +158,7 @@ For example, let's estimate a person's income, knowing that they were a 57 year-
 
 While it's possible to do this by hand, it's even easier to input the new person's information into a dataframe with these variables and `predict()` the value using R. 
 
-Try modifying the values to see how the predicted income changes.
+Try modifying the values to see how the predicted income changes. (NOTE: With `predict()`, you have to include values for every independent variable included in the model.)
 ```{r ols-predict}
 newperson <- data.frame(age = 57,
                         prestige = 70,
@@ -209,7 +209,7 @@ modelsummary(list(ols_nodummy, ols_dummy1, ols_dummy2),
 
 As we can see from these results, there is no difference in whether you use your own dummies or use the defaults. Just note, however, that R will drop whatever the first category is. In the case of `sex`, the first one was `male`, since I coded it as a `factor`. In the case of `race`, however, it was simply a `character`-type variable, so the first category, and the one that was dropped, was `black`. Creating and using your own dummies gives you more control over this, but isn't necessary. 
 
-If we'd like to change the "reference category," AKA the category that is dropped, one option is to turn the variable into a factor with new levels (1 = White, 2 = Black, 3 = Other). Another is by putting in ourselves which levels to include in the model: Including Black and Other makes White the reference. Finally, another option is to use the `stats::relevel()` function to choose a new base category. (`relevel(var, ref = new_reference_level`)
+If we'd like to change the "reference category," AKA the category that is dropped, one option is to turn the variable into a factor with new levels (1 = White, 2 = Black, 3 = Other). Another is by putting in ourselves which levels to include in the model: Including Black and Other makes White the reference. Finally, another option is to use the `stats::relevel()` function to choose a new base category. (`relevel(var, ref = new_reference_level)`)
 
 
 ## Scaling and Non-Linearization 
@@ -223,7 +223,7 @@ Taking the log of a term does two things.
 2. Theoretically, we use it when we think the effect is *increasing at a decreasing rate OR decreasing at a decreasing rate*. 
 
 
-```{r plot-log}
+```{r plot-log, fig.cap="Visualizing Transformed Income Variables"}
 gss <- gss %>% 
   mutate(logincome = log(conrinc),
          thouinc = conrinc/1000,
@@ -304,20 +304,22 @@ Okay, so what does this mean for prediction?
 
 Our equation now is $$log_e(\widehat{income}) = \beta_0 + \hat{\beta}_{Work Experience} + \hat{\beta}_{WorkExperience^2} + ... + u $$ 
 
-It might also be better to graph this to visualize the changing effects. I'll first save the coefficients from the previous model as `coef_workexp` and `coef_worksq`. Then, I write a function that shows how the coefficients are multiplied by `workexp` and workexp$^2$. Finally, I use the `stat_function()` function within my `ggplot()` command to graph the line. 
+It might also be better to graph this to visualize the changing effects. I'll first save the coefficients from the previous model as `coef_workexp` and `coef_worksq`. Then, I write a function that shows how the coefficients are multiplied by `workexp` and `workexp$^2$`. Finally, I use the `stat_function()` function within my `ggplot()` command to graph the line. 
 
 ```{r plot_workexp}
 coef_workexp <- ols_work_worksq$coefficients["workexp"]
 coef_worksq <- ols_work_worksq$coefficients["worksq"]
+int_worksq <- ols_work_worksq$coefficients["(Intercept)"]
 
-func_wrkexp2 <- function(workexp) coef_workexp * workexp + coef_worksq * workexp^2
+func_wrkexp2 <- function(workexp) coef_workexp * workexp + coef_worksq * workexp^2 + int_worksq
 
 ggplot() + 
-  stat_function(fun = func_wrkexp2, linewidth = 1) +
+  stat_function(fun = func_wrkexp2, linewidth = 1, aes(color = "Predicted")) +
   scale_x_continuous(name = "Work Experience (Years Since Age 18)", 
                      limits = c(0,70)) +
+  geom_smooth(data = gss, aes(x = workexp, y = logincome, color = "Actual")) + 
   labs(y = "log(Income)", title = "Effects of Work Experience on Income",
-       caption = "Holding constant work hours and sex") +
+       caption = "Holding constant work hours and sex", color = "") +
   theme_light() + theme(plot.title = element_text(hjust =.5))
 ```
 
