@@ -1,0 +1,377 @@
+---
+title: "Week 6 - Interaction Terms"
+author: "Fred Traylor, Lab TA"
+date: "2/27/2023"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen = 999)
+
+library(tidyverse)
+library(stargazer)
+
+library(rstanarm)
+library(tidybayes)
+
+library(modelsummary)
+library(broom.mixed)
+  options(modelsummary_get = "broom") 
+
+seed <- 0890110980
+```
+
+
+# Data Work
+
+Let's play with the GSS again. This week, we don't have a specific hypothesis about what leads to income or occupational prestige, but instead we'll be playing around with various relationships between a set of variables. 
+
+```{r gss-loading}
+gss2018 <- readRDS("lab_data/GSS2018.Rds")
+
+gss <- gss2018 %>%   
+  select(conrinc, hrs1, wrkslf, prestg10,                 # Current Job
+         sex, race, hispanic, age, educ, degree, partyid, # Other Demos
+         wtss                                             # Weight
+         ) %>%
+  mutate( 
+    logincome = log(conrinc),
+    workexp = age - 18,
+    worksq = workexp^2,
+    workhrs = case_when(
+      hrs1 == 89 ~ NaN,
+      TRUE ~ hrs1
+      ),
+    age = case_when(
+      age > 88 ~ NaN,
+      TRUE ~ age
+      ),
+    selfemp = case_when(
+      wrkslf == 1 ~ 1,  # Self-Employed
+      wrkslf == 2 ~ 0   # Works for someone else 
+      ),
+    degree = factor(degree, levels = c(0:4),  
+                    labels = c("Less_HS", "HS", "Assoc", "Bach", "Grad") 
+                    ),
+    female = ifelse(sex == 2, 1, 0),
+    race4 = case_when(
+      hispanic != 1 ~ "Hispanic",
+      race == 1 & hispanic == 1 ~ "White",
+      race == 2 & hispanic == 1 ~ "Black",
+      race == 3 & hispanic == 1 ~ "Other",
+      ),
+    partyid = case_when(
+      partyid %in% c(0:2) ~ "Democrat",
+      partyid %in% c(4:6) ~ "Republican",
+      partyid %in% c(3,7) ~ "Other Party"
+      ),
+    weight = wtss
+    ) %>% 
+  select(-hrs1, -wtss, -wrkslf, -sex) %>%  
+  drop_na() 
+```
+
+
+## Descriptive Statistics
+
+As always, let's do some descriptive statistics. One thing to note is that I created several dummy variables, `female`, indicating whether the respondent is female, and `selfemp`, indicating whether they are self-employed (as opposed to working for somebody else). This is noteworthy here because, since I coded them directly as 0-1 variables, and not as factors or characters, they show up in the summary table for numeric variables. In this case, the mean of `female` represents the % of the sample that is female. 
+
+```{r desc-tables}
+datasummary_skim(gss, type = "numeric",
+                 histogram = F, fmt = 2, # Show 2 decimal places 
+                 output = "data.frame")
+
+datasummary_skim(gss, type = "categorical",
+                 output = "data.frame")
+
+```
+
+\newpage 
+
+# Interactions
+
+## Dummy X Dummy
+To start, let's investigate the relationship between a person's income (in logged dollars) and their years of education, their status as self-employed, and their sex. 
+
+I created two models below: 
+
+1. The first is an "additive" model, where the three independent variables act independently on income.
+2. The second is a "multiplicative" model, which includes a term dependent on the status of self-employment and sex together. 
+
+```{r dum-dum}
+dum_dum_base <- lm(logincome ~ educ + selfemp + female,
+                   data = gss, weights = weight)
+dum_dum_int <- lm(logincome ~ educ + selfemp * female,
+                  data = gss, weights = weight)
+modelsummary(list(dum_dum_base, dum_dum_int),
+             estimate = "{estimate} ({std.error}) {stars}",
+             statistic = NULL, gof_omit = "F|RMSE|Log|IC")
+
+```
+
+In the first model, we see that each year of education has a significant effect on log income, increasing it by 15% for each additional year. Additionally, women earned about 51% less than men, while self-employment had no significant effect on income. 
+
+Turning now to the second model, we must change how we interpret our table. Let's start with the interaction term: Self-employed women earned 49% less income than everyone else. But who is that everyone else, and what are their values? The term `female` still denotes all women, both self- and other-employed. And the term `selfemp` represents all self-employed individuals, male and female. 
+
+Here's another way to think about it. let's create a new variable that is a cross of `female` and `selfemp`. Then, let's use that new variable in a regression and compare the output to the other. 
+
+
+```{r dum-dum-cross}
+
+gss <- gss %>% 
+  mutate(female_selfemp = case_when(
+    female == 1 & selfemp == 1 ~ "Female, Self Emp",
+    female == 1 & selfemp == 0 ~ "Female, Not Self Emp",
+    female == 0 & selfemp == 1 ~ "Male, Self Emp",
+    female == 0 & selfemp == 0 ~ "0 Male, Not Self Emp" 
+    # putting 0 so this row is 'dropped' in regression
+  ))
+
+# ftable(gss$female, gss$selfemp, gss$female_selfemp) # Double-checking the coding
+
+dum_dum_cross <- lm(logincome ~ educ + female_selfemp,
+                  data = gss, weights = weight)
+modelsummary(list(dum_dum_int, dum_dum_cross),
+             estimate = "{estimate} ({std.error}) {stars}",
+             statistic = NULL, gof_omit = "F|RMSE|Log|IC")
+```
+
+Looking at the output, we can see a couple of numbers that align. The value .123 is the same for self-employed people in the original interaction model AND  for self-employed males in the new one. This is because any self-employed females would take the decrease in wages associated with the coefficient for `female`. This decrease, $-0.457$ is also seen in both models. In the interaction model, it is the value for `female`, and in the new model, it is the value for other-employed females. Again, this is because self-employed females take the hit from the multiplicative effect of being self-employed AND female **in addition to** the effects of being female and of being self-employed. This is represented by the value $-.824 = .123 (selfemp) + -.453 (female) + -.495 (female * selfemp)$. 
+
+This just goes to show that it is possible to run interactions with a new variable that combines the two terms. However, with more than a simple 2X2 set of categories, it becomes unwieldy to create and interpret. 
+
+
+## Dummy X Category
+
+Remembering from last week that a categorical variable is the same as a group of dummy variables, we can create and interpret an interaction model with political party affiliation and self-employment status. 
+
+```{r dum-cat}
+dum_cat_base <- lm(logincome ~ selfemp + partyid,
+                   data = gss, weights = weight)
+dum_cat_int <- lm(logincome ~ selfemp * partyid,
+                  data = gss, weights = weight)
+
+modelsummary(list(dum_cat_base, dum_cat_int),
+             estimate = "{estimate} ({std.error}) {stars}",
+             statistic = NULL, gof_omit = "F|RMSE|Log|IC")
+```
+
+What do we see? First, self-employment doesn't seem to have much of an effect in either model *by itself*, and neither does being Republican. But, when we interact the two terms, we see a significant effect where *self-employed Republicans* have elevated incomes beyond self-employed non-Republicans and above other-employed Republicans. 
+
+While this isn't the best example empirically (why would we have cause to believe party is associated with income?), it does point to an important role of interactions in exploratory data analysis. Using an inductive approach, we can look at these results and begin wondering what it is that creates this relationship between income and party, and why this relationship  only exists for Republicans who are self-employed, as opposed to other-employed Republicans and those who belong to other parties. 
+
+## Dummy X Continuous
+
+We can also create interactions between dummy variables and continuous variables. in the example below, we can hypothesize that income is affected by the hours a person works and whether they have a college degree or higher. 
+
+```{r dum-con}
+gss <- gss %>% 
+  mutate(college = case_when(
+    degree %in% c("Bach", "Grad") ~ 1,  # College or Grad
+    degree %in% c("Less_HS", "HS", "Assoc") ~ 0   # Non-college
+  ))
+# table(gss$college, gss$degree)
+
+dum_con_base <- lm(logincome ~ workhrs + college,
+                   data = gss, weights = weight)
+dum_con_int <- lm(logincome ~ workhrs * college,
+                  data = gss, weights = weight)
+modelsummary(list(dum_con_base, dum_con_int),
+             estimate = "{estimate} ({std.error}) {stars}",
+             statistic = NULL, gof_omit = "F|RMSE|Log|IC")
+```
+
+We can see here that the introduction of the interaction term had no real change on the effect of working hours. Interestingly, though, it did bump up the effect of college education, with a college degree now increasing wages by nearly 130%!
+
+Looking now at the interaction term itself, it points slightly negative. We can then use algebra to find how many hours of work a college-educated individual would need to cancel out the effect of their degree alone: $.032x + 1.825 - .009x = .032x$. Fortunately for us in this class, this only happens at about 200 hours of work.
+
+Sociologically, we could try to explain this as people without college degrees being more likely to work hourly jobs while those with degrees being more likely to hold salaried positions. Luckily for us today, we don't have to fully explain it. 
+
+I'll also add here that, since categorical variables are just groups of dummies, this could happen the same with a categorical variable as well. 
+
+\newpage 
+
+## Continuous X Continuous
+
+Rounding out the simple cases of interactions, we have continuous X continuous interactions. 
+
+```{r con-con}
+con_con_base <- lm(logincome ~ workhrs + educ,
+                   data = gss, weights = weight)
+con_con_int <- lm(logincome ~ workhrs * educ,
+                  data = gss, weights = weight)
+
+modelsummary(list(con_con_base, con_con_int),
+             estimate = "{estimate} ({std.error}) {stars}",
+             statistic = NULL, gof_omit = "F|RMSE|Log|IC")
+```
+
+The results here point to a point of diminishing returns. That is, while working hours and years of education both increase income, increasing both does not provide the same outcome as you would think from the main effects alone. 
+
+
+## Self-Interactions: Change in Slope
+
+One interesting case of interactions are changes in slope at a point. Consider that occupational prestige might increase with education. But is that change in prestige the same after earning graduating high school? Looking at this graph suggests it might.
+
+```{r edslope-graph, message=FALSE, warning=FALSE}
+gss %>% 
+  ggplot(aes(x = educ, y = prestg10)) +
+  geom_jitter() + geom_smooth() +
+  geom_vline(aes(xintercept = 12), linetype = "dashed", 
+             linewidth = 1.25, color = 'red') +
+  theme_light()
+```
+
+Below, I create three models. The first is the effect of education on prestige. The second adds in a term denoting whether they have 12 years of education or more. As you can expect, there's a problem with multicollinearity here. But, in the third model, I interact the two terms. 
+
+```{r self-int}
+gss$edtwelve <- ifelse(gss$educ >= 12, 1, 0)
+
+m1 <- lm(prestg10 ~ educ            , data = gss, weights = weight)
+m2 <- lm(prestg10 ~ educ + edtwelve , data = gss, weights = weight)
+m3 <- lm(prestg10 ~ educ * edtwelve , data = gss, weights = weight)
+modelsummary(list(m1, m2, m3),
+             estimate = "{estimate} ({std.error}) {stars}",
+             statistic = NULL, gof_omit = "F|RMSE|Log|IC")
+```
+
+We see something weird here. Why is there such a strong decrease in prestige for having completed twelve years of education?
+
+Looking at the values, though, we can see that this effect is nearly equivalent to 12 times the coefficient for the interaction term. ($2.308 * 12 = 27.696$) This means that, while education has no real effect on prestige, there is a great deal of prestige growth for each year of education *after* completing high school. 
+
+Importantly, since high school completion requires 12 years of education, we do not have any cases where HS completion decreases prestige. 
+
+Just because this one is weird to interpret, let's rescale our education variable so it is only years over twelve. 
+```{r selfint-rescale}
+gss <- gss %>% mutate(edover12 = educ - 12)
+
+m4 <- lm(prestg10 ~ edover12 + edtwelve,
+         data = gss, weights = weight)
+m5 <- lm(prestg10 ~ edover12 * edtwelve,
+         data = gss, weights = weight)
+modelsummary(list("Main" = m2, "Main (Shifted)" = m4,
+                  "Interaction" = m3, "Interaction (Shifted)" = m5),
+             estimate = "{estimate} ({std.error}) {stars}",
+             statistic = NULL, gof_omit = "F|RMSE|Log|IC")
+```
+
+Comparing our main effects models (1 and 2), we can see that shifting the education variable by starting it at 12 years had no effect on effect sizes or model fit, but only shifted the intercept. 
+
+Comparing models 3 and 4, however, we see a change, not in the model fit but in the effect size of the high school completion term. Instead of there being a set increase in prestige attributable to having completed high school, we see an effect of additional years of education *beyond* high school. 
+
+\newpage 
+
+## Interactions with Multiple Variables
+
+Last week, we talked about how the effects of work experience on income are curvilinear, requiring both `workexp` and `worksq` to accurately capture the effect. But now, what if we want to interact this effect with something else?
+
+### One to Multiple 
+
+If we have only one variable we want to interact with multiple other variables, we can either specify interactions individually ($(a*b) + (a*c)$), or we can interact the one variable with *both* of the others by putting the multiples in parentheses ($a*(b+c)$). 
+
+In this example below, I interact `female` with our terms `workexp` and `worksq.`
+
+```{r one-mult}
+
+one_mult1 <- lm(logincome ~ female + workexp + worksq ,
+                data = gss, weights = weight)
+one_mult2 <- lm(logincome ~ female * workexp + female * worksq,
+                data = gss, weights = weight)
+one_mult3 <- lm(logincome ~ female * (workexp + worksq),
+                data = gss, weights = weight)
+modelsummary(list(one_mult1, one_mult2, one_mult3),
+             estimate = "{estimate} ({std.error}) {stars}",
+             statistic = NULL, gof_omit = "F|RMSE|Log|IC")
+```
+
+In this example, taken from Mize (2019), we can see that women earn than men, and that this effect is present in the interaction model as well. 
+
+Notably, this example shows that it is acceptable to give R `female * workexp + female * worksq` or to give it `female * (workexp + worksq)`. Both ways specify that you want `female` interactions with both `workexp` and `worksq`, although the second is more elegant. 
+
+
+### Multiple to Multiple
+
+Similarly, if you have multiple variables you want interacted, you can put both sets in parentheses. **NOTE**, however, that while R will interact each term from one set with each from from the other, it will not create interactions within the same set. 
+
+In the example below, we want interactions of `logincome` with both `workexp` and `worksq`, and we also want interactions of `educ` with `workexp` and `worksq.` This code will give us this output, but it will not give us interactions of `logincome` with `educ` or of `workexp` with `worksq`. 
+
+```{r mult-mult}
+
+mult_mult1 <- lm(prestg10 ~ logincome + educ + workexp + worksq,
+              data = gss, weights = weight)
+mult_mult2 <- lm(prestg10 ~ (logincome + educ) * (workexp + worksq),
+              data = gss, weights = weight)
+modelsummary(list(mult_mult1, mult_mult2),
+             estimate = "{estimate} ({std.error}) {stars}",
+             statistic = NULL, gof_omit = "F|RMSE|Log|IC")
+```
+
+
+
+
+### Three Way Interactions
+
+You can also perform three-way interactions by "multiplying" the variables together in the formula. These will create interactions of all three pairings along with one interaction of all three together. These are easy to confuse readers (and yourself), so they are rarely used. 
+
+To provide a case of this, let's hypothesize that the effect of the interaction of `logincome` and `educ` on occupational prestige differs by sex. In this case, we provide a three-way interaction so that we receive different coefficients for the interaction by `female`.
+
+```{r three-way}
+
+threeint1 <- lm(prestg10 ~ logincome + educ + female,
+              data = gss, weights = weight)
+threeint2 <- lm(prestg10 ~ logincome * educ + female,
+              data = gss, weights = weight)
+threeint3 <- lm(prestg10 ~ (logincome + educ) * female,
+              data = gss, weights = weight)
+threeint4 <- lm(prestg10 ~ logincome * educ * female,
+              data = gss, weights = weight)
+modelsummary(list(threeint1, threeint2, threeint3, threeint4),
+             estimate = "{estimate} ({std.error}) {stars}",
+             statistic = NULL, gof_omit = "F|RMSE|Log|IC")
+```
+
+The first model only has the main effects included.
+
+The second model includes the interaction for `logincome` and `educ`, but no accounting for how the *joint effect* of education and income are affected by sex. 
+
+The third model introduces interactions of `female` with both education and income, but not on the two together.
+
+Finally, model 4 provides interactions of all three pairwise relationships along with a three-way interaction term that explains how the effect of education and income together is also affected by sex. 
+
+\newpage 
+
+# Bayesian Estimation 
+
+As always, let's end the lab session today with a look at how to do all this using `rstanarm::stan_glm()`. As you can see from the code below, you create an interaction term with `stan_glm()` the same way as with `lm()`.
+
+
+```{r bayes}
+bayes_mod1 <- stan_glm(logincome ~ female + (workexp + worksq),
+                         data = gss,  seed = seed, weights = weight,
+                         chains = 1, refresh = 0)
+bayes_int1 <- stan_glm(logincome ~ female * (workexp + worksq),
+                         data = gss,  seed = seed, weights = weight, 
+                         chains = 1, refresh = 0)
+
+bmods <- list("Base Model" = bayes_mod1,
+              "Interaction Model" = bayes_int1,
+              "OLS Int Model" = one_mult3)
+
+bayesrows <- data.frame(
+    # Left Column 
+  c("Bayes R2 (Mean)", "Bayes R2 (Median)", "Bayes R2 (SD)"),
+    # Base Model
+  c(mean(bayes_R2(bayes_mod1)), median(bayes_R2(bayes_mod1)), sd(bayes_R2(bayes_mod1))),
+    # Interaction Model
+  c(mean(bayes_R2(bayes_int1)), median(bayes_R2(bayes_int1)), sd(bayes_R2(bayes_int1))),
+  
+  c("", "", "")
+)
+
+modelsummary(bmods, gof_omit = "IC|Log|alg|pss|RMSE|F",
+             add_rows = bayesrows,
+             title = "Bayesian Model Outputs"
+             )
+```
+
