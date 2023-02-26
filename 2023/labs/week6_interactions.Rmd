@@ -10,22 +10,19 @@ knitr::opts_chunk$set(echo = TRUE)
 options(scipen = 999)
 
 library(tidyverse)
-library(stargazer)
-
 library(rstanarm)
 library(tidybayes)
-
 library(modelsummary)
 library(broom.mixed)
-  options(modelsummary_get = "broom") 
+options(modelsummary_get = "broom") 
 
-seed <- 0890110980
+seed <- 10980
 ```
 
 
 # Data Work
 
-Let's play with the GSS again. This week, we don't have a specific hypothesis about what leads to income or occupational prestige, but instead we'll be playing around with various relationships between a set of variables. 
+Let's use the GSS again. This week, we don't have a specific hypothesis about what leads to income or occupational prestige, but instead we'll consider with various relationships between a set of variables to illustrate how to specify and interpret interaction terms. 
 
 ```{r gss-loading}
 gss2018 <- readRDS("lab_data/GSS2018.Rds")
@@ -97,22 +94,22 @@ To start, let's investigate the relationship between a person's income (in logge
 I created two models below: 
 
 1. The first is an "additive" model, where the three independent variables act independently on income.
-2. The second is a "multiplicative" model, which includes a term dependent on the status of self-employment and sex together. 
+2. The second is a "multiplicative" model, which includes an interaction between self-employment and sex. 
 
 ```{r dum-dum}
 dum_dum_base <- lm(logincome ~ educ + selfemp + female,
                    data = gss, weights = weight)
 dum_dum_int <- lm(logincome ~ educ + selfemp * female,
                   data = gss, weights = weight)
+
 modelsummary(list(dum_dum_base, dum_dum_int),
              estimate = "{estimate} ({std.error}) {stars}",
              statistic = NULL, gof_omit = "F|RMSE|Log|IC")
-
 ```
 
-In the first model, we see that each year of education has a significant effect on log income, increasing it by 15% for each additional year. Additionally, women earned about 51% less than men, while self-employment had no significant effect on income. 
+In the first model, we see that each year of education has a significant effect on log income, increasing it by 0.153 for each additional year. Additionally, women earned about -0.151 less than men on the log scale, while self-employment had no significant effect on income. 
 
-Turning now to the second model, we must change how we interpret our table. Let's start with the interaction term: Self-employed women earned 49% less income than everyone else. But who is that everyone else, and what are their values? The term `female` still denotes all women, both self- and other-employed. And the term `selfemp` represents all self-employed individuals, male and female. 
+Turning now to the second model, we must change how we interpret our table. Let's start with the interaction term: Self-employed women earned 0.495 less log income than everyone else. But who is that everyone else, and what are their values? The term `female` still denotes all women, both self- and other-employed. And the term `selfemp` represents all self-employed individuals, male and female. 
 
 Here's another way to think about it. let's create a new variable that is a cross of `female` and `selfemp`. Then, let's use that new variable in a regression and compare the output to the other. 
 
@@ -139,12 +136,12 @@ modelsummary(list(dum_dum_int, dum_dum_cross),
 
 Looking at the output, we can see a couple of numbers that align. The value .123 is the same for self-employed people in the original interaction model AND  for self-employed males in the new one. This is because any self-employed females would take the decrease in wages associated with the coefficient for `female`. This decrease, $-0.457$ is also seen in both models. In the interaction model, it is the value for `female`, and in the new model, it is the value for other-employed females. Again, this is because self-employed females take the hit from the multiplicative effect of being self-employed AND female **in addition to** the effects of being female and of being self-employed. This is represented by the value $-.824 = .123 (selfemp) + -.453 (female) + -.495 (female * selfemp)$. 
 
-This just goes to show that it is possible to run interactions with a new variable that combines the two terms. However, with more than a simple 2X2 set of categories, it becomes unwieldy to create and interpret. 
+This demonstrates how to run interactions with a new variable that combines the two terms. However, with more than a simple 2X2 set of categories, it becomes unwieldy to create and interpret. 
 
 
 ## Dummy X Category
 
-Remembering from last week that a categorical variable is the same as a group of dummy variables, we can create and interpret an interaction model with political party affiliation and self-employment status. 
+Recall from last week that a categorical variable can be specified as a set of dummy variables. We can create and interpret an interaction model with political party affiliation and self-employment status using this approach.
 
 ```{r dum-cat}
 dum_cat_base <- lm(logincome ~ selfemp + partyid,
@@ -157,13 +154,11 @@ modelsummary(list(dum_cat_base, dum_cat_int),
              statistic = NULL, gof_omit = "F|RMSE|Log|IC")
 ```
 
-What do we see? First, self-employment doesn't seem to have much of an effect in either model *by itself*, and neither does being Republican. But, when we interact the two terms, we see a significant effect where *self-employed Republicans* have elevated incomes beyond self-employed non-Republicans and above other-employed Republicans. 
-
-While this isn't the best example empirically (why would we have cause to believe party is associated with income?), it does point to an important role of interactions in exploratory data analysis. Using an inductive approach, we can look at these results and begin wondering what it is that creates this relationship between income and party, and why this relationship  only exists for Republicans who are self-employed, as opposed to other-employed Republicans and those who belong to other parties. 
+What do we see? First, self-employment doesn't seem to have much of an effect in either model *by itself*, and neither does being Republican. But, when we interact the two terms, we see a significant effect where *self-employed Republicans* have higher incomes than self-employed non-Republicans and other-employed Republicans. 
 
 ## Dummy X Continuous
 
-We can also create interactions between dummy variables and continuous variables. in the example below, we can hypothesize that income is affected by the hours a person works and whether they have a college degree or higher. 
+We can also create interactions between dummy variables and continuous variables. In the example below, we assess the relationship between income, the hours a person works and whether they have a college degree or higher. 
 
 ```{r dum-con}
 gss <- gss %>% 
@@ -182,20 +177,17 @@ modelsummary(list(dum_con_base, dum_con_int),
              statistic = NULL, gof_omit = "F|RMSE|Log|IC")
 ```
 
-We can see here that the introduction of the interaction term had no real change on the effect of working hours. Interestingly, though, it did bump up the effect of college education, with a college degree now increasing wages by nearly 130%!
+We can see here that the introduction of the interaction term had no real change on the effect of working hours. Interestingly, though, increase the coefficient for college education.
 
 Looking now at the interaction term itself, it points slightly negative. We can then use algebra to find how many hours of work a college-educated individual would need to cancel out the effect of their degree alone: $.032x + 1.825 - .009x = .032x$. Fortunately for us in this class, this only happens at about 200 hours of work.
 
 Sociologically, we could try to explain this as people without college degrees being more likely to work hourly jobs while those with degrees being more likely to hold salaried positions. Luckily for us today, we don't have to fully explain it. 
-
-I'll also add here that, since categorical variables are just groups of dummies, this could happen the same with a categorical variable as well. 
 
 \newpage 
 
 ## Continuous X Continuous
 
 Rounding out the simple cases of interactions, we have continuous X continuous interactions. 
-
 ```{r con-con}
 con_con_base <- lm(logincome ~ workhrs + educ,
                    data = gss, weights = weight)
@@ -208,57 +200,6 @@ modelsummary(list(con_con_base, con_con_int),
 ```
 
 The results here point to a point of diminishing returns. That is, while working hours and years of education both increase income, increasing both does not provide the same outcome as you would think from the main effects alone. 
-
-
-## Self-Interactions: Change in Slope
-
-One interesting case of interactions are changes in slope at a point. Consider that occupational prestige might increase with education. But is that change in prestige the same after earning graduating high school? Looking at this graph suggests it might.
-
-```{r edslope-graph, message=FALSE, warning=FALSE}
-gss %>% 
-  ggplot(aes(x = educ, y = prestg10)) +
-  geom_jitter() + geom_smooth() +
-  geom_vline(aes(xintercept = 12), linetype = "dashed", 
-             linewidth = 1.25, color = 'red') +
-  theme_light()
-```
-
-Below, I create three models. The first is the effect of education on prestige. The second adds in a term denoting whether they have 12 years of education or more. As you can expect, there's a problem with multicollinearity here. But, in the third model, I interact the two terms. 
-
-```{r self-int}
-gss$edtwelve <- ifelse(gss$educ >= 12, 1, 0)
-
-m1 <- lm(prestg10 ~ educ            , data = gss, weights = weight)
-m2 <- lm(prestg10 ~ educ + edtwelve , data = gss, weights = weight)
-m3 <- lm(prestg10 ~ educ * edtwelve , data = gss, weights = weight)
-modelsummary(list(m1, m2, m3),
-             estimate = "{estimate} ({std.error}) {stars}",
-             statistic = NULL, gof_omit = "F|RMSE|Log|IC")
-```
-
-We see something weird here. Why is there such a strong decrease in prestige for having completed twelve years of education?
-
-Looking at the values, though, we can see that this effect is nearly equivalent to 12 times the coefficient for the interaction term. ($2.308 * 12 = 27.696$) This means that, while education has no real effect on prestige, there is a great deal of prestige growth for each year of education *after* completing high school. 
-
-Importantly, since high school completion requires 12 years of education, we do not have any cases where HS completion decreases prestige. 
-
-Just because this one is weird to interpret, let's rescale our education variable so it is only years over twelve. 
-```{r selfint-rescale}
-gss <- gss %>% mutate(edover12 = educ - 12)
-
-m4 <- lm(prestg10 ~ edover12 + edtwelve,
-         data = gss, weights = weight)
-m5 <- lm(prestg10 ~ edover12 * edtwelve,
-         data = gss, weights = weight)
-modelsummary(list("Main" = m2, "Main (Shifted)" = m4,
-                  "Interaction" = m3, "Interaction (Shifted)" = m5),
-             estimate = "{estimate} ({std.error}) {stars}",
-             statistic = NULL, gof_omit = "F|RMSE|Log|IC")
-```
-
-Comparing our main effects models (1 and 2), we can see that shifting the education variable by starting it at 12 years had no effect on effect sizes or model fit, but only shifted the intercept. 
-
-Comparing models 3 and 4, however, we see a change, not in the model fit but in the effect size of the high school completion term. Instead of there being a set increase in prestige attributable to having completed high school, we see an effect of additional years of education *beyond* high school. 
 
 \newpage 
 
@@ -308,8 +249,6 @@ modelsummary(list(mult_mult1, mult_mult2),
 ```
 
 
-
-
 ### Three Way Interactions
 
 You can also perform three-way interactions by "multiplying" the variables together in the formula. These will create interactions of all three pairings along with one interaction of all three together. These are easy to confuse readers (and yourself), so they are rarely used. 
@@ -338,6 +277,8 @@ The second model includes the interaction for `logincome` and `educ`, but no acc
 The third model introduces interactions of `female` with both education and income, but not on the two together.
 
 Finally, model 4 provides interactions of all three pairwise relationships along with a three-way interaction term that explains how the effect of education and income together is also affected by sex. 
+
+In pratice, three-way interactions become quite difficult to interpret and so should be used with extreme caution.
 
 \newpage 
 
