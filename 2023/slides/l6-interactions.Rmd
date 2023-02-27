@@ -89,7 +89,7 @@ $$y = \beta_0 + \beta_1x + \beta_2z + u$$
 
 $$y = \beta_0 + \beta_1x + \beta_2z + \beta_3xz + u$$
 
-- $\beta_0$ and $\beta_1$ are now considered as the \textbf{main effects}. 
+- $\beta_1$ and $\beta_2$ are now considered as the \textbf{main effects}. 
 - $\beta_3$ is the coefficient for the interaction term, representing the effect of $x$ *times* $z$.
   
 # Introducing interactions
