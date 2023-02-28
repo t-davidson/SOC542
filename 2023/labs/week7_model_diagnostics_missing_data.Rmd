@@ -1,0 +1,450 @@
+---
+title: "Week 7 - Model Diagnostics & Missing Data"
+author: "Fred Traylor, Lab TA"
+date: "3/6/2023"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen = 10)
+
+library(tidyverse)
+library(rstanarm)
+library(modelsummary)
+library(broom.mixed)
+library(flextable)
+
+library(mice)
+library(naniar)
+library(car)
+
+seed <- 12345
+```
+
+# Data Loading and Management
+
+Let's use the GSS again. This week, we don't have a specific hypothesis about what leads to income or occupational prestige, but instead we'll be testing various models to see how they fit.
+
+```{r gss-loading}
+gss2018 <- readRDS("lab_data/GSS2018.Rds")
+
+gss <- gss2018 %>% 
+  select(conrinc, hrs1, wrkslf, prestg10, # Current Job
+         educ, degree, maeduc, paeduc,    # Education
+         sex, race, age, wtss             # Other Demos
+  ) %>% haven::zap_labels() %>% 
+  mutate( 
+    logincome = log(conrinc),
+    workexp = age - 18,
+    worksq = workexp^2,
+    workhrs = ifelse(hrs1 == 89, NaN, hrs1),
+    age = ifelse(age > 89, NaN, age),
+    selfemp = ifelse(wrkslf == 1, 1, 0),  # Self-Employed
+    degree = factor(degree, levels = c(0,1,2,3,4),  
+                    labels = c("Less_HS", "HS", "Assoc", "Bach", "Grad") ),
+    female = ifelse(sex == 2, 1, 0),
+    race = factor(race, levels = c(1,2,3),
+                  labels = c("White", "Black", "Other")),
+    weight = wtss
+    ) %>% 
+  select(-hrs1, -wtss, -wrkslf, -sex, -age)
+
+```
+
+In past week's we've run `drop_na()` on our dataset to ensure we only have observations with no missingness. This week, we're going to leave those cases in. But, for comparison, we'll also make a "complete" version of the dataset that has no missing data.
+
+```{r gss-complete}
+gsscomp <- gss %>% drop_na()
+```
+
+## Descriptives
+
+As always, let's look at our descriptive statistics. This time, pay attention to the number of missing observations for each variable.
+
+```{r desc-tables}
+datasummary_skim(gss, type = "numeric", fmt = 2, # Show 2 decimal places 
+                 title = "Sample Descriptive Statistics: Continuous Variables",
+                 notes = "Data: 2018 General Social Survey")
+
+datasummary_skim(gss, type = "categorical",
+                 title = "Sample Descriptive Statistics: Categorical Variables",
+                 notes = "Data: 2018 General Social Survey")
+
+```
+
+
+\newpage
+
+# Some Models
+
+Now that we know what our data looks like, and know there are missing values, let's run some models. Both models use the same predictors, but the second model only uses observations that have no missing data on our variables (`data = gsscomp`).
+
+```{r some-mods}
+mod1 <- lm(logincome ~ prestg10 + selfemp + race + female,
+           data = gss, weights = weight)
+mod2 <- lm(logincome ~ prestg10 + selfemp + race + female,
+           data = gsscomp, weights = weight) # NOTE The use of gsscomp here 
+ourmods <- list("w/Missings" = mod1, "Complete Cases Only" = mod2)
+modelsummary(ourmods, estimate = "{estimate} ({std.error}) {stars}",
+             statistic = NULL, gof_omit = "F|RMSE|Log|IC")
+```
+
+Below, I quickly graph the models to see how the coefficients change when we only use complete cases. The `modelsummary::modelplot()` function does all the backwork in transforming our models into data frames, plotting them in `ggplot2` objects for us. Since it is `ggplot2`, I can then easily add on a vertical line.
+
+```{r  mod-comp}
+modelplot(ourmods, coef_omit = 'Interc') +
+  geom_vline(aes(xintercept = 0), 
+             linetype = "dotted", linewidth = 1, alpha = .5)
+```
+
+\newpage
+
+# Model Diagnostics
+
+## Multicollinearity
+
+### Tolerance
+
+One thing that is very important in model diagnostics is the concept of multicollinearity. We've already talked about it some in this course, but here we'll actually get around to quantifying it.
+
+One measure of multicollinearity is called "Tolerance." The Tolerance for a variable `k` is calculated as: $$ Tolerance = 1-R_k^2$$
+
+In other words, we run a regression of a variable, subtract the $R^2$ from 1, and use this to estimate how similar the variable is to the other variables included in the model. We'll do this for each independent variable to get a final table showing them all.
+
+```{r calc-tol}
+tol_prestg10 <- lm(prestg10 ~ selfemp + race + female,
+                   data = gss)
+summary(tol_prestg10)
+```
+
+We see above that our $R^2$ for `prestg10` is .01919, making the tolerance for Prestige $1- .01919 = .98081$.
+
+A variable where the other predictors have no effects in predicting it would have a tolerance equal to 1. ($R^2 = 0; 1 - 0 = 1$). Our other predictors in `mod1` were weekly predictive of prestige ($R^2 = .01919$), so a Tolerance of .98 is what we expected.
+
+Conversely, a variable that is perfectly predicted by the others would have a tolerance of 0 since $R^2 = 1; 1 - 1 = 0$. Thus, the tolerance ranges from 0 (perfectly predicted by the other variables) to 1 (not at all predicted).
+
+Tolerances less than about .5 are cause to revisit the model. This would mean that a variable is predicted at least 50% by the other predictors in the model.
+
+### VIF
+
+Another method is call the Variance Inflation Factor or VIF. This is related to Tolerance in that it is simply 1 divided by the tolerance: $$ VIF = \frac{1}{1-R_k^2} = \frac{1}{Tolerance}$$
+
+Using the same model above, with our tolerance for prestige at .98081, we can calculate $VIF = \frac{1}{.98081}=1.08196$.
+
+A variable where the other predictors have no effects in predicting it would have a VIF that is very close to 1 ($1 /(0-0) = 1/0 = Undefined$). Conversely, a variable that is perfectly predicted by the others would have a VIF very close to 1 since $1 /(1-1) = 1$. Thus, VIF's range from 1 (not at all predicted) to infinitely large (perfectly predicted). 
+
+VIF's larger than 2 (when tolerance = .5) are cause to revisit the model, and larger than 5 should require a much closer look.
+
+### Calculating Multicollinearity
+
+Because VIF is more commonly used, we'll calculate that first. We can use the `vif()` function from the package `car` to get the VIF. We can then invert VIF (${1}/{VIF}$) to calculate tolerance.
+
+```{r calc-multicoll}
+mcol <- vif(mod1) %>% as.data.frame() %>% 
+  mutate(Tolerance = 1/GVIF)
+print(mcol)
+```
+
+These are all very weakly predicted by the others. Hooray!
+
+You'll notice that these don't align perfectly with our calculations from earlier. This is because the `car::vif()` command calculates the Generalized GIF. Additionally, the metric $GVIF^{1 / (2*Df)}$ is useful in comparing GVIF's across models since it accounts for the number of total predictors. (A model with lots of predictors is likely to capture some variation due to chance, so this helps account for that.)
+
+-   For more information, see John Fox's response to the question here: <https://stats.stackexchange.com/questions/70679/which-variance-inflation-factor-should-i-be-using-textgvif-or-textgvif>
+-   And the linked paper here: <https://www.tandfonline.com/doi/abs/10.1080/01621459.1992.10475190>
+
+#### High Multicollinearity
+
+Let's try to now create a model that *will* have high multicollinearity.
+
+```{r high_multicoll}
+multicolmol <- lm(logincome ~ prestg10 + educ + degree + workexp + worksq + maeduc + paeduc,
+                  data=gsscomp)
+
+vif(multicolmol) %>% 
+  as.data.frame() %>% 
+  mutate(Tolerance = 1/GVIF)
+```
+
+While the output doesn't directly tell us which variables are collinear with each other, we can see that education and degree have high GVIF and then realize that theoretically they would be collinear. The same goes for work experience and `worksq`, which is to be expected since they were created from the same variable. Lastly, we can see that mother's education and father's education, while not reaching a GVIF of 2, are getting close, and might be worth reconsidering having both. 
+
+### Interpreting and Using VIF
+
+What do we even use VIF for, anyway?
+
+Remember that VIF stands for Variance Inflation Factor. Through some fancy statistics work, we can understand it as a multiplier on the standard deviations of the coefficient from what it would be without the collinearity.
+
+Multicollinearity is a problem in modeling because we want each predictor to capture unique portions of the variance in $\hat{y}$. Instead, variables that are highly multicollinear are not capturing unique portions of the variance, making their coefficients less precise, as seen in the increase in standard errors.
+
+In the model above, we can say that the standard error for education is about 4 times higher than it would be if multicollinearity were not present in the model.
+
+\newpage 
+
+## Various Information Criteria
+
+Because we as humans like to quantify things, we have three key metrics we use.
+
+1.  **Log likelihood**, which calculates the likelihood of the data given your parameters. Less negative (larger) is better.
+
+2.  **Akaike information criteria (AIC)**, calculated as $AIC = 2k - 2ln(LL)$, where k is the number of predictors, and LL is the log likelihood. Lower AICs reflect better model fit.
+
+3.  **Bayesian information criteria (BIC)**, calculated as $BIC = -2*LL + log(N)*k$, where LL is the log likelihood, N is the number of observations, and k is the number of predictors. Lower BICs reflect better model fit.
+
+```{r model_fits}
+data.frame(
+  AIC = sapply(ourmods, AIC),
+  BIC = sapply(ourmods, BIC),
+  LogLikelihood = sapply(ourmods, logLik)
+  ) %>%
+  rownames_to_column() %>% 
+  rename("Model" = rowname) %>% flextable() %>% autofit()
+
+```
+
+Fortunately, `modelsummary()` provides all three in the default. (But not for Bayesian Models.)
+
+```{r msumm_fits}
+modelsummary(ourmods, statistic = NULL, stars = T,
+             gof_omit = "F|RMSE")
+```
+
+\newpage
+
+## Cross Validation
+
+When it comes time to evaluate the model's performance itself, not just the goodness-of-fit, missingness, or multicollinearity of its variables, we can use cross-validation. There are multiple methods, but they all rely upon seeing how good the model is at predicting the value of data outside the model.
+
+### Leave-One-Out Cross Validation
+
+One form of cross validation is Leave-One-Out, where we leave out one data point and see how good the model does. **NOTE**: While this can be done on OLS models, the `rstanarm::loo()` function only works on `stan_glm` objects (not `lm`). Because of this, let's create two Bayesian models and see how they do. (Also, you sadly can't use data weights with `loo()`, so we'll create unweighted models.)
+
+```{r bayesmod-create}
+bayes_mod1 <- stan_glm(logincome ~ prestg10 + selfemp + race + female,
+                       data = gsscomp,  seed = seed,
+                       chains = 1, refresh = 0)
+bayes_mod2 <- stan_glm(logincome ~ prestg10 + selfemp + race + female * (workexp + worksq),
+                       data = gsscomp,  seed = seed,
+                       chains = 1, refresh = 0)
+
+bmods <- list(bayes_mod1, bayes_mod2)
+modelsummary(bmods, estimate = "{estimate} ({std.error})",
+             statistic = NULL, gof_omit = "F|RMSE")
+```
+
+Let's run `loo()` on each of our models and then use `loo_compare()` to compare the results.
+
+```{r loo}
+loo1 <- loo(bayes_mod1)
+loo2 <- loo(bayes_mod2)
+loo1
+loo2 
+loo_compare(loo1, loo2)
+```
+
+The results here show that model 1, compared to model1 2, decreases the log likelihood by 29.5, with a standard error of this difference of 8.8. Since 29.5 is much larger than 8.8 (an approximation of a t-test), we can say the second model is better.
+
+We can also visually inspect our values to ensure there's no errant points flying around.
+
+```{r}
+plot(loo1)
+plot(loo2)
+```
+
+### K-Wise Cross Validation
+
+The most popular form of cross validation, however, is K-wise. This means we subset the data into K number of partitions, then cross-validate the model on that. The command is `kfold(model, K = K)`. Below, I run them on just 5 folds for speed, although 10 is the standard.
+
+```{r kfold, message=FALSE, warning=FALSE}
+kf1 <- kfold(bayes_mod1, K = 5)
+kf2 <- kfold(bayes_mod2, K = 5)
+print(list(kf1, kf2))
+loo_compare(kf1, kf2)
+```
+
+Similar to before, we see that the second model increased the log likelihood (AKA made it less negative), meaning it is better at predicting `logincome`.
+
+# Missing Data
+
+## Patterns of Missingness
+
+Lastly tonight, let's talk about missing data.
+
+To start, let's take a look at which variables are missing data. A powerful way to do this is to examine "patterns of missingness." The `naniar` package provides a function `gg_miss_upset()` to create an "upset plot" showing how many observations have missing data on certain combinations of variables.
+
+```{r miss-upset}
+gg_miss_upset(gss)
+```
+
+Since `conrinc` and `logincome` are the same variable ($logincome = log_e(conrinc)$), we know that any missings on one will be missing on the other as well. What is noticeable, though, is the large amount of missings on working hours and parents' education. Looking at the [GSS Data Explorer](https://gssdataexplorer.norc.org/variables/4/vshow), we can see that people who were not working either full or part time are inapplicable here. 
+
+(This website provides other great ways to visualize missingess: <https://cran.r-project.org/web/packages/naniar/vignettes/naniar-visualisation.html>)
+
+## Handling Missing Data
+
+### Complete-Case Analysis
+
+Complete-case analysis is where you drop observations which are missing on any variable in the dataset, even if you're not using them. This is never a good idea.
+
+### Available-Case Analysis
+
+This is what we have done in this course thus far. Available-case analysis is where you drop observations which have missing values on any of the variables you are working with *in a specific model*. This is also called "**listwise deletion**." 
+
+Practically, it's easy. Methodologically, it has some problems. Namely, how do we know our data is missing completely at random?
+
+### Mean (and Median) Imputation
+
+An easy alternative to listwise deletion is mean imputation. This means you "impute" (AKA substitute in) the mean of a variable (or mode, for categorical variable) in the place of any missing value. This allows you to retain cases that would be listwise deleted.
+
+Of course, these are not simple fixes. You run the risk of pushing too many things to the middle, especially when it isn't warranted or even useful. Make sure you know your data when you do this.
+
+The function is `naniar::impute_mean()`. If you think your data are skewed, you can also use `impute_median()` instead.
+
+```{r central-imp}
+gss <- gss %>% 
+  mutate(imp_conrinc = impute_median(conrinc),
+         imp_loginc = impute_mean(logincome))
+
+gss %>% select(conrinc, imp_conrinc, logincome, imp_loginc) %>%
+  datasummary_skim()
+```
+
+Notice how imputing using median and mean strengthens the mean by shrinking the standard deviation. This is especially visible in the density plots below.
+
+```{r imp-density}
+conrincplot <- gss %>% 
+  ggplot() + 
+  geom_density(aes(x = conrinc, color = "Original")) +
+  geom_density(aes(x = imp_conrinc, color = "Imputed")) +
+  theme_minimal() + ggtitle("CONRINC")
+logimcomeplot <- gss %>% 
+  ggplot() + 
+  geom_density(aes(x = logincome, color = "Original")) +
+  geom_density(aes(x = imp_loginc, color = "Imputed")) +
+  theme_minimal() + ggtitle("LOGINCOME")
+
+cowplot::plot_grid(conrincplot, logimcomeplot, nrow = 2)
+  
+```
+
+### Regression Imputation
+
+Regression imputation is like mean imputation, but using multiple variables. It runs a regression equation on each missing observation to estimate the value of the missing data. Now, we can account for differences in missingness based on relationships with other variables. Like magic!
+
+(If you're wondering how R does this for categorical variables, we'll get to it after spring break.)
+
+### Multivariate Imputation by Chained Equations (MICE)
+
+Multiple imputation is a term that means we're doing (regression) imputation multiple times.
+
+The benefit is that we no longer have to settle for just one version of the final imputed variable. We can now make a series of datasets, all with imputed data on the missing values. MICE is just a case of multiple imputation that uses chained equations.
+
+In short: We mean impute values for all variables, use these to regression impute the missing values of them, then repeat until we no longer are using the mean imputed values. Of course, regression imputation gives different values than mean imputation, so we repeat the procedure over and over until the values "converge," another way of saying they stop changing.
+
+If you're curious, more detail on the steps that make these equations chained can be found here: <https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3074241/#mpr329-sec-0002title>
+
+Below, we use the `mice` command to create five new, imputed datasets. (If we only wanted one dataset, a la normal regression imputation, we set `m = 1`.) The `maxit` option tells it how many iterations it should do before giving up. The default is 5, but I set it to 2 here for the same of speed. 
+
+```{r mice1}
+imp <- mice(gss, m = 5, maxit = 2, seed = seed)
+```
+
+The output tells us which variables were imputed and that there are several "logged events." There are several reasons this can occur. The biggest ones are due to collinearity. Let's take a look and see.
+
+```{r mice-logged}
+imp$loggedEvents
+```
+
+The column `meth` tells us that collinearity is to blame for our problem variables. We can then select these columns out to create a new dataset that doesn't include the variables we don't want in our final regression. (We'll keep `logincome` since we're removing `conrinc`.) I also set `printFlag = T` so that we don't get the output from above. 
+
+```{r mice2}
+newimp <- gss %>% 
+  select(-workexp, -conrinc, -imp_loginc, -imp_conrinc) %>% 
+  mice(., m= 5, maxit = 2,
+       seed = seed, printFlag=F)
+newimp$loggedEvents
+
+```
+
+The `NULL` output when we ask for logged events means there were no issues here. 
+
+### MICE Diagnostics
+
+There are several ways to evaluate our imputation. One diagnostic plot we can make is to map the densities of our imputed variables (in red) against the actual (in blue). This might remind you of the posterior predictive checks we use for Bayesian models. 
+
+```{r mice_diag}
+densityplot(newimp, layout = c(3,3))
+```
+
+These suggest that certain variables like `workhrs` and `paeduc` are well imputed by relationships with the other variables, while `worksq` and `educ` have difficulty. A key way to fix this would be to specify which variables should be used to predict the others, but that's beyond our purview for today. For example, saying that $worksq = workexp^2$ would greatly improve prediction of `worksq`. Even better would be to create `worksq` *after* imputation. 
+
+
+### Modeling with Imputed Data
+
+To create a linear regression with imputed data, we cannot use our normal function. Instead we use the `with()` function to tell R to regress "with" our imputed dataset. (As an aside, we could've always used `with(data, lm(y ~x))`, but it didn't make much sense.) 
+
+```{r imp-reg}
+# CAN"T USE THIS WITH MICE DATA
+# impmod1 <- lm(imp_loginc ~ female + race + workhrs + prestg10, data = newimp)
+
+impmod1 <- with(newimp, lm(logincome ~ female + race + workhrs + prestg10))
+
+summary(impmod1)
+```
+
+What's this?! Remember that multiple imputation gives you multiple datasets, so now R ran regressions on each of these datasets.
+
+If you simply run `summary` on the regression object, R will give you one row for each term, for each dataset.
+
+Instead, we can use `mice::pool()` to take the average of the parameters. 
+
+```{r imp-sum}
+impmod_pool <- pool(impmod1)
+summary(impmod_pool)
+```
+
+The `modelsummary()` command will run this for us and will pool the R-squared, but it won't give us other goodness-of-fit info, including the number of observations and how many imputed datasets we have. For this reason, it's generally better to pool your models first. 
+
+```{r imp_msumm}
+modelsummary(impmod1, estimate = "{estimate} ({std.error}) {stars}",
+             statistic = NULL)
+```
+
+
+To explore how the number of imputed datasets can affect the output, let's create one with 100 imputations and 5 maximum iterations. 
+
+```{r bigimp}
+bigimp <- gss %>% select(-conrinc, -imp_loginc) %>% 
+  mice(., m= 100, maxit = 5,
+       seed = seed, printFlag=F)
+impmod2 <- with(bigimp, lm(logincome ~ female + race + workhrs + prestg10))
+impmod2_pool <- pool(impmod2)
+```
+
+Now, let's put together a table comparing out two MICE data models alongside the base model with no imputed data, the complete case model, and the model with mean-imputation.
+
+```{r imp-compare, message=FALSE, warning=FALSE}
+
+mod4 <- lm(logincome ~ female + race + workhrs + prestg10,
+           data = gss)
+mod5 <- lm(logincome ~ female + race + workhrs + prestg10,
+           data = gsscomp)
+mod6 <- lm(imp_loginc ~ female + race + workhrs + prestg10,
+           data = gss)
+lastmods <- list("Avail. Case" = mod4,
+                 "Comp. Case" = mod5,
+                 "Mean Imp" = mod6,
+                 "Reg Imp (M=5)" = impmod_pool,
+                 "Reg Imp (M=100)" = impmod2_pool)
+
+modelsummary(lastmods, stars = T,
+             title = "Comparison of Methods of Handling Missing Data",
+             gof_omit = "RMSE|F")
+
+```
+
+We can also, of course, visualize this as a coefficient plot.
+
+```{r imp-complot}
+modelplot(lastmods, coef_omit = 'Interc') +
+  geom_vline(aes(xintercept = 0), linetype = "dotted", linewidth = 1, alpha = .5)
+```
