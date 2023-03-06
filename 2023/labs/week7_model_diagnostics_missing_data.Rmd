@@ -110,7 +110,7 @@ One thing that is very important in model diagnostics is the concept of multicol
 
 One measure of multicollinearity is called "Tolerance." The Tolerance for a variable `k` is calculated as: $$ Tolerance = 1-R_k^2$$
 
-In other words, we run a regression of a variable, subtract the $R^2$ from 1, and use this to estimate how similar the variable is to the other variables included in the model. We'll do this for each independent variable to get a final table showing them all.
+In other words, we run a regression where the outcome is one of our independent variables, controlling for other independent variables. We then subtract the $R^2$ from 1, and use this to estimate how similar the variable is to the other variables included in the model. We'll do this for each independent variable to get a final table showing them all.
 
 ```{r calc-tol}
 tol_prestg10 <- lm(prestg10 ~ selfemp + race + female,
@@ -136,7 +136,7 @@ A variable where the other predictors have no effects in predicting it would hav
 
 VIF's larger than 2 (when tolerance = .5) are cause to revisit the model, and larger than 5 should require a much closer look.
 
-### Calculating Multicollinearity
+### Measuring Multicollinearity
 
 Because VIF is more commonly used, we'll calculate that first. We can use the `vif()` function from the package `car` to get the VIF. We can then invert VIF (${1}/{VIF}$) to calculate tolerance.
 
@@ -172,7 +172,7 @@ While the output doesn't directly tell us which variables are collinear with eac
 
 What do we even use VIF for, anyway?
 
-Remember that VIF stands for Variance Inflation Factor. Through some fancy statistics work, we can understand it as a multiplier on the standard deviations of the coefficient from what it would be without the collinearity.
+Remember that VIF stands for Variance Inflation Factor. We can understand it as a multiplier on the standard deviations of the coefficient from what it would be without the collinearity.
 
 Multicollinearity is a problem in modeling because we want each predictor to capture unique portions of the variance in $\hat{y}$. Instead, variables that are highly multicollinear are not capturing unique portions of the variance, making their coefficients less precise, as seen in the increase in standard errors.
 
@@ -182,7 +182,7 @@ In the model above, we can say that the standard error for education is about 4 
 
 ## Various Information Criteria
 
-Because we as humans like to quantify things, we have three key metrics we use.
+These measures all capture how well a model fits the observed data. Each of these metrics is difficult to interpret in isolation but provides a useful way to compare multiple models
 
 1.  **Log likelihood**, which calculates the likelihood of the data given your parameters. Less negative (larger) is better.
 
@@ -201,7 +201,7 @@ data.frame(
 
 ```
 
-Fortunately, `modelsummary()` provides all three in the default. (But not for Bayesian Models.)
+Fortunately, `modelsummary()` provides all three in the default for frequentist models.
 
 ```{r msumm_fits}
 modelsummary(ourmods, statistic = NULL, stars = T,
@@ -212,7 +212,7 @@ modelsummary(ourmods, statistic = NULL, stars = T,
 
 ## Cross Validation
 
-When it comes time to evaluate the model's performance itself, not just the goodness-of-fit, missingness, or multicollinearity of its variables, we can use cross-validation. There are multiple methods, but they all rely upon seeing how good the model is at predicting the value of data outside the model.
+Predictive performance can be calculated using cross-validation. These approaches are infrequently used in frequentist statistics but are central to modern Bayesian inference.
 
 ### Leave-One-Out Cross Validation
 
@@ -227,8 +227,8 @@ bayes_mod2 <- stan_glm(logincome ~ prestg10 + selfemp + race + female * (workexp
                        chains = 1, refresh = 0)
 
 bmods <- list(bayes_mod1, bayes_mod2)
-modelsummary(bmods, estimate = "{estimate} ({std.error})",
-             statistic = NULL, gof_omit = "F|RMSE")
+modelsummary(bmods,
+             statistic = "conf.int", gof_omit = "F|RMSE")
 ```
 
 Let's run `loo()` on each of our models and then use `loo_compare()` to compare the results.
@@ -236,23 +236,21 @@ Let's run `loo()` on each of our models and then use `loo_compare()` to compare 
 ```{r loo}
 loo1 <- loo(bayes_mod1)
 loo2 <- loo(bayes_mod2)
-loo1
-loo2 
 loo_compare(loo1, loo2)
 ```
 
-The results here show that model 1, compared to model1 2, decreases the log likelihood by 29.5, with a standard error of this difference of 8.8. Since 29.5 is much larger than 8.8 (an approximation of a t-test), we can say the second model is better.
+The comparison shows that the first model tends to perform worse according to the ELPD metric than model 2.
 
-We can also visually inspect our values to ensure there's no errant points flying around.
+We can also plot the Pareto k values, which can indicate whether there are data points that may bias the results. Ideally, all values should be less than 0.7.
 
 ```{r}
 plot(loo1)
 plot(loo2)
 ```
 
-### K-Wise Cross Validation
+### K-Fold Cross Validation
 
-The most popular form of cross validation, however, is K-wise. This means we subset the data into K number of partitions, then cross-validate the model on that. The command is `kfold(model, K = K)`. Below, I run them on just 5 folds for speed, although 10 is the standard.
+The most popular form of cross validation is K-fold. This means we subset the data into K number of partitions, then cross-validate the model on that. The command is `kfold(model, K = K)`. Below, I run them on just 5 folds for speed, although 10 is the standard (assuming there is sufficient data to fit each).
 
 ```{r kfold, message=FALSE, warning=FALSE}
 kf1 <- kfold(bayes_mod1, K = 5)
@@ -261,7 +259,7 @@ print(list(kf1, kf2))
 loo_compare(kf1, kf2)
 ```
 
-Similar to before, we see that the second model increased the log likelihood (AKA made it less negative), meaning it is better at predicting `logincome`.
+Similar to before, we see that the second model is better at predicting `logincome`.
 
 # Missing Data
 
@@ -308,7 +306,7 @@ gss %>% select(conrinc, imp_conrinc, logincome, imp_loginc) %>%
   datasummary_skim()
 ```
 
-Notice how imputing using median and mean strengthens the mean by shrinking the standard deviation. This is especially visible in the density plots below.
+Notice how imputing using median and mean puts more density around these values and reduces the standard deviation. This is especially visible in the density plots below.
 
 ```{r imp-density}
 conrincplot <- gss %>% 
@@ -328,7 +326,7 @@ cowplot::plot_grid(conrincplot, logimcomeplot, nrow = 2)
 
 ### Regression Imputation
 
-Regression imputation is like mean imputation, but using multiple variables. It runs a regression equation on each missing observation to estimate the value of the missing data. Now, we can account for differences in missingness based on relationships with other variables. Like magic!
+Regression imputation is like mean imputation, but using multiple variables. It runs a regression equation on each missing observation to estimate the value of the missing data. Now, we can account for differences in missingness based on relationships with other variables.
 
 (If you're wondering how R does this for categorical variables, we'll get to it after spring break.)
 
@@ -375,7 +373,7 @@ There are several ways to evaluate our imputation. One diagnostic plot we can ma
 densityplot(newimp, layout = c(3,3))
 ```
 
-These suggest that certain variables like `workhrs` and `paeduc` are well imputed by relationships with the other variables, while `worksq` and `educ` have difficulty. A key way to fix this would be to specify which variables should be used to predict the others, but that's beyond our purview for today. For example, saying that $worksq = workexp^2$ would greatly improve prediction of `worksq`. Even better would be to create `worksq` *after* imputation. 
+These suggest that certain variables like `workhrs` and `paeduc` are well imputed by relationships with the other variables, while `worksq` and `educ` have difficulty. A way to improve the imputations would be to specify which variables should be used to predict the others, but that's beyond our purview for today. For example, saying that $worksq = workexp^2$ would greatly improve prediction of `worksq`. Even better would be to create `worksq` *after* imputation. 
 
 
 ### Modeling with Imputed Data
@@ -383,7 +381,7 @@ These suggest that certain variables like `workhrs` and `paeduc` are well impute
 To create a linear regression with imputed data, we cannot use our normal function. Instead we use the `with()` function to tell R to regress "with" our imputed dataset. (As an aside, we could've always used `with(data, lm(y ~x))`, but it didn't make much sense.) 
 
 ```{r imp-reg}
-# CAN"T USE THIS WITH MICE DATA
+# CAN'T USE THIS WITH MICE DATA
 # impmod1 <- lm(imp_loginc ~ female + race + workhrs + prestg10, data = newimp)
 
 impmod1 <- with(newimp, lm(logincome ~ female + race + workhrs + prestg10))
@@ -391,7 +389,7 @@ impmod1 <- with(newimp, lm(logincome ~ female + race + workhrs + prestg10))
 summary(impmod1)
 ```
 
-What's this?! Remember that multiple imputation gives you multiple datasets, so now R ran regressions on each of these datasets.
+What's this?! Remember that multiple imputation gives you multiple datasets, so now R ran a separate regression on each of these datasets.
 
 If you simply run `summary` on the regression object, R will give you one row for each term, for each dataset.
 
