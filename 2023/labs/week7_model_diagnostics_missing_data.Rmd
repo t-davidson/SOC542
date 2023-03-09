@@ -132,7 +132,7 @@ Another method is call the Variance Inflation Factor or VIF. This is related to 
 
 Using the same model above, with our tolerance for prestige at .98081, we can calculate $VIF = \frac{1}{.98081}=1.08196$.
 
-A variable where the other predictors have no effects in predicting it would have a VIF that is very close to 1 ($1 /(0-0) = 1/0 = Undefined$). Conversely, a variable that is perfectly predicted by the others would have a VIF very close to 1 since $1 /(1-1) = 1$. Thus, VIF's range from 1 (not at all predicted) to infinitely large (perfectly predicted). 
+A variable where the other predictors have no effects in predicting it would have a VIF that is very close to 1 ($1 /(1-1) = 1/0 = Undefined$). Conversely, a variable that is perfectly predicted by the others would have a VIF very close to 1 since $1 /(1-0) = 1$. Thus, VIF's range from 1 (not at all predicted) to infinitely large (perfectly predicted). 
 
 VIF's larger than 2 (when tolerance = .5) are cause to revisit the model, and larger than 5 should require a much closer look.
 
@@ -148,7 +148,7 @@ print(mcol)
 
 These are all very weakly predicted by the others. Hooray!
 
-You'll notice that these don't align perfectly with our calculations from earlier. This is because the `car::vif()` command calculates the Generalized GIF. Additionally, the metric $GVIF^{1 / (2*Df)}$ is useful in comparing GVIF's across models since it accounts for the number of total predictors. (A model with lots of predictors is likely to capture some variation due to chance, so this helps account for that.)
+You'll notice that these don't align perfectly with our calculations from earlier. This is because the `car::vif()` command calculates the Generalized VIF. Additionally, the metric $GVIF^{1 / (2*Df)}$ is useful in comparing GVIF's across models since it accounts for the number of total predictors. (A model with lots of predictors is likely to capture some variation due to chance, so this helps account for that.)
 
 -   For more information, see John Fox's response to the question here: <https://stats.stackexchange.com/questions/70679/which-variance-inflation-factor-should-i-be-using-textgvif-or-textgvif>
 -   And the linked paper here: <https://www.tandfonline.com/doi/abs/10.1080/01621459.1992.10475190>
@@ -186,7 +186,7 @@ These measures all capture how well a model fits the observed data. Each of thes
 
 1.  **Log likelihood**, which calculates the likelihood of the data given your parameters. Less negative (larger) is better.
 
-2.  **Akaike information criteria (AIC)**, calculated as $AIC = 2k - 2ln(LL)$, where k is the number of predictors, and LL is the log likelihood. Lower AICs reflect better model fit.
+2.  **Akaike information criteria (AIC)**, calculated as $AIC = 2k - 2(LL)$, where k is the number of predictors, and LL is the log likelihood. Lower AICs reflect better model fit.
 
 3.  **Bayesian information criteria (BIC)**, calculated as $BIC = -2*LL + log(N)*k$, where LL is the log likelihood, N is the number of observations, and k is the number of predictors. Lower BICs reflect better model fit.
 
