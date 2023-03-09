@@ -1,7 +1,7 @@
 ---
 title: "Week 8 - Regression w/Binary Outcomes"
 author: "Fred Traylor, Lab TA"
-date: "3/21/2022"
+date: "3/20/2023"
 output: pdf_document
 ---
 
