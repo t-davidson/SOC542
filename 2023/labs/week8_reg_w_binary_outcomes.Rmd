@@ -1,5 +1,5 @@
 ---
-title: "Week 8 - Regression w/Binary Outcomes"
+title: "Week 8 - Regression with Binary Outcomes"
 author: "Fred Traylor, Lab TA"
 date: "3/20/2023"
 output: pdf_document
@@ -16,7 +16,7 @@ library(broom.mixed)
 library(flextable)
 library(naniar)
 
-seed <- 12345
+seed <- 10980
 ```
 
 
@@ -78,9 +78,8 @@ gss <- gss %>%
   filter(ballot != 1) 
 gg_miss_upset(gss)
 gss %>% count()
-
 ```
-Much better! We still have about 100 people missing responses to our target variable, but there are no noticeable patterns with or among the other variables. While we can (and probably should) do any of the methods from last time to impute missing values, this week, we're just going to use listwise deletion to keep it simple. 
+Much better! We still have about 100 people missing responses to our target variable, but there are no noticeable patterns with or among the other variables. While we can (and probably should) do any of the methods from last time to impute missing values, we're just going to use listwise deletion to keep it simple. 
 
 ```{r}
 gss <- gss %>% drop_na()
@@ -102,9 +101,9 @@ datasummary_skim(gss, type = "categorical",
 
 ```
 
-We could also create a "balance table" that compares demographics on each side of the issue. It isn't traditional to publish this in an article, but it does offer an interesting look. (These are usually put at the beginning of an article using experimental or other two-sample data, allowing readers to see the sample are similar. That said, it'll do in our case for some quick looks.)
+We can also create a "balance table" to compares demographics on each side of the issue.
 
-The format is `datasummary_balance(~VAR, data = DATA, ... )`, where `VAR` is the variable we want to analyze the sample by. Also, the function only provides differences and standard errors of those differences for continuous variables and only when we split by two groups.  
+The format is `datasummary_balance(~VAR, data = DATA, ... )`, where `VAR` is the variable we want to analyze the sample by. Note the function only provides differences and standard errors of those differences for continuous variables and only when we split by two groups.  
 
 ```{r baltable}
 datasummary_balance(~legal_grass, data = gss,
@@ -123,8 +122,7 @@ Let's start off by creating a linear probability model for the likelihood somebo
 ```{r lin-prob}
 linprob1 <- lm(legal_grass ~ conservatism + age + educ + race4 + sex,
                data = gss, weights = weight)
-modelsummary(linprob1, estimate = "{estimate} ({std.error}) {stars}",
-             statistic = NULL, gof_omit = "F|RMSE|Log|IC")
+modelsummary(linprob1, estimate = "{estimate} ({std.error})", statistic = NULL, gof_omit = "F|RMSE|Log|IC")
 ```
 
 
@@ -165,18 +163,18 @@ ggplot(linpreddata, aes(x = conservatism, y = age, fill = pred_grass)) +
   scale_x_continuous(breaks = seq(0,8,1)) +
   scale_y_continuous(breaks = seq(18,88,10)) +
   labs(title = "Linear Probability Model",
+       y = "Age", x = "Conservativsm", fill = "Probability",
        subtitle = "Predicted Probability of Favoring Marijuana Legalization")
 ```
 
 
+# Logistic regression
 
-# Logit Model
-
-Now, let's make a model using logistic regression. (This is also called a "logit" model.) 
+Now, let's estimate an alternative model using logistic regression. (This is also called a "logit" model.) 
 
 The set up is very similar to how we create a linear regression model. There are two key differences: 
 1. We use the `glm()` function instead of `lm()`.
-2. We include a line saying `family = "binomial"`. 
+2. We include the argument `family = "binomial"` to specify the link function.
 
 Let's go ahead and run three models. First, let's recreate our previous linear probability model, but this time using `glm()` and `family = gaussian(link = "identity")`. Second, let's run a logistic regression model using `glm()` and `family = "binomial"`. And lastly, we'll add a model "`logit_base`" that uses only conservatism as a predictor. 
 
@@ -198,11 +196,11 @@ compmods <- list("LPM via OLS" = linprob1,
                  "Base Logit" = logit_base,
                  "Full Logit" = logit_full)
 modelsummary(compmods,
-             estimate = "{estimate} ({std.error}) {stars}",
+             estimate = "{estimate} ({std.error})",
              statistic = NULL, gof_omit = "F|RMSE")
 ```
 
-One of the first things we notice is that the standard errors of the coefficients have exploded in size in the logit model!
+One of the first things we notice is that the standard errors of the coefficients have exploded in size in the logit model and the coefficients are very different.
 
 You'll also notice that we get different model diagnostics when we use `lm()` and `glm()`. We don't get an $R^2$ for the GLM's. But we also see a significant shrinkage in the model AIC and BIC when using the GLM. 
 
@@ -216,6 +214,8 @@ modelplot(compmods, coef_omit = 'Interc') +
 ```
 
 We see here just how big the confidence intervals are in our logit model. We also see that the linear probability model coefficient estimates are typically covered by the logit model's confidence intervals. Interestingly, we also see big differences in the coefficients for conservatism. 
+
+This plot highlights the differences between the models, but it is critical to note that these coefficients have different interpretations, so should not be directly compared on the same scale. 
 
 ## Interpretation
 
@@ -265,12 +265,13 @@ ggplot(logitpreddata, aes(x = conservatism, y = age, fill = pred_grass)) +
   scale_x_continuous(breaks = seq(0,8,1)) +
   scale_y_continuous(breaks = seq(18,88,10)) +
   labs(title = "Logit Model",
+        y = "Age", x = "Conservativsm", fill = "Probability",
        subtitle = "Predicted Probability of Favoring Marijuana Legalization")
 ```
 
 # Odds Ratios
 
-Because log odds are often difficult to interpret, another way of presenting your output is with odds ratios.
+Log odds can be difficult to interpret, so another way of presenting your output is with odds ratios.
 
 Getting the exponentiated coefficients is easy. Just use `exp()` on the coefficients of your model. Below, I compare the log odds and the odds ratios of our logit model. 
 
@@ -289,11 +290,11 @@ For continuous variables, such as education, we say that each additional year of
 
 **If the OR is greater than 1, it is an increase in the odds. If it is less than 1, it is a decrease.**
 
-Because of this easy interpretation, at least as far as applying results, I personally prefer to work with odds ratios. On the other hand, I know others prefer log odds because the simple positive-negative heuristic works for them. (0.25 and -0.25 are the same distance from zero, which is easier to understand than 0.25 and 4 being the same distance from 1. )
+Because of this easy interpretation, I personally prefer to work with odds ratios. On the other hand, I know others prefer log odds because the simple positive-negative heuristic works for them. (0.25 and -0.25 are the same distance from zero, which is easier to understand than 0.25 and 4 being the same distance from 1. )
 
-While exponentiating the coefficients is easy, getting standard errors for these is much more difficult. 
+While exponentiating the coefficients is easy, getting standard errors is a little more difficult. 
 
-Fortunately, `modelsummary` makes it easy: just include `exponentiate = T`. 
+Fortunately, `modelsummary` makes it easy: just include `exponentiate = T` to get odds ratis and associated standard errors.
 
 ```{r OR-table}
 modelsummary(logit_full, exponentiate = T,
@@ -331,7 +332,7 @@ In the models above, we see that the base logit model, which only included conse
 The most standard method of model evaluation is the $R^2$. However, we cannot calculate it in logistic regression. Instead, we can approximate it with a "pseudo" $R^2$. A common way of doing this is McFadden's $R^2$, calculated as: 
 
 $$R^2_{McFadden} = \frac{1 - LL_{mod}}{ LL_0}$$
-Where $LL_{mod}$ is the log-likelihood for the model, and $LL_0$ is the Log Likelihood for the "null model" which only includes the intercept as the predictor. (More info here: http://thestatsgeek.com/2014/02/08/r-squared-in-logistic-regression/)
+Where $LL_{mod}$ is the log-likelihood for the model, and $LL_0$ is the Log Likelihood for the "null model" which only includes the intercept as the predictor.
 
 We can calculate it using the `DescTools` package. (**Note** that I use `package::function()` form below, since `DescTools` overwrites some important functions in `modelsummary`.) We can also ask it to give us the log-likelihood. 
 
@@ -344,7 +345,7 @@ DescTools::PseudoR2(lin_glm1, which = c("McFadden","McFaddenAdj", "logLik"))
 Just like with log likelihood, we want to maximize McFadden's pseudo-$R^2$. 
 
 # Bayesian Modeling 
-Let's finish by replicating two of our previous analyses using `stan_glm()`. The first is the linear probability model and the second is the logistic model. You'll note that they display the exact same except for the line that tell `rstanarm` what "family" of distributions to pull from. The "identity" family tells it to maintain the 'identity' of the dependent variable, while the "logit" family tells it to perform the 'logit' transformation on the dependent variable. 
+Let's finish by replicating two of our previous analyses using `stan_glm()`. The first is the linear probability model and the second is the logistic model. You'll note that they display the exact same except for the line that tell `rstanarm` what "family" of distributions to pull from. The "identity" family tells it not to conduct any transformation, while the "logit" family tells it to perform the logit transformation on the dependent variable. 
 
 ```{r bayes}
 bmodlinpro <- stan_glm(legal_grass ~ conservatism + age + educ + race4 + sex,
