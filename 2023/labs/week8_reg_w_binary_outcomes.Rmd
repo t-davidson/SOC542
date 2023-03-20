@@ -13,6 +13,7 @@ library(tidyverse)
 library(rstanarm)
 library(modelsummary)
 library(broom.mixed)
+options(modelsummary_get = "broom") 
 library(flextable)
 library(naniar)
 
