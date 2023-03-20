@@ -90,7 +90,7 @@ options("modelsummary_format_numeric_latex" = "plain")
 ## Specification
 - The LPM is estimated using OLS:
 
-$$P(y=1) = \beta_0 + \beta_1x_1 + \beta_2x_2 + ... + \beta_kx_k + u$$
+$$y = \beta_0 + \beta_1x_1 + \beta_2x_2 + ... + \beta_kx_k + u$$
 
 - Thus,
 
