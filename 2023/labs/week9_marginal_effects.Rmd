@@ -1,0 +1,353 @@
+---
+title: "Week 9 - Marginal Effects"
+author: "Fred Traylor, Lab TA"
+date: "3/27/2023"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen = 10)
+
+library(tidyverse)
+library(rstanarm)
+library(modelsummary)
+library(broom.mixed)
+options(modelsummary_get = "broom") 
+library(flextable)
+library(naniar)
+library(marginaleffects)
+# library(collapse) # Don't have to load, but make sure it's installed. 
+
+seed <- 10980
+```
+
+
+# Data Loading and Management
+
+Let's use the GSS again. This week, we'll be looking again at factors that influence a person's income and factors that predict whether that person has been unemployed at any point in the past ten years. 
+
+```{r gss-loading}
+gss2018 <- readRDS("lab_data/GSS2018.Rds") 
+
+gss <- gss2018 %>% 
+  select(
+
+    # Targets: R's Income & Hrs Worked
+    conrinc, unemp,
+    
+    # Demographics 
+    prestg10, wrkslf,
+    sex, race, hispanic, age, educ, 
+    wtss, 
+    ) %>% 
+  haven::zap_labels() %>% 
+  mutate( 
+    
+    # New Variables
+    unemp = 2-unemp,
+
+    # Variables we've used before
+    logincome = log(conrinc),
+    selfemp = ifelse(wrkslf == 2, "OtherEmp", "SelfEmp"),
+    age = ifelse(age > 88, NaN, age),
+    agesq = age^2,
+    sex = ifelse(sex == 1, "Male", "Female"),
+    race = case_when(
+      hispanic != 1 ~ "Hispanic",
+      race == 1 & hispanic == 1 ~ "White",
+      race == 2 & hispanic == 1 ~ "Black",
+      race == 3 & hispanic == 1 ~ "Other",
+      ),
+    race4 = factor(race, levels = c("White", "Black", "Hispanic", "Other")),
+    weight = wtss
+    )  %>% 
+  select(-wtss, - race, -hispanic, -conrinc, -wrkslf) %>% 
+  drop_na()
+
+```
+
+
+# A Regression Model
+
+Let's start by creating a set of models that predicts respondent's income.  As before, we use `age`, and a term for the square of that value, `agesq.` In the third equation of this set, I use `I(age^2)` for the squared term. We'll get to this in a minute, but this will let us calculate effects of work experience and work experience-squared at the same time. 
+
+```{r three-mods, message=FALSE}
+
+increg1 <- lm(logincome ~ race4 + age +            educ + sex + selfemp,
+              data = gss, weights = weight)
+increg2 <- lm(logincome ~ race4 + age + agesq +    educ + sex + selfemp,
+              data = gss, weights = weight)
+increg3 <- lm(logincome ~ race4 + age + I(age^2) + educ + sex + selfemp,
+              data = gss, weights = weight)
+
+modelsummary(list(increg1, increg2, increg3),
+             estimate = "{estimate} ({std.error}) {stars}",
+             statistic = NULL, gof_omit = "F|RMSE|IC|Log",
+             output = "flextable") %>% autofit()
+```
+
+Notice that models 2 and 3 are identical, except for what we use as inputs for the squared term of age. The `I(age^2)` term is important here. 
+
+# Predicted Effects
+
+In the past, we used the `predict()` function to predict values at certain points. This time, we're going to use the `predictions()` function in the `marginaleffects` package. 
+
+```{r pred1}
+predictions(increg3, by = c("sex", "race4"))
+```
+
+Above, we have predicted values of `logincome` at each level of `race4` and `sex`, along with standard errors of these predictions. The function also held all of our other predictors (`age`, `educ`, etc.) at their means and mode. 
+
+We can also predict income at different values of education, like so:
+
+```{r pred2}
+predictions(increg3, by = "educ") %>% arrange(educ)
+```
+
+Let's now plot the predicted values of income based on education using the `plot_predictions()` function. 
+```{r predplot1-educprest}
+plot_predictions(increg3, condition = "educ")
+```
+
+This plot shows the predicted values of income along various points of education, when everything else is held at the mean. (More on that in a minute.) If we go back up to our predictions from above, we see that the predicted (log) income at 0 years of education was 8.899 and at 20 years it was 10.856. The other points follow in a straight line because this is a linear prediction from a linear model. 
+
+*What about a nonlinear effect, though?* 
+
+Remember that earlier we saw a curvilinear effect of age and age-squared on income. Our second model used these as two separate terms, `age` and `agesq`, while our third model used them as one term `age` and a term constructed within the equation from it `I(age^2)`. Let's now see what that did. 
+
+You might have noticed that the graph above has `ggplot` aesthetics, so all `ggplot` changes are possible. Here, I added titles to each graph, and also plotted the actual data with `ggplot` as well. 
+
+```{r predplot2-age}
+cowplot::plot_grid(
+  plot_cap(increg2, condition = "age") + ggtitle("Model 2: Age"),
+  plot_cap(increg2, condition = "agesq")  + ggtitle("Model 2: agesq"),
+  plot_cap(increg3, condition = "age") + ggtitle("Model 3"),
+  ggplot(gss, aes(x = age, y = logincome)) + 
+    geom_smooth(color = "black", linewidth = .5) +
+    ggtitle("Actual")
+  )
+```
+
+Above, we can see that age is associated with an increase in income, while the square of age decreases it. We also see that, when we put these together, we get a parabolic effect, such that income peaks and then declines with work experience (age). When using predictions, we want to use these constructed terms like `I(age^2)` to ensure that we can map the effect of age on income like this. 
+
+When we compare model 3's relationship of age to income, we see it is much more in line with the relationship we see in our actual data. 
+
+## Plotting Predictions w/Two or More Variables
+
+You can also use the `plot_cap()` function to plot predictions with two or more variables. Below, we see the effects of education and sex together on income. 
+
+```{r plotcap-multi}
+plot_predictions(increg3, condition = c("educ", "sex"))
+```
+
+Just note, however, you can only have two conditions per graph. If you want more than two factors, you can "facet" your graph using ggplot. 
+
+Below, we construct predictions, feed those to ggplot, and build our plot around that. 
+```{r predggplot}
+incpreds <- predictions(increg3, by = c("selfemp", "age", "sex"))
+head(incpreds)
+
+ggplot(incpreds,
+       aes(x = age, y = estimate,
+           ymin = estimate - std.error, 
+           ymax = estimate + std.error)) +
+  geom_ribbon(aes(fill = selfemp), alpha = .3) +
+  geom_line(aes(color = selfemp), linewidth = 1.5) + 
+  facet_wrap(~sex) +
+  theme_minimal() + 
+  labs(title = "Predicted Value of Income (Logged)", subtitle = "Data: 2018 GSS", 
+       fill = "Self Employment", color = "Self Employment",
+       caption = "Shaded regions show one standard error")
+```
+
+
+# Marginal Effects 
+What if we want to see how the predicted value changes when we go from one value to another? We can find the "marginal effect" of a variable to see how the predicted effect changes. This is particularly important for logistic regression, where coefficients do not have a straightforward linear interpretation. 
+
+## Another Model
+Let's create another model, this time predicting whether the respondent has ever been unemployed during the past ten years.
+
+Running this will throw us a warning, but we can ignore that. Another way of running it that won't produce the warning is to use `family = "quasibinomial"` instead of  `"binomial"`, but the output  will be the same. The only noticable difference in the two is that SE's will be larger, and we won't get a log-Likelihood (or AIC). 
+
+```{r workmods}
+unemp1 <- glm(unemp ~ logincome + race4 + age + I(age^2) + educ + sex + selfemp,
+              data = gss, weights = weight, family = "binomial")
+unemp2 <- glm(unemp ~ logincome + race4 + age + I(age^2) + educ + sex + selfemp,
+              data = gss, weights = weight, family = "quasibinomial")
+modelsummary(list(unemp1, unemp2),
+             estimate = "{estimate} ({std.error}) {stars}",
+             statistic = NULL, gof_omit = "F|RMSE")
+```
+
+## Marginal Effects 
+```{r mfx1}
+slopes(unemp1) %>% as.data.frame()
+```
+
+Notice the column "dydx." If you've ever taken calculus, you'll recognize this as the change in y (delta y) over the change in x (delta x). In other words, this is the change in predicted value at this point along the line. 
+
+The values above show the marginal effect of each independent variable, for each observation. In this case, there are eight regressors (Black, Hispanic, Other, age, education, sex, income, and self-employed) and 895 observations: $8*895 = 7160$.
+
+This is good info, but it's also a ton of info, and not in a form that is very useful. 
+
+## Average Marginal Effect 
+
+One way to summarize this information is to calculate the average of the marginal effects. We can get the marginal effects and then take the average of that across different levels. 
+
+```{r ame}
+slopes(unemp1) %>% summary()
+```
+
+We can also display these in a table. Because we have contrasts (from categorical variables), we need to tell `modelsummary` how to group our terms. (We're going to work on `modelsummary`'s grouping terms more in two weeks, so no need to fully understand what happening on that line.) Briefly, what the line says is that we want columns for "term" and "contrast" and then our models.  
+```{r ame-table}
+mfx <- lapply(list("unemp1" = unemp1, "increg3" = increg3), 
+              slopes)
+modelsummary(mfx, stars = T,
+             group = term + contrast ~ model,
+             gof_omit = "F|RMSE|IC|Log|R", output = "flextable") %>% autofit()
+```
+
+## Marginal Effects at the Mean 
+
+You might've noticed that, in most models above, all the other factors were held at their means. This is actually a very common method, to hold all variables at their means. This is called the marginal effect at the mean (MEM). For each variable, it calculates the marginal effect when all other variables are held at their means. (Categorical variables are set at their modes.) This makes it both useful and easy useful to interpret. 
+
+If we want to hold them at their means, we set `newdata` to `datagrid()`, with nothing inside, which defaults to everything at the mean (or mode).
+```{r mem}
+slopes(unemp1, newdata = datagrid())
+```
+
+So above, we see that the average effect of a one year increase in education is a  0.01 decrease in the log odds of having been unemployed, when everything else is held at their means (or modes). Similarly, although we know the effect of age changes, on average, it decreases the log odds by 0.007.
+
+For categorical variables, we use the contrast column to specify the effect. So being female increases the log odds of being unemployed by .006, compared to men, and being Black increases them by 0.058 compared to white. 
+
+## Conditional Marginal Effects
+
+We can also consider marginal effects conditional on the value of other covariates. 
+
+Below, I construct the marginal effects where education is set at 12 years. The equation is the same as above, `slopes(model), newdata = datagrid()`,  but with an argument into which we input our conditions.
+
+```{r cme}
+slopes(unemp1, newdata = datagrid(educ = 12))
+```
+
+We can also specify multiple conditions, like where race is Black, age is 35, and education is at either 12 or 16. 
+
+```{r cmegrid}
+marginaleffects(unemp1, newdata = datagrid(educ = c(12,16),
+                                           race4 = "Black",
+                                           age = 35)) %>% 
+  as.data.frame()
+```
+
+Notice above that each `rowid` has 2 levels, one where `educ==12` and one where `educ==16`. So row 1 is the marginal effect of `logincome` on unemployment where race is Black, age is 35, and education is 12; row 2 is the same, but where education is 16. We do see a (very) slight difference in the marginal effect ("dydx") between these two points. 
+
+The next two rows examine the marginal effects of Black, compared to White, when race is Black, age is 35, and education is 12 and 16. 
+
+If you look further down, you see the marginal effect of an additional year of education at 12 and 16 are slightly different, suggesting that education's buffer against unemployment slows down at higher levels. 
+
+
+### Conditional Marginal Effects Plots 
+
+Conditional marginal effects tables are useful, but it often makes more sense to plot them to see what is going on. We often use this to illustrate and create interactions. 
+
+```{r cmeplot}
+plot_slopes(unemp1, variables = "logincome", condition = c("educ")) + 
+  geom_hline(yintercept = 0, linetype = "dotted") + theme_light()
+
+```
+
+In this graph, we see that income provides some sort of buffer against unemployment, such that each additional unit of `logincome` decreases the log odds of having been unemployed in the past decade by about .08 but (nonsignificantly) gets whittled away with higher years of education. 
+
+We can also plot the marginal effects conditional on multiple variables, including categorical ones. 
+```{r cmeplot-cat}
+plot_cme(unemp1, variables = "age", condition = c("selfemp","sex")) + theme_minimal()
+```
+
+
+This plot displays the marginal effects of sex and employment on the odds of somebody being unemployed. We see that the effect is slightly higher for other-employed females than for everybody else, although this difference is neither large nor statistically significant. 
+
+Lastly, if we include a categorical variable in the `variables = VAR` argument, `plot_slopes()` will show the effects differently across them.  
+
+```{r cmeplot-cat2}
+plot_slopes(unemp1, variables = "race4", condition = c("age")) + 
+  geom_hline(yintercept = 0, linetype = "dotted") + theme_light()
+```
+
+By breaking this out by race, we see that being Hispanic (compared to White workers) increases the log odds of unemployment among younger workers, an effect that is nonexistent among Black or Other-Race workers. 
+
+# Marginal Effects with Bayesian Models 
+Lastly, let's explore creating predictions and marginal effects using Bayesian models. 
+
+## Model Estimation
+
+Let's create two models that replicate the ones we created before, `increg3` and `unemp1`.
+```{r bayes}
+bmod_unemp <- stan_glm(unemp ~ race4 + age + I(age^2) + educ + sex + selfemp,
+                       data = gss, weights = weight, 
+                       family = binomial(link = "logit"),
+                       seed = seed, chains = 1, refresh = 0)
+bmod_inc <- stan_glm(logincome ~ race4 + age + I(age^2) + educ + sex + selfemp,
+                     data = gss, weights = weight,
+                     family = gaussian(link = "identity"),
+                     seed = seed, chains = 1, refresh = 0)
+
+modelsummary(list("Logit: Unemployment" = bmod_unemp, "OLS: Income (log)" = bmod_inc), 
+             estimate = "{estimate} ({std.error})", 
+             statistic = NULL, gof_omit = "F|RMSE|pss|alg")
+
+```
+
+## Predictions
+Fortunately, we can use the same functions above to predict from Bayesian models. (Just make sure you have the `collapse` package installed.)
+
+```{r bayespred}
+predictions(bmod_inc, by = c("educ", "sex")) %>% 
+  as.data.frame() %>% arrange(educ, sex)
+```
+
+We can also plot from them as well. 
+```{r bayespredplot}
+cowplot::plot_grid(
+  plot_predictions(increg3, condition = "age") + ggtitle("OLS Income"),
+  plot_predictions(unemp1, condition = "age") + ggtitle("MLE Unemployment"),
+  plot_predictions(bmod_inc, condition = "age") + ggtitle("Bayes Income"),
+  plot_predictions(bmod_unemp, condition = "age") + ggtitle("Bayes Unemployment")
+  )
+```
+
+## Marginal Effects 
+We can also use them to find the marginal effects. 
+```{r bmfx}
+slopes(bmod_inc) %>% as.data.frame()
+```
+
+Just like before, we have the marginal effects of each variable for each observation. We should instead summarize this uncertainty by calculating average marginal effects.
+
+```{r bmfxsum}
+summary(slopes(bmod_unemp))
+```
+
+Let's also remind ourselves what the frequentist model's average marginal effects looked like and combine those into a data frame with the Bayesian ones. 
+
+```{r mfx-comp}
+mfxwork <- summary(slopes(unemp1)) %>% 
+  mutate(model = "MLE") %>% select(model, term, contrast, estimate)
+bmfxwork <- summary(slopes(bmod_unemp)) %>% 
+  mutate(model = "Bayes") %>% select(model, term, contrast, estimate)
+
+rbind(mfxwork, bmfxwork) %>% as.data.frame() %>% 
+  arrange(term, contrast) 
+```
+
+Starting from the top, we see that the effects of each term are fairly similar, which is what we expected. For example, each additional year of age decreases the probability of having been unemployed by 0.05 in the MLE model and by .007 in the Bayesian model. 
+
+The contrasts are slightly larger for other variables. For example, being male increases the log odds of unemployment by .05 in the ML model, but by only .006 in the Bayesian one. 
+
+Lastly, let's plot the marginal effect of education conditional on age:
+
+```{r bcmeplot}
+plot_slopes(bmod_unemp, variables = "educ", condition = c("age")) + 
+  geom_hline(yintercept = 0, linetype = "dotted") + theme_light()
+```
+
