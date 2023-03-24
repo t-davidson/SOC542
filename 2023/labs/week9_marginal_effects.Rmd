@@ -10,11 +10,11 @@ knitr::opts_chunk$set(echo = TRUE)
 options(scipen = 10)
 
 library(tidyverse)
+  theme_set(theme_light())
 library(rstanarm)
 library(modelsummary)
 library(broom.mixed)
 options(modelsummary_get = "broom") 
-library(flextable)
 library(naniar)
 library(marginaleffects)
 # library(collapse) # Don't have to load, but make sure it's installed. 
@@ -83,8 +83,8 @@ increg3 <- lm(logincome ~ race4 + age + I(age^2) + educ + sex + selfemp,
 
 modelsummary(list(increg1, increg2, increg3),
              estimate = "{estimate} ({std.error}) {stars}",
-             statistic = NULL, gof_omit = "F|RMSE|IC|Log",
-             output = "flextable") %>% autofit()
+             title = "Income Models",
+             statistic = NULL, gof_omit = "F|RMSE|IC|Log")
 ```
 
 Notice that models 2 and 3 are identical, except for what we use as inputs for the squared term of age. The `I(age^2)` term is important here. 
@@ -129,7 +129,7 @@ cowplot::plot_grid(
   )
 ```
 
-Above, we can see that age is associated with an increase in income, while the square of age decreases it. We also see that, when we put these together, we get a parabolic effect, such that income peaks and then declines with work experience (age). When using predictions, we want to use these constructed terms like `I(age^2)` to ensure that we can map the effect of age on income like this. 
+Above, we can see that age is associated with an increase in income, while the square of age decreases it. We also see that, when we put these together, we get a parabolic effect, such that income peaks and then declines with age. When using predictions, we want to use these constructed terms like `I(age^2)` to ensure that we can map the effect of age on income like this. 
 
 When we compare model 3's relationship of age to income, we see it is much more in line with the relationship we see in our actual data. 
 
@@ -138,15 +138,26 @@ When we compare model 3's relationship of age to income, we see it is much more 
 You can also use the `plot_cap()` function to plot predictions with two or more variables. Below, we see the effects of education and sex together on income. 
 
 ```{r plotcap-multi}
-plot_predictions(increg3, condition = c("educ", "sex"))
+plot_predictions(increg3, condition = c("educ", "sex")) 
 ```
 
 Just note, however, you can only have two conditions per graph. If you want more than two factors, you can "facet" your graph using ggplot. 
 
 Below, we construct predictions, feed those to ggplot, and build our plot around that. 
+
+I use the `datagrid()` function to construct a grid that sets the variables from `increg3` at their means/modes, except for the three that I specify by hand. Those get set to the specified ranges of values. 
+
+I then use that grid into the `newdata = ` argument of `predictions()` to create predicted values of logincome for each combination of self employment, age, and sex I specified. 
+
+Lastly, I use the predicted values to plot these predictions.  
+
 ```{r predggplot}
-incpreds <- predictions(increg3, by = c("selfemp", "age", "sex"))
-head(incpreds)
+incgrid <- datagrid(model = increg3,
+                    selfemp = unique(gss$selfemp),
+                    age = seq(18,88,10),
+                    sex = unique(gss$sex))
+
+incpreds <- predictions(increg3, newdata = incgrid)
 
 ggplot(incpreds,
        aes(x = age, y = estimate,
@@ -155,12 +166,12 @@ ggplot(incpreds,
   geom_ribbon(aes(fill = selfemp), alpha = .3) +
   geom_line(aes(color = selfemp), linewidth = 1.5) + 
   facet_wrap(~sex) +
-  theme_minimal() + 
   labs(title = "Predicted Value of Income (Logged)", subtitle = "Data: 2018 GSS", 
        fill = "Self Employment", color = "Self Employment",
        caption = "Shaded regions show one standard error")
 ```
 
+\newpage 
 
 # Marginal Effects 
 What if we want to see how the predicted value changes when we go from one value to another? We can find the "marginal effect" of a variable to see how the predicted effect changes. This is particularly important for logistic regression, where coefficients do not have a straightforward linear interpretation. 
@@ -177,23 +188,26 @@ unemp2 <- glm(unemp ~ logincome + race4 + age + I(age^2) + educ + sex + selfemp,
               data = gss, weights = weight, family = "quasibinomial")
 modelsummary(list(unemp1, unemp2),
              estimate = "{estimate} ({std.error}) {stars}",
+             title = "Unemployment Models", 
              statistic = NULL, gof_omit = "F|RMSE")
 ```
 
-## Marginal Effects 
+## Marginal Effects
+To examine the marginal effects of our variables, we use the function `slopes()`. 
+
 ```{r mfx1}
-slopes(unemp1) %>% as.data.frame()
+slopes(unemp1) %>% as.data.frame() %>% head(12)
 ```
 
 Notice the column "dydx." If you've ever taken calculus, you'll recognize this as the change in y (delta y) over the change in x (delta x). In other words, this is the change in predicted value at this point along the line. 
 
 The values above show the marginal effect of each independent variable, for each observation. In this case, there are eight regressors (Black, Hispanic, Other, age, education, sex, income, and self-employed) and 895 observations: $8*895 = 7160$.
 
-This is good info, but it's also a ton of info, and not in a form that is very useful. 
+This is good info, but it's not in a useful form. 
 
 ## Average Marginal Effect 
 
-One way to summarize this information is to calculate the average of the marginal effects. We can get the marginal effects and then take the average of that across different levels. 
+One way to summarize this information is to calculate the average of the marginal effects. We can get the marginal effects and then take the average of that across different levels. The `summary()` function will condense the information for us.
 
 ```{r ame}
 slopes(unemp1) %>% summary()
@@ -203,9 +217,10 @@ We can also display these in a table. Because we have contrasts (from categorica
 ```{r ame-table}
 mfx <- lapply(list("unemp1" = unemp1, "increg3" = increg3), 
               slopes)
+
 modelsummary(mfx, stars = T,
              group = term + contrast ~ model,
-             gof_omit = "F|RMSE|IC|Log|R", output = "flextable") %>% autofit()
+             gof_omit = "F|RMSE|IC|Log|R")
 ```
 
 ## Marginal Effects at the Mean 
@@ -225,18 +240,18 @@ For categorical variables, we use the contrast column to specify the effect. So 
 
 We can also consider marginal effects conditional on the value of other covariates. 
 
-Below, I construct the marginal effects where education is set at 12 years. The equation is the same as above, `slopes(model), newdata = datagrid()`,  but with an argument into which we input our conditions.
+Below, I construct the marginal effects where education is set at 10 years. The equation is the same as above, `slopes(model), newdata = datagrid()`,  but with an argument into which we input our conditions.
 
 ```{r cme}
-slopes(unemp1, newdata = datagrid(educ = 12))
+slopes(unemp1, newdata = datagrid(educ = 10))
 ```
 
 We can also specify multiple conditions, like where race is Black, age is 35, and education is at either 12 or 16. 
 
 ```{r cmegrid}
-marginaleffects(unemp1, newdata = datagrid(educ = c(12,16),
-                                           race4 = "Black",
-                                           age = 35)) %>% 
+slopes(unemp1, newdata = datagrid(educ = c(12,16),
+                                  race4 = "Black",
+                                  age = 35)) %>% 
   as.data.frame()
 ```
 
@@ -253,25 +268,25 @@ Conditional marginal effects tables are useful, but it often makes more sense to
 
 ```{r cmeplot}
 plot_slopes(unemp1, variables = "logincome", condition = c("educ")) + 
-  geom_hline(yintercept = 0, linetype = "dotted") + theme_light()
-
+  geom_hline(yintercept = 0, linetype = "dotted") 
 ```
 
 In this graph, we see that income provides some sort of buffer against unemployment, such that each additional unit of `logincome` decreases the log odds of having been unemployed in the past decade by about .08 but (nonsignificantly) gets whittled away with higher years of education. 
 
 We can also plot the marginal effects conditional on multiple variables, including categorical ones. 
 ```{r cmeplot-cat}
-plot_cme(unemp1, variables = "age", condition = c("selfemp","sex")) + theme_minimal()
+plot_slopes(unemp1, variables = "age", 
+            condition = c("selfemp","sex"))
 ```
 
 
 This plot displays the marginal effects of sex and employment on the odds of somebody being unemployed. We see that the effect is slightly higher for other-employed females than for everybody else, although this difference is neither large nor statistically significant. 
 
-Lastly, if we include a categorical variable in the `variables = VAR` argument, `plot_slopes()` will show the effects differently across them.  
+Lastly, if we include a multi-categorical variable in the `variables = VAR` argument, `plot_slopes()` will show the effects differently across them.  
 
 ```{r cmeplot-cat2}
 plot_slopes(unemp1, variables = "race4", condition = c("age")) + 
-  geom_hline(yintercept = 0, linetype = "dotted") + theme_light()
+  geom_hline(yintercept = 0, linetype = "dotted")
 ```
 
 By breaking this out by race, we see that being Hispanic (compared to White workers) increases the log odds of unemployment among younger workers, an effect that is nonexistent among Black or Other-Race workers. 
@@ -293,6 +308,7 @@ bmod_inc <- stan_glm(logincome ~ race4 + age + I(age^2) + educ + sex + selfemp,
                      seed = seed, chains = 1, refresh = 0)
 
 modelsummary(list("Logit: Unemployment" = bmod_unemp, "OLS: Income (log)" = bmod_inc), 
+             title = "Bayesian Models", 
              estimate = "{estimate} ({std.error})", 
              statistic = NULL, gof_omit = "F|RMSE|pss|alg")
 
@@ -319,7 +335,7 @@ cowplot::plot_grid(
 ## Marginal Effects 
 We can also use them to find the marginal effects. 
 ```{r bmfx}
-slopes(bmod_inc) %>% as.data.frame()
+slopes(bmod_inc) %>% as.data.frame() %>% head(12)
 ```
 
 Just like before, we have the marginal effects of each variable for each observation. We should instead summarize this uncertainty by calculating average marginal effects.
@@ -348,6 +364,6 @@ Lastly, let's plot the marginal effect of education conditional on age:
 
 ```{r bcmeplot}
 plot_slopes(bmod_unemp, variables = "educ", condition = c("age")) + 
-  geom_hline(yintercept = 0, linetype = "dotted") + theme_light()
+  geom_hline(yintercept = 0, linetype = "dotted") 
 ```
 
