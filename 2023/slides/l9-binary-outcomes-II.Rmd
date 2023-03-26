@@ -42,9 +42,9 @@ knitr::knit_hooks$set(mysize = function(before, options, envir) {
 })
 
 knitr::opts_chunk$set(
- fig.width = 4,
+ fig.width = 3.5,
  fig.asp = 0.8,
- out.width = "70%",
+ out.width = "65%",
  fig.align = "center"
 )
 
@@ -57,13 +57,8 @@ set.seed(08901)
 
 library(ggplot2)
 library(tidyverse)
-library(latex2exp)
 library(kableExtra)
 library(modelsummary)
-library(viridis)
-library(cowplot)
-library(mice)
-library(reshape2)
 library(rstanarm)
 library(marginaleffects)
 
@@ -125,10 +120,9 @@ $$P(y=1) = p = logit^{-1}(\beta_0 + \beta_1x + \beta_2z + \beta_3xz)$$
     - Membership in a micro-finance Self-Help Group (SHG), N = 3357
 - Independent variables:
     - Age (continuous)
-    - Nativity (dummy)
-        - 72% of women not born in current village, largely due to marriage-related migration
+    - Nativity (dummy), 72% of women not born in current village due to marriage-related migration
     
-```{r load-dom, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+```{r load-dom, echo = FALSE, mysize=TRUE, size='\\scriptsize'}
 library(haven)
 data <- read_dta("../../2022/slides/data/individual_characteristics.dta") %>%
     select(village, resp_gend, age, religion, caste, educ, villagenative, shgparticipate) %>%
@@ -147,39 +141,39 @@ data <- read_dta("../../2022/slides/data/individual_characteristics.dta") %>%
 # Interaction terms
 ## Data exploration
 There are two different factors that will be useful for understanding the results. First, nonnative respondents (typically married women due to village exogamy) and SHG participants tend to be older than natives and non-participants.
-```{r exploration, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+```{r exploration, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
 data %>% group_by(nonnative) %>% summarize(mean(age), median(age)) 
 ```
 
 # Interaction terms
 ## Data exploration
 There are two different factors that will be useful for understanding the results. First, nonnative respondents (typically married women due to village exogamy) and SHG participants tend to be older than natives and non-participants.
-```{r exploration2, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+```{r exploration2, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
 data %>% group_by(shg) %>% summarize(mean(age), median(age)) 
 ```
 
 # Interaction terms
 ## Data exploration
-```{r age-plot1, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+```{r age-plot1, echo = FALSE, mysize=TRUE, size='\\scriptsize'}
 ggplot(aes(x = age), data = data) + geom_histogram(bins = 10, alpha = 0.5, color = "black") + theme_classic()
 ```
 
 # Interaction terms
 ## Data exploration
-```{r age-plot2, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+```{r age-plot2, echo = FALSE, mysize=TRUE, size='\\scriptsize'}
 ggplot(aes(x = age, group = nonnative, fill = as.factor(nonnative)), data = data) + geom_histogram(bins = 10, alpha = 0.5, color = "black") + theme_classic() + labs(fill = "nonnative")
 ```
 
 # Interaction terms
 ## Data exploration
-```{r age-plot3, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+```{r age-plot3, echo = FALSE, mysize=TRUE, size='\\scriptsize'}
 ggplot(aes(x = age, group = shg, fill = as.factor(shg)), data = data) + geom_histogram(bins = 10, alpha = 0.5, color = "black") + theme_classic() + scale_fill_viridis_d() + labs(fill = "SHG")
 ```
 
 # Interaction terms
 ## Data exploration
 Second, ~40% of nonnative women participate in SHGs, compared to only ~30% of natives. 
-```{r exploration3, echo = TRUE, mysize=TRUE, size='\\footnotesize', warning = F}
+```{r exploration3, echo = TRUE, mysize=TRUE, size='\\scriptsize', warning = F}
 data %>% group_by(nonnative, shg) %>%
     summarize(count = n(), .groups = "keep") %>% kable()
 ```
@@ -187,7 +181,7 @@ data %>% group_by(nonnative, shg) %>%
 # Interaction terms
 ## Estimating models
 A LPM and logistic regression are used to estimate the probability of SHG membership as a function of age and nativity (whether a respondent was born in their current village of residence). 
-```{r simple-lpm1, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+```{r simple-lpm1, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
 lpm <- lm(shg ~ age + nonnative + age:nonnative, 
           data = data)
 logistic <- glm(shg ~ age + nonnative + age:nonnative, 
@@ -196,8 +190,8 @@ logistic <- glm(shg ~ age + nonnative + age:nonnative,
 
 # Interaction terms
 ## Comparing models
-```{r table1, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
-modelsummary(list("LPM"=lpm, "Logistic"=logistic, "Odds-ratio"=logistic), stars = c("*" = 0.05, "**" = 0.01, "***" = 0.001), gof_omit = "AIC|BIC|RMSE|R2|Std.Errors|FE", exponentiate = c(F,F,T), output = "huxtable", coef_omit = "(Intercept)")
+```{r table1, echo = FALSE, mysize=TRUE, size='\\scriptsize'}
+modelsummary(list("LPM"=lpm, "Logistic"=logistic, "Odds-ratio"=logistic), stars = c("*" = 0.05, "**" = 0.01, "***" = 0.001), gof_omit = "AIC|BIC|RMSE|R2|Std.Errors|FE", exponentiate = c(F,F,T), output = "markdown", coef_omit = "(Intercept)")
 ```
 
 # Interaction terms
@@ -212,7 +206,7 @@ modelsummary(list("LPM"=lpm, "Logistic"=logistic, "Odds-ratio"=logistic), stars 
 - One of the ways we can start to make sense of these interactions is by making predictions.
 - Let's consider predictions for a nonnative woman aged 25:
 
-```{r preds-simple, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+```{r preds-simple, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
 c1 <- coefficients(lpm)
 c2 <- coefficients(logistic)
 p.lpm <- as.numeric(c1[1] + c1[2]*25 + c1[3] + c1[4]*25)
@@ -225,7 +219,7 @@ print(p.logit)
 ## Understanding interactions using predictions
 - The predictions are different if we ignore the interaction term:
 
-```{r preds-simple2, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+```{r preds-simple2, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
 p.lpm.ignore <- as.numeric(c1[1] + c1[2]*25 + c1[3])
 p.logit.ignore <- invlogit(as.numeric(c2[1] + c2[2]*25 + c2[3]))
 print(p.lpm.ignore)
@@ -237,7 +231,7 @@ print(p.logit.ignore)
 - We could also make the same predictions for native women, holding age constant.
 - The equation is simplified since the main effect and interaction effect are now zero:
 
-```{r preds-simple3, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+```{r preds-simple3, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
 p.lpm2 <- as.numeric(c1[1] + c1[2]*25)
 p.logit2 <- invlogit(as.numeric(c2[1] + c2[2]*25))
 print(p.lpm2)
@@ -247,79 +241,55 @@ print(p.logit2)
 - Despite the negative interaction, the main effect of nativity implies that a village native will be less likely to belong to an SHG, holding age constant.
 
 # Predictions
-## Using a for-loop to make predictions
-```{r preds-loop, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
-results <- as_tibble()
-for (a in 18:85) {
-    for (n in 0:1) {
-        p <- invlogit(
-            as.numeric(c2[1] + c2[2]*a + c2[3]*n +
-                                        c2[4]*(a*n)))
-        r <- list("p" = p, "age" =  a, "nonnative" = n)
-        results <- bind_rows(results, r)
-    }
-}
-```
-
-# Predictions
-## Predicted values by age and nativity
-```{r preds-plot, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
-ggplot(aes(x = age, y = p, group = nonnative, color = as.factor(nonnative)),
-       data = results) +
-    geom_line() + geom_smooth(method = "lm", se = F, color = "black", linetype = "dotted") +
-    labs(y = "Predicted probability of SHG membership",
-        x = "Age", color = "nonnative") + theme_classic()
-```
-\tiny Dotted black lines show linear fits to the predictions to help illustrate non-linearity. Neither line is truly linear, although the characteristic S-curve is only discernible for the steeper line.
-
-# Predictions
 ## Using the `predictions` function
-- These predictions can be obtained by using the  `predictions` function from `marginaleffects`.
+- We can do this systematically by creating a new object containing every combination of predictors. The `predictions` function can then be used to obtain predicted values from the model.
 
-```{r predictions, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
-new <- results %>% select(age, nonnative)
-preds <- predictions(logistic, newdata = as.data.frame(new))
+```{r predictions, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
+ages <- 18:85
+nativity <- 0:1
+new <- expand.grid(list("age" = ages, "nonnative" = nativity))
+
+preds <- predictions(logistic, newdata = new)
 preds %>% select(estimate, age, nonnative) %>%
     head(5) %>% kable()
 ```
 
 # Predictions
 ## Plotting the results\footnote{Standard errors are calculated using an approach known as the delta method. See \href{https://www.stata.com/support/faqs/statistics/compute-standard-errors-with-margins/}{this post} for further details.}
-```{r preds-plot2, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+```{r preds-plot2, echo = FALSE, mysize=TRUE, size='\\scriptsize'}
 ggplot(aes(x = age, y = estimate, group = nonnative, color = as.factor(nonnative)), data = preds) + geom_ribbon(aes(ymin = conf.low, ymax = conf.high), fill = "grey70", color = "black", alpha = 0.5, linetype = "dotted") +
     geom_line() + labs(y = "Predicted probability of SHG membership",
-                                          x = "Age", color = "nonnative") + theme_classic()
+                       x = "Age", color = "nonnative") + theme_classic()
 ```
 
 # Predictions
 We can directly obtain these results by using the `plot_predictions` function.
 
-```{r plot-cap, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+```{r plot-cap, echo = FALSE, mysize=TRUE, size='\\scriptsize'}
 plot_predictions(logistic, condition = c("age", "nonnative")) + theme_classic()
 ```
 
 # Predictions
 ## Improving the model
 - The previous model suggests differences in relationship by nativity.
-    - For natives, there is a strong positive relationship between age and SHG membership.
-    - For nonnatives, there is little evidence of such a relationship.
+- For natives, there is a strong positive relationship between age and SHG membership.
+- For nonnatives, there is little evidence of such a relationship.
 - Although there are age differences, these patterns seem remarkably strong.
-    - I suspect that adding a squared term for age will help to improve the model.
+- I suspect that adding a squared term for age will help to improve the model.
 
 # Predictions
 ## Improving the model
-```{r age-squared, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+```{r age-squared, echo = FALSE, mysize=TRUE, size='\\scriptsize'}
 logistic2 <- glm(shg ~ age + I(age^2) + nonnative + age:nonnative, data = data, family = binomial())
 
-modelsummary(list("Logistic 1"=logistic, "Logistic 2"=logistic2), stars = c("*" = 0.05, "**" = 0.01, "***" = 0.001), gof_omit = "AIC|BIC|RMSE", output = "huxtable")
+modelsummary(list("Logistic 1"=logistic, "Logistic 2"=logistic2), stars = c("*" = 0.05, "**" = 0.01, "***" = 0.001), gof_omit = "AIC|BIC|RMSE", output = "markdown")
 ```
 
 # Predictions
 ## Making new predictions
-```{r age-squared-preds, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+```{r age-squared-preds, echo = FALSE, mysize=TRUE, size='\\scriptsize'}
 plot_predictions(logistic2, condition = c("age", "nonnative")) + theme_classic()
 ```
-
 
 # Marginal effects
 ## Predictions versus marginal effects
@@ -327,12 +297,12 @@ plot_predictions(logistic2, condition = c("age", "nonnative")) + theme_classic()
 - But what if we want to make statements about the overall effect of a predictor?
     - What is the average effect of age?
     - How does the effect of age vary as a function of other covariates?
-- Like polynomial regression, it is difficult to determine this by examining coefficients or plotting predictions.
+    - Like polynomial regression, it is difficult to determine this by examining coefficients or plotting predictions.
 
 # Marginal effects
 ## Definitions
 - A \textbf{marginal effect} is the relationship between change in single predictor and the dependent variable while *holding other variables constant*.
-    - Recall that standard OLS coefficients can be intepreted as marginal effects, but this is no longer true with logistic regression.
+- Recall that standard OLS coefficients can be intepreted as marginal effects, but this is no longer true with logistic regression.
 - "Marginal effects are partial derivatives of the regression equation with respect to each variable in the model for each unit in the data."\footnote{Leeper 2021. See the \href{https://cran.r-project.org/web/packages/margins/vignettes/Introduction.html}{vignette} for the margins package.}
 - In a logistic regression, the effects of predictors can be non-linear, such that the effect of $x$ on $y$ will vary according to the level of $z$.
 
@@ -344,7 +314,7 @@ plot_predictions(logistic2, condition = c("age", "nonnative")) + theme_classic()
 ## Calculation
 Observe how the `slopes` function returns $N*k$ rows, where $N$ is the number of observations in the dataset and $k$ is the number of *unique* predictors.
 
-```{r me, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+```{r me, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
 ME <- slopes(logistic2)
 dim(ME)
 dim(data)[1]*2
@@ -353,7 +323,7 @@ dim(data)[1]*2
 # Marginal effects
 ## Interpretation
 This table shows the marginal effects for age and nonnative for the first two respondents.
-```{r me-head, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+```{r me-head, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
 ME %>% filter(rowid <= 2) %>% arrange(rowid) %>%
     select(rowid, term, contrast, estimate, std.error, shg, age, nonnative) %>%
     kable()
@@ -363,39 +333,41 @@ ME %>% filter(rowid <= 2) %>% arrange(rowid) %>%
 ## Marginal effects at specified values
 - Marginal effects are better understood by contextualizing them at relevant values of the data.
 - Like the example above, we may want to calculate the marginal effect of a predictor at specific values of other covariates.
-    - e.g. What is the marginal effect of age by nativity at different values of age?
-
+- e.g. How does the effect of age vary by nativity and age?
+    
 # Marginal effects
-## Marginal effects at specified values: Nativity at age 25
-```{r me-specified, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+## Marginal effects at specified values
+```{r me-specified, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
 ME.n <- slopes(logistic,
-                       newdata = datagrid(nonnative = c(0,1),
-                                          age = c(25)))
+               newdata = datagrid(nonnative = c(0,1),
+                                  age = c(25)))
 ME.n %>% filter(term == "age") %>%
     select(estimate, std.error, nonnative, age) %>%
     kable()
 ```
 
+<!--
 # Marginal effects
 ## Marginal effects at specified values: Comparing 25 and 65 year olds
-```{r me-diff, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+```{r me-diff, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
 round(ME.n$estimate[2] - ME.n$estimate[1],3)
 ```
 - Here is the same result when considering respondents aged 65 (calculation omitted):
-
-```{r me-65, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+    
+```{r me-65, echo = FALSE, mysize=TRUE, size='\\scriptsize'}
 ME.n2 <- slopes(logistic2,
-                       newdata = datagrid(nonnative = c(0,1),
-                                          age = c(65)))
+                newdata = datagrid(nonnative = c(0,1),
+                                   age = c(65)))
 round(ME.n2$estimate[2] - ME.n2$estimate[1],3)
 ```
+-->
 
 # Marginal effects
-## Marginal effects at specified values: Age for natives
-```{r me-specified-age, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+## Marginal effects at specified values
+```{r me-specified-age, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
 ME.a <- slopes(logistic,
-                       newdata = datagrid(nonnative = 0,
-                                          age = 18:65))
+               newdata = datagrid(nonnative = 0,
+                                  age = 18:65))
 ME.a %>% filter(term == "age") %>%
     select(estimate, std.error, age)  %>%
     filter(age %in% c(18,25,35,45,55,65)) %>%
@@ -403,32 +375,33 @@ ME.a %>% filter(term == "age") %>%
 ```
 
 # Marginal effects
-## Marginal effects at specified values: Age for natives
-```{r me-specified-age2, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+## Marginal effects at specified values
+```{r me-specified-age2, echo = FALSE, mysize=TRUE, size='\\scriptsize'}
 ggplot(aes(x = age, y = estimate), data = ME.a %>% filter(term == "age")) + geom_line() +
     geom_ribbon(aes(ymin = conf.low, ymax = conf.high), fill = "grey70", color = "black", alpha = 0.3, linetype = 'dotted') + theme_classic()
 ```
-\tiny Note the non-linear relationship occurs even thought the inputs to the model are linear (i.e. age$^2$ is not included as a predictor). This is because the logistic regression creates a non-linear mapping of the linear model.
+\tiny Note the non-linear relationship occurs even thought the inputs to the model are linear. This is because the logistic regression creates a non-linear mapping of the linear model.
 
 # Marginal effects
 ## Plotting conditional marginal effects using `plot_slopes`
-```{r me-specified-nn-cme1, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
-plot_slopes(logistic, variables = "age", condition = list("age", "nonnative" = 0)) + 
-    theme_classic() + theme(legend.position = "none")
-```
-# Marginal effects
-## Plotting conditional marginal effects using `plot_slopes`
-```{r me-specified-nn-cme2, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
-plot_slopes(logistic, variables = "age", condition = list("age", "nonnative")) + 
+```{r me-specified-nn-cme1, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
+plot_slopes(logistic, variables = "age", 
+            condition = list("age", "nonnative" = 0)) +
     theme_classic() + theme(legend.position = "none")
 ```
 
-
+# Marginal effects
+## Plotting conditional marginal effects using `plot_slopes`
+```{r me-specified-nn-cme2, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
+plot_slopes(logistic, variables = "age", 
+            condition = list("age", "nonnative")) + 
+    theme_classic() + theme(legend.position = "none")
+```
 
 # Marginal effects
 ## Plotting conditional marginal effects using `plot_slopes`
-The relationship is very different if we consider the model with the squared age term.
-```{r me-specified-age-cme, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+The relationship changes substantially when we add age$^2$.
+```{r me-specified-age-cme, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
 plot_slopes(logistic2, variables = "age", condition = c("age", "nonnative")) +
     theme_classic() + geom_hline(yintercept = 0, linetype = "dashed")
 ```
@@ -442,7 +415,7 @@ plot_slopes(logistic2, variables = "age", condition = c("age", "nonnative")) +
 # Marginal effects
 ## Marginal effects at means
 We can get the marginal effects at means by specifying `newdata = "mean"`. Does this approach make sense in this case?
-```{r mem-specified-age2, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+```{r mem-specified-age2, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
 slopes(logistic2, newdata = "mean") %>% 
     select(term, estimate, age, nonnative) %>%
     kable()
@@ -451,7 +424,7 @@ slopes(logistic2, newdata = "mean") %>%
 # Marginal effects
 ## Marginal effects at means
 In this case, it is more appropriate to consider the marginal effects for each value of nonnative. By default, age is now held at the mean value.
-```{r mem-specified-age2-2, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+```{r mem-specified-age2-2, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
 slopes(logistic2, 
                 newdata = datagrid(nonnative = c(0,1))) %>%
                 select(term, estimate, age, nonnative) %>%
@@ -466,7 +439,7 @@ slopes(logistic2,
 # Marginal effects
 ## Average marginal effects
 We can obtain the AME by taking a summary of the marginal effects table produced above (`ME`). 
-```{r AME, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+```{r AME, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
 AME <- summary(ME)
 AME %>% select(term, estimate, std.error) %>% kable()
 ```
@@ -474,7 +447,7 @@ AME %>% select(term, estimate, std.error) %>% kable()
 # Marginal effects
 ## Average marginal effects
 This quantity can also be directly computed using `avg_slopes`.
-```{r AME2, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+```{r AME2, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
 avg_slopes(logistic2) %>%
                 select(term, estimate, std.error) %>%
                 kable()
@@ -482,8 +455,8 @@ avg_slopes(logistic2) %>%
 
 # Marginal effects
 
-We can also produce a plot of the marginal effects and associated confidence intervals by calling `modelplot` on the full marginal effects table.
-```{r AME-plot, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+We can plot of the marginal effects and confidence intervals by calling `modelplot` on the marginal effects table.
+```{r AME-plot, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
 modelplot(ME) + geom_vline(xintercept = 0, linetype = "dotted")
 ```
 
@@ -495,16 +468,17 @@ modelplot(ME) + geom_vline(xintercept = 0, linetype = "dotted")
 
 # Marginal effects
 
-```{r age-cubed, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+```{r age-cubed, echo = FALSE, mysize=TRUE, size='\\scriptsize'}
 logistic3 <- glm(shg ~ age + I(age^2) + nonnative + age:nonnative + caste + educ + village, data = data, family = binomial())
 
-modelsummary(list("Logistic 1"=logistic, "Logistic 2"=logistic2, "Logistic 3"=logistic3), stars = c("*" = 0.05, "**" = 0.01, "***" = 0.001), coef_omit = "village", gof_omit = "AIC|BIC|RMSE|F|Num.Obs.", output = "huxtable")
+modelsummary(list("Logistic 1"=logistic, "Logistic 2"=logistic2, "Logistic 3"=logistic3), stars = c("*" = 0.05, "**" = 0.01, "***" = 0.001), coef_omit = "village", gof_omit = "AIC|BIC|RMSE|F|Num.Obs.", output = "markdown")
 ```
 
 # Marginal effects
 
-```{r me-specified-age3, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
-plot_slopes(logistic3, variable = "age", condition = c("age", "nonnative")) + theme_classic()
+```{r me-specified-age3, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
+plot_slopes(logistic3, variable = "age", condition = c("age", "nonnative")) +
+    theme_classic()
 ```
 
 # Marginal effects
@@ -515,7 +489,7 @@ plot_slopes(logistic3, variable = "age", condition = c("age", "nonnative")) + th
 # Marginal effects
 ## Bayesian estimation
 
-```{r bayes, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+```{r bayes, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
 bayes <- stan_glm(shg ~ age + I(age^2) + nonnative + age:nonnative, 
                   data = data, family = binomial(), 
                   chains = 1, refresh = 0)
@@ -525,7 +499,7 @@ bayes <- stan_glm(shg ~ age + I(age^2) + nonnative + age:nonnative,
 # Marginal effects
 ## Bayesian estimation
 The AMEs are close to those obtained from the maximum likelihood model.
-```{r bayes.plot, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+```{r bayes.plot, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
 summary(slopes(bayes)) %>% 
     kable()
 ```
@@ -533,22 +507,25 @@ summary(slopes(bayes)) %>%
 # Marginal effects
 We can see similar relationships using the same `plot_slopes` specification as above.
 
-```{r bayes.plot2, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+```{r bayes.plot2, echo = FALSE, mysize=TRUE, size='\\scriptsize'}
 plot_slopes(bayes, variable = "age", condition = c("age", "nonnative")) + theme_minimal()
 ```
 
 # Marginal effects
 ## Improving the model?
 
-```{r bayes.2, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
-bayes.2 <- stan_glm(shg ~ age + I(age^2) + nonnative + age:nonnative + caste + educ + village, 
+```{r bayes.2, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
+bayes.2 <- stan_glm(shg ~ age + I(age^2) + nonnative +
+                        caste + 
+                        nonnative:caste + age:caste + age:nonnative +
+                        educ + village, 
                     data = data, family = binomial(),
                     chains = 1,  refresh = 0)
 ```
 
 # Marginal effects
 ## Comparing the held-out likelihood scores using LOO-CV
-```{r bayes.loo, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+```{r bayes.loo, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
 l1 <- loo(bayes)
 l2 <- loo(bayes.2)
 loo_compare(l1,l2)
@@ -556,13 +533,25 @@ loo_compare(l1,l2)
 
 # Marginal effects
 
-```{r bayes.loo-plot, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+```{r bayes.loo-plot, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
 plot(l2)
 ```
 
 # Marginal effects
-```{r bayes.plot-final, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+```{r bayes.plot-final, echo = FALSE, mysize=TRUE, size='\\scriptsize'}
 plot_slopes(bayes.2, variable = "age", condition = c("age", "nonnative")) + theme_classic()
+```
+
+# Marginal effects
+We can easily extend this approach to consider other variables.
+```{r bayes.plot-final2, echo = FALSE, mysize=TRUE, size='\\scriptsize'}
+plot_slopes(bayes.2, variable = "caste", condition = c("nonnative")) + theme_classic()
+```
+
+# Marginal effects
+We can easily extend this approach to consider other variables.
+```{r bayes.plot-final3, echo = FALSE, mysize=TRUE, size='\\scriptsize'}
+plot_slopes(bayes.2, variable = "caste", condition = c("age", "nonnative")) + theme_classic()
 ```
 
 # Summary
@@ -573,6 +562,9 @@ plot_slopes(bayes.2, variable = "age", condition = c("age", "nonnative")) + them
 
 # Next week
 - Count outcomes
-    - Poisson regression
-    - Negative-binomial regression
-    - And zero-inflated variants
+- Poisson regression
+- Negative-binomial regression
+- And zero-inflated variants
+
+
+
