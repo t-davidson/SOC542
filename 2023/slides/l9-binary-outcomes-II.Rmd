@@ -3,7 +3,7 @@ title: "SOC542 Statistical Methods in Sociology II"
 subtitle: "Binary outcomes II"
 author: Thomas Davidson
 institute: Rutgers University
-date: March 27, 2022
+date: March 27, 2023
 urlcolor: blue
 output:
     beamer_presentation:
@@ -67,7 +67,7 @@ options("modelsummary_format_numeric_latex" = "plain")
 
 # Course updates
 - Homework 3 is due 3/31 at 5pm
-- Continue working on course projects
+- Projects: Data cleaning and descriptive analyses, preliminary regression models
 
 # Plan
 - Interaction terms and logistic regression
@@ -126,7 +126,7 @@ $$P(y=1) = p = logit^{-1}(\beta_0 + \beta_1x + \beta_2z + \beta_3xz)$$
 library(haven)
 data <- read_dta("../../2022/slides/data/individual_characteristics.dta") %>%
     select(village, resp_gend, age, religion, caste, educ, villagenative, shgparticipate) %>%
-    filter(resp_gend == 2 & religion >= 1 & shgparticipate >= 1 & caste >= 1 &
+    filter(resp_gend == 2 & religion >= 1 & shgparticipate >= 1 & caste >= 1 & age <= 65 &
            village != 16 & village != 33 & village != 77 & age <= 65 & age >= 18) %>% # dropping men and missing (negative values)
     mutate(caste = ifelse(caste <= 2, "low", "high"),
            hindu = ifelse(religion == 1, 1, 0),
@@ -199,7 +199,7 @@ modelsummary(list("LPM"=lpm, "Logistic"=logistic, "Odds-ratio"=logistic), stars 
 - In both models, the coefficients for the main effects of age and nativity are positive.
 - The coefficients for interaction terms are both negative.
     - This implies that there is a negative effect of age for nonnative women. In other words, as age increases the probability of belonging to an SHG decreases.
-- However, it is difficult to make sense of these interactions by only considering the coefficients, since the relationship between variables in a logistic regression is non-linear.
+- However, it is difficult to understand these interactions by only considering the coefficients, since the relationship between variables in a logistic regression is non-linear.
 
 # Predictions
 ## Understanding interactions using predictions
@@ -245,7 +245,7 @@ print(p.logit2)
 - We can do this systematically by creating a new object containing every combination of predictors. The `predictions` function can then be used to obtain predicted values from the model.
 
 ```{r predictions, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
-ages <- 18:85
+ages <- 18:65
 nativity <- 0:1
 new <- expand.grid(list("age" = ages, "nonnative" = nativity))
 
@@ -264,18 +264,23 @@ ggplot(aes(x = age, y = estimate, group = nonnative, color = as.factor(nonnative
 
 # Predictions
 We can directly obtain these results by using the `plot_predictions` function.
-
 ```{r plot-cap, echo = FALSE, mysize=TRUE, size='\\scriptsize'}
 plot_predictions(logistic, condition = c("age", "nonnative")) + theme_classic()
 ```
 
 # Predictions
+The LPM shows a similar pattern but the predictions are constrained to be linear.
+```{r plot-cap-lpm, echo = FALSE, mysize=TRUE, size='\\scriptsize'}
+plot_predictions(lpm, condition = c("age", "nonnative")) + theme_classic()
+```
+
+# Predictions
 ## Improving the model
-- The previous model suggests differences in relationship by nativity.
-- For natives, there is a strong positive relationship between age and SHG membership.
-- For nonnatives, there is little evidence of such a relationship.
+- The previous model suggests differences in relationship by nativity and age:
+    - For natives, there is a strong positive relationship between age and SHG membership.
+    - For nonnatives, there is little evidence of such a relationship.
 - Although there are age differences, these patterns seem remarkably strong.
-- I suspect that adding a squared term for age will help to improve the model.
+- Let's add a squared term to account for non-linear effects of age.
 
 # Predictions
 ## Improving the model
@@ -297,13 +302,13 @@ plot_predictions(logistic2, condition = c("age", "nonnative")) + theme_classic()
 - But what if we want to make statements about the overall effect of a predictor?
     - What is the average effect of age?
     - How does the effect of age vary as a function of other covariates?
-    - Like polynomial regression, it is difficult to determine this by examining coefficients or plotting predictions.
+- Like polynomial regression, it is difficult to determine this by examining coefficients or plotting predictions.
 
 # Marginal effects
 ## Definitions
 - A \textbf{marginal effect} is the relationship between change in single predictor and the dependent variable while *holding other variables constant*.
-- Recall that standard OLS coefficients can be intepreted as marginal effects, but this is no longer true with logistic regression.
 - "Marginal effects are partial derivatives of the regression equation with respect to each variable in the model for each unit in the data."\footnote{Leeper 2021. See the \href{https://cran.r-project.org/web/packages/margins/vignettes/Introduction.html}{vignette} for the margins package.}
+- Recall that standard OLS coefficients can be intepreted as marginal effects, but this is no longer true with logistic regression.
 - In a logistic regression, the effects of predictors can be non-linear, such that the effect of $x$ on $y$ will vary according to the level of $z$.
 
 # Marginal effects
@@ -399,6 +404,14 @@ plot_slopes(logistic, variables = "age",
 ```
 
 # Marginal effects
+## Comparision with the LPM
+```{r me-specified-lpm, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
+plot_slopes(lpm, variables = "age", 
+            condition = list("age", "nonnative")) + 
+    theme_classic() + theme(legend.position = "none")
+```
+
+# Marginal effects
 ## Plotting conditional marginal effects using `plot_slopes`
 The relationship changes substantially when we add age$^2$.
 ```{r me-specified-age-cme, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
@@ -433,7 +446,7 @@ slopes(logistic2,
 
 # Marginal effects
 ## Average marginal effects
-- A different approach involves averaging over the variation in other covariates to calculate the \textbf{average marginal effect (AME)} of a predictor.
+- Another approach involves averaging over the variation in other covariates to calculate the \textbf{average marginal effect (AME)} of a predictor.
 - We can obtain this by averaging over all the observation specific marginal effects.
 
 # Marginal effects
@@ -464,7 +477,7 @@ modelplot(ME) + geom_vline(xintercept = 0, linetype = "dotted")
 ## Full specification
 - These models show how the marginal effect of age is highly non-linear
 - Let's add some complexity by incorporating covariates for caste and education
-- We should also add the village-level fixed effects to account for spatial variation
+- I also add the village-level fixed effects to account for spatial variation
 
 # Marginal effects
 
@@ -478,7 +491,7 @@ modelsummary(list("Logistic 1"=logistic, "Logistic 2"=logistic2, "Logistic 3"=lo
 
 ```{r me-specified-age3, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
 plot_slopes(logistic3, variable = "age", condition = c("age", "nonnative")) +
-    theme_classic()
+    theme_classic() + geom_hline(yintercept = 0, linetype = "dashed")
 ```
 
 # Marginal effects
@@ -506,18 +519,18 @@ summary(slopes(bayes)) %>%
 
 # Marginal effects
 We can see similar relationships using the same `plot_slopes` specification as above.
-
 ```{r bayes.plot2, echo = FALSE, mysize=TRUE, size='\\scriptsize'}
-plot_slopes(bayes, variable = "age", condition = c("age", "nonnative")) + theme_minimal()
+plot_slopes(bayes, variable = "age", condition = c("age", "nonnative")) + 
+    theme_classic() + geom_hline(yintercept = 0, linetype = "dashed")
 ```
 
 # Marginal effects
 ## Improving the model?
-
+Let's fit something even more complex using `stan_glm`.
 ```{r bayes.2, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
 bayes.2 <- stan_glm(shg ~ age + I(age^2) + nonnative +
-                        caste + 
-                        nonnative:caste + age:caste + age:nonnative +
+                        caste + nonnative:caste +
+                        age:caste + age:nonnative +
                         educ + village, 
                     data = data, family = binomial(),
                     chains = 1,  refresh = 0)
@@ -539,32 +552,36 @@ plot(l2)
 
 # Marginal effects
 ```{r bayes.plot-final, echo = FALSE, mysize=TRUE, size='\\scriptsize'}
-plot_slopes(bayes.2, variable = "age", condition = c("age", "nonnative")) + theme_classic()
+plot_slopes(bayes.2, variable = "age", condition = c("age", "nonnative")) + 
+    theme_classic() + geom_hline(yintercept = 0, linetype = "dashed")
 ```
 
 # Marginal effects
-We can easily extend this approach to consider other variables.
-```{r bayes.plot-final2, echo = FALSE, mysize=TRUE, size='\\scriptsize'}
-plot_slopes(bayes.2, variable = "caste", condition = c("nonnative")) + theme_classic()
+```{r bayes.plot-final2, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
+plot_slopes(bayes.2, variable = "caste", condition = c("nonnative")) +
+    theme_classic() + geom_hline(yintercept = 0, linetype = "dashed")
 ```
 
 # Marginal effects
-We can easily extend this approach to consider other variables.
-```{r bayes.plot-final3, echo = FALSE, mysize=TRUE, size='\\scriptsize'}
-plot_slopes(bayes.2, variable = "caste", condition = c("age", "nonnative")) + theme_classic()
+```{r bayes.plot-final3, echo = TRUE, mysize=TRUE, size='\\scriptsize'}
+plot_slopes(bayes.2, variable = "caste", condition = c("age", "nonnative")) + 
+    theme_classic() + geom_hline(yintercept = 0, linetype = "dashed")
 ```
 
 # Summary
 - Logistic regression models (and other GLMs) can be challenging to interpret, particularly when we add interaction terms.
-- By making predictions, we can observe variation in outcomes across different covariate values and make interpretations on the probability scale.
-- Marginal effects allow us to better isolate the effect of individual variables, akin to the way we interpret OLS results.
-- In both cases, visualizations help us to better understand the interactions between key variables.
+- By making predictions, we can observe variation in outcomes across different values and  interpret results on the outcome scale.
+- Marginal effects allow us to isolate the effect of individual variables, akin to the way we interpret OLS results, and to assess relationships between predictions.
+- In both cases, visualizations improve our understanding of the relationships between variables compared to regression tables alone.
 
 # Next week
 - Count outcomes
 - Poisson regression
 - Negative-binomial regression
 - And zero-inflated variants
+
+# Lab
+- Logistic regression, interactions, and marginal effects.
 
 
 
