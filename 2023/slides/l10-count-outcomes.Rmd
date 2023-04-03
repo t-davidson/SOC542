@@ -72,9 +72,9 @@ options("modelsummary_format_numeric_latex" = "plain")
 # Course updates
 ## Homework
 - Homework 3 grades by end of week
-- Homework 4 will be released tomorrow, due 4/14
+- Homework 4 will be released later this week, due 4/14
     - Count outcomes
-    - Categorical and ordered outcomes (next week)
+    - Categorical and ordered outcomes (next lecture)
 
 # Course updates
 ## Projects
