@@ -46,3 +46,6 @@ notes.md
 
 # Latex log files
 *.log
+
+# User Rproj files
+*.Rproj
