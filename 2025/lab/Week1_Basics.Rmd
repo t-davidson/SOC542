@@ -37,73 +37,68 @@ library(modelsummary)
 #### Let's refresh our memory of the RStudio Environment
 
 ```{r}
-
 getwd() # Show the working directory
 
 # Use setwd() if you need to change the file path or point-and-click in the file pane to the right
-
 ```
 
 ## R Basics Review
-
+Let's start by creating a vector of whole random numbers called `a`.
 ```{r}
-
-# Let's start by creating a vector of whole random numbers
-a <- round(rnorm(n = 10, mean = 100, sd = 10))
-
+a <- sample(1:100, size = 10, replace = T)
 ```
 
-Here are some basic functions for measures of central tendency
+Here are some basic functions for measures of central tendency.
+
+Mode:
 ```{r}
-# Mode
 getmode <- function(v) {   # getmode is a function we create because the "mode" function does something else
-  uniqv <- unique(v)       # create a vector `uniqv` that has only unique values of `v`
-  uniqv[which.max(tabulate(match(v, uniqv)))]  # follows the steps from by-hand method above 
+      uniqv <- unique(v)       # create a vector `uniqv` that has only unique values of `v`
+      uniqv[which.max(tabulate(match(v, uniqv)))]  # follows the steps from by-hand method above 
 }
 
 getmode(a)
 ```
 
+Median:
 ```{r}
-# Median 
 median(a)
 ```
 
+Mean:
 ```{r}
-# Mean
 mean(a)
 ```
 
-Here are some basic functions for measures of variability
+Here are some basic functions for measures of variability.
+
+Range:
 ```{r}
-# Range
 range(a)
 ```
 
+Inter-quartile range
 ```{r}
-# IQR
 IQR(a)
 ```
 
+Variance and standard deviation
 ```{r}
-# Variance
 var(a)
 
-# Standard deviation
 sd(a)
 ```
 
-## Let's get data
+## Let's load the data
+
+Download wage1 dataset from Github into your working directory then import wage1.dta using the `read_dta` function from the haven package. Name the object `wage_org`.
 
 ```{r}
-# Download wage1 dataset from Canvas into your working directory ('getwd' and 'setwd'). 
-# Import wage1.dta using the read_dta() function from the haven package; name it wage_org
 wage_org <- read_dta("DATASETS/wage1.dta")
-
-# Info about dataset: http://fmwww.bc.edu/ec-p/data/wooldridge/datasets.list.html
-# Codebook: http://fmwww.bc.edu/ec-p/data/wooldridge/wage1.des
-
 ```
+
+Info about dataset: http://fmwww.bc.edu/ec-p/data/wooldridge/datasets.list.html
+Codebook: http://fmwww.bc.edu/ec-p/data/wooldridge/wage1.des
 
 ```{r}
 # Copy wage_org to a working dataset called wage1.
@@ -114,10 +109,10 @@ wage1 <- wage_org
 
 #### Exercise
 
--   Inspect data in R viewer using view() function.
+Inspect data in R viewer using `View` function.
 
 ```{r}
-view(wage1)
+View(wage1)
 ```
 
 *Question 1*: What do the columns and rows represent?
@@ -130,11 +125,11 @@ Response*:* Columns represent variables or characteristics of people, who are re
 dim(wage1)
 ```
 
-*Question 2b*: How big is the sample size? (n=??)
+*Question 2b*: How big is the sample size? (n = ?)
 
-Response: n= 526
+Response: n = 526
 
-*Question 3a*: Find participant 35 in the view(wage1), how many years of education did they report?
+*Question 3a*: Find participant 35 in the View(wage1), how many years of education did they report?
 
 Response: 12 years of education
 
@@ -146,7 +141,7 @@ wage1[35,"educ"]
 
 #### Exercise
 
--   Use the str() function to understand the structure of the dataset.
+Use the `str` function to understand the structure of the dataset.
 
 ```{r}
 str(wage1)
@@ -164,7 +159,7 @@ colSums(is.na(wage1))
 
 #### Exercise
 
--   Use the head() function to display the first few rows of the dataset. This gives a glimpse of the actual data values.
+-   Use the `head` function to display the first few rows of the dataset. This gives a glimpse of the actual data values.
 
 ```{r}
 head(wage1)
@@ -174,7 +169,7 @@ head(wage1)
 
 #### Exercise
 
--   Create a new factor variable called 'gender' based on the 'female' variable. This variable should have two levels: "Male" and "Female", where 'female' == 1 is "Female".
+-   Create a new factor variable called `gender` based on the `female` variable. This variable should have two levels: "Male" and "Female", where `female == 1` is "Female".
 
 ```{r}
 wage1 <- wage1 %>%
@@ -184,11 +179,11 @@ wage1 <- wage1 %>%
 
 #### Exercise
 
--   Recode the 'educ' variable into a new categorical variable 'educ_level' as a factor variable with the following levels:
-    -   'Less than High School' (less than 12 years)
-    -   'High School Graduate' (12 years)
-    -   'Some College' (13 to 15 years)
-    -   'College Graduate and above' (16 or more years)
+Recode the `educ` variable into a new categorical variable `educ_level` as a factor variable with the following levels:
+    - "Less than High School" (less than 12 years)
+    - "High School Graduate" (12 years)
+    - "Some College" (13 to 15 years)
+    - "College Graduate and above" (16 or more years)
 
 ```{r}
 wage1 <- wage1 %>%
@@ -203,7 +198,7 @@ wage1 <- wage1 %>%
 
 #### Exercise
 
--   Create a new factor variable 'region' based on 'northcen', 'south', and 'west'. The regions should be labeled as 'North', 'South', 'West'. If a participant does not fall into any of these categories, label them as 'Other'.
+Create a new factor variable `region` based on `northcen`, `south`, and `west`. The regions should be labeled as 'North', 'South', 'West'. If a participant does not fall into any of these categories, label them as `Other`.
 
 ```{r}
 wage1 <- wage1 %>%
@@ -226,7 +221,7 @@ wage1 %>%
 
 #### Exercise
 
--   Select a subset of columns for further analysis (wage, educ_level, exper, tenure, gender, region) from the 'wage1' dataset and name the new data frame 'wage2'.
+Select a subset of columns for further analysis (`wage`, `educ_level`, `exper`, `tenure`, `gender`, `regio`) from the `wage1` dataset and name the new data frame `wage2`.
 
 ```{r}
 wage2 <- wage1 %>%
@@ -237,7 +232,7 @@ wage2 <- wage1 %>%
 
 #### Exercise
 
--   Calculate the mean, median, and standard deviation for 'wage','exper', and 'tenure'.
+Calculate the mean, median, and standard deviation for `wage`,`exper`, and `tenure`.
 
 ```{r}
 mean(wage2$wage, na.rm = TRUE)
@@ -255,21 +250,25 @@ sd(wage2$tenure, na.rm = TRUE)
 
 #### Exercise
 
--   Calculate frequency tables with counts and percentages for the categorical variables 'educ_level', 'gender', and 'region'.
+Calculate frequency tables with counts and percentages for the categorical variables `educ_level`, `gender`, and `region`. Combine the results for each variable into a single table.
 
+Education level:
 ```{r}
 educ_freq <- table(wage2$educ_level)
 educ_percent <- prop.table(educ_freq) * 100
 educ_table <- cbind(Count = educ_freq, Percentage = round(educ_percent,2))
 educ_table
+```
 
+Gender:
+```{r}
 gender_freq <- table(wage2$gender)
 gender_percent <- prop.table(gender_freq) * 100
 gender_table <- cbind(Count = gender_freq, Percentage = round(gender_percent, 2))
 gender_table
 ```
 
-For 'region'
+Region:
 
 ```{r}
 region_freq <- table(wage2$region)
@@ -277,16 +276,12 @@ region_percent <- prop.table(region_freq) * 100
 region_table <- cbind(Count = region_freq, Percentage = round(region_percent, 2))
 region_table
 ```
-- Use datasummary_skim() to provide a descriptive table of wage2
-```{r}
-datasummary_skim(wage2)
-```
 
 *Question 6*: What is the most common education level in the dataset?
 
 Response: High school graduate with 37.64% of sample.
 
-*Question 7*: What is the average number of years of experience ('exper') among the participants?
+*Question 7*: What is the average number of years of experience (`exper`) among the participants?
 
 ```{r}
 mean(wage2$exper) 
@@ -323,7 +318,8 @@ Response: ANOVA. The DV is interval ratio and IV is composed of more than two ed
 ### Data Visualizations
 
 #### Exercise
-- Fill in the blanks in the below code for a Box and Whiskers Plot.
+
+Fill in the blanks in the below code for a box-and-whiskers plot.
 
 ```{r}
 ggplot(wage2, aes(x = educ_level, y = wage)) +
@@ -336,7 +332,7 @@ ggplot(wage2, aes(x = educ_level, y = wage)) +
 ```
 
 #### Exercise
--   Fill in the blanks in the below code for a histogram of average wages grouped by education level.
+Fill in the blanks in the below code for a histogram of average wages grouped by education level.
 
 Calculate the mean wage for each education level.
 ```{r}
