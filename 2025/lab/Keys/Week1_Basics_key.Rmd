@@ -61,31 +61,31 @@ getmode(a)
 
 Median:
 ```{r}
-BLANK
+median(a)
 ```
 
 Mean:
 ```{r}
-BLANK
+mean(a)
 ```
 
 Here are some basic functions for measures of variability.
 
 Range:
 ```{r}
-BLANK
+range(a)
 ```
 
 Inter-quartile range
 ```{r}
-BLANK
+IQR(a)
 ```
 
 Variance and standard deviation
 ```{r}
-BLANK
+var(a)
 
-BLANK
+sd(a)
 ```
 
 ## Let's load the data
@@ -111,7 +111,7 @@ wage1 <- wage_org
 Inspect data in R viewer using `View` function.
 
 ```{r}
-BLANK
+View(wage1)
 ```
 
 *Question*: What do the columns and rows represent?
@@ -121,7 +121,7 @@ Response*:* Columns represent variables or characteristics of people, who are re
 *Question*: Using code, how many rows and columns are there?
 
 ```{r}
-BLANK
+dim(wage1)
 ```
 
 *Question*: How big is the sample size? (n = ?)
@@ -135,7 +135,7 @@ Response: 12 years of education
 *Question*: Instead of manually looking up the row and column, what code works to answer this?
 
 ```{r}
-wage1[BLANK]
+wage1[35,"educ"]
 ```
 
 #### Exercise
@@ -143,7 +143,7 @@ wage1[BLANK]
 Use the `str` function to understand the structure of the dataset.
 
 ```{r}
-BLANK
+str(wage1)
 ```
 
 *Question*: Are there any factor variables?
@@ -153,7 +153,7 @@ Response: No, there aren't any factor variables.
 Question 5: Determine the number of missing values in each variable.
 
 ```{r}
-colSums(BLANK)
+colSums(is.na(wage1))
 ```
 
 #### Exercise
@@ -161,7 +161,7 @@ colSums(BLANK)
 -   Use the `head` function to display the first few rows of the dataset. This gives a glimpse of the actual data values.
 
 ```{r}
-BLANK
+head(wage1)
 ```
 
 ### Data Recoding & Wrangling
@@ -172,7 +172,7 @@ BLANK
 
 ```{r}
 wage1 <- wage1 %>%
-  mutate(gender = factor(ifelse(female == BLANK, "BLANK", "BLANK"), 
+  mutate(gender = factor(ifelse(female == 1, "Female", "Male"), 
                          levels = c("Male", "Female")))
 ```
 
@@ -187,10 +187,10 @@ Recode the `educ` variable into a new categorical variable `educ_level` as a fac
 ```{r}
 wage1 <- wage1 %>%
   mutate(educ_level = factor(case_when(
-    educ BLANK 12 ~ "Less than High School",
-    educ BLANK 12 ~ "High School Graduate",
-    educ BLANK 12 & educ < 16 ~ "Some College",
-    educ BLANK 16 ~ "College Graduate and above"
+    educ < 12 ~ "Less than High School",
+    educ == 12 ~ "High School Graduate",
+    educ > 12 & educ < 16 ~ "Some College",
+    educ >= 16 ~ "College Graduate and above"
   ), levels = c("Less than High School", "High School Graduate", "Some College", "College Graduate and above")))
 
 ```
@@ -202,9 +202,9 @@ Create a new factor variable `region` based on `northcen`, `south`, and `west`. 
 ```{r}
 wage1 <- wage1 %>%
   mutate(region = case_when(
-    BLANK == 1 ~ "North Central",
-    BLANK == 1 ~ "South",
-    BLANK == 1 ~ "West",
+    northcen == 1 ~ "North Central",
+    south == 1 ~ "South",
+    west == 1 ~ "West",
     TRUE ~ "Other"  # default case
   )) %>%
   mutate(region = factor(region))
@@ -214,7 +214,7 @@ wage1 <- wage1 %>%
 
 ```{r}
 wage1 %>%
-  filter(BLANK) %>%
+  filter(northcen + south + west > 1) %>%
   nrow()
 ```
 
@@ -223,7 +223,8 @@ wage1 %>%
 Select a subset of columns for further analysis (`wage`, `educ_level`, `exper`, `tenure`, `gender`, `regio`) from the `wage1` dataset and name the new data frame `wage2`.
 
 ```{r}
-wage2 <- BLANK  
+wage2 <- wage1 %>%
+  select(wage, educ_level, exper, tenure, gender, region)  
 ```
 
 ### Descriptive Statistics
@@ -233,17 +234,17 @@ wage2 <- BLANK
 Calculate the mean, median, and standard deviation for `wage`,`exper`, and `tenure`.
 
 ```{r}
-mean(BLANK, na.rm = TRUE)
-median(BLANK, na.rm = TRUE)
-sd(BLANK, na.rm = TRUE)
+mean(wage2$wage, na.rm = TRUE)
+median(wage2$wage, na.rm = TRUE)
+sd(wage2$wage, na.rm = TRUE)
 
-mean(BLANK, na.rm = TRUE)
-median(BLANK, na.rm = TRUE)
-sd(BLANK, na.rm = TRUE)
+mean(wage2$exper, na.rm = TRUE)
+median(wage2$exper, na.rm = TRUE)
+sd(wage2$exper, na.rm = TRUE)
 
-mean(BLANK, na.rm = TRUE)
-median(BLANK, na.rm = TRUE)
-sd(BLANK, na.rm = TRUE)
+mean(wage2$tenure, na.rm = TRUE)
+median(wage2$tenure, na.rm = TRUE)
+sd(wage2$tenure, na.rm = TRUE)
 ```
 
 #### Exercise
@@ -252,7 +253,7 @@ Calculate frequency tables with counts and percentages for the categorical varia
 
 Education level:
 ```{r}
-educ_freq <- table(BLANK)
+educ_freq <- table(wage2$educ_level)
 educ_percent <- prop.table(educ_freq) * 100
 educ_table <- cbind(Count = educ_freq, Percentage = round(educ_percent,2))
 educ_table
@@ -260,7 +261,7 @@ educ_table
 
 Gender:
 ```{r}
-gender_freq <- table(BLANK)
+gender_freq <- table(wage2$gender)
 gender_percent <- prop.table(gender_freq) * 100
 gender_table <- cbind(Count = gender_freq, Percentage = round(gender_percent, 2))
 gender_table
@@ -269,7 +270,7 @@ gender_table
 Region:
 
 ```{r}
-region_freq <- table(BLANK)
+region_freq <- table(wage2$region)
 region_percent <- prop.table(region_freq) * 100
 region_table <- cbind(Count = region_freq, Percentage = round(region_percent, 2))
 region_table
@@ -277,7 +278,7 @@ region_table
 
 Use `datasummary_skim` to provide a descriptive table of wage2
 ```{r}
-BLANK
+datasummary_skim(wage2)
 ```
 
 *Question 6*: What is the most common education level in the dataset?
@@ -287,7 +288,7 @@ Response: High school graduate with 37.64% of sample.
 *Question 7*: What is the average number of years of experience (`exper`) among the participants?
 
 ```{r}
-BLANK
+mean(wage2$exper) 
 # Response: 17.017 years of experience
 ```
 
@@ -295,9 +296,9 @@ BLANK
 
 ```{r}
 wage2 %>%
-  group_by(BLANK) %>%
+  group_by(educ_level) %>%
   summarise(
-    Mean = BLANK(BLANK, na.rm = TRUE)
+    Mean = mean(wage, na.rm = TRUE)
   )
 # Response: College graduates and above with $8.95/hourly earnings
 ```
@@ -306,10 +307,10 @@ wage2 %>%
 
 ```{r}
 wage2 %>%
-  group_by(BLANK) %>%
+  group_by(educ_level) %>%
   summarise(
-    Mean = BLANK(BLANK, na.rm = TRUE),
-    SD = BLANK(BLANK,na.rm = TRUE)
+    Mean = mean(wage, na.rm = TRUE),
+    SD = sd(wage,na.rm = TRUE)
   )
 # Response: Some College Mean = 6.03 and SD = 3.32
 ```
@@ -325,12 +326,12 @@ Response: ANOVA. The DV is interval ratio and IV is composed of more than two ed
 Fill in the blanks in the below code for a box-and-whiskers plot.
 
 ```{r}
-ggplot(BLANK, aes(x = BLANK, y = BLANK)) +
+ggplot(wage2, aes(x = educ_level, y = wage)) +
   geom_boxplot() +
   labs(title = "Figure 1. Average Hourly Earnings by Education Level",
        x = "Education Level",
        y = "Hourly Earnings",
-       caption = "Notes: n=BLANK; Wooldridge Data Set") +
+       caption = "Notes: n=526; Wooldridge Data Set") +
   theme_minimal()
 ```
 
@@ -340,20 +341,20 @@ Fill in the blanks in the below code for a histogram of average wages grouped by
 Calculate the mean wage for each education level.
 ```{r}
 mean_wages <- wage2 %>%
-  group_by(BLANK) %>%
-  summarise(Mean = BLANK(BLANK, na.rm = TRUE))
+  group_by(educ_level) %>%
+  summarise(Mean = mean(wage, na.rm = TRUE))
 ```
 
 Create the histogram with density plots and mean lines.
 ```{r}
-ggplot(BLANK, aes(x = BLANK, fill = BLANK)) +
+ggplot(wage2, aes(x = wage, fill = educ_level)) +
   geom_density(alpha = 0.7) +
   geom_vline(data = mean_wages, aes(xintercept = Mean, color = educ_level), linetype = "dashed") +
   scale_fill_brewer(palette = "Set1") +
   labs(title = "Figure 2. Average Hourly Earnings by Education Level",
        x = "Hourly Earnings",
        y = "Density",
-       caption = "Notes: n=BLANK; Wooldridge Data Set") +
+       caption = "Notes: n=526; Wooldridge Data Set") +
   theme_minimal()
 ```
 
