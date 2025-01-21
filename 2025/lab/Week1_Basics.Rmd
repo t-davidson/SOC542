@@ -116,7 +116,7 @@ BLANK
 
 *Question*: What do the columns and rows represent?
 
-Response*:* Columns represent variables or characteristics of people, who are represented as rows; each row represents one person (unit) observed.
+Response*:* BLANK
 
 *Question*: Using code, how many rows and columns are there?
 
@@ -126,11 +126,11 @@ BLANK
 
 *Question*: How big is the sample size? (n = ?)
 
-Response: n = 526
+Response: BLANK
 
 *Question*: Find participant 35 in the View(wage1), how many years of education did they report?
 
-Response: 12 years of education
+Response: BLANK
 
 *Question*: Instead of manually looking up the row and column, what code works to answer this?
 
@@ -148,7 +148,7 @@ BLANK
 
 *Question*: Are there any factor variables?
 
-Response: No, there aren't any factor variables.
+Response: BLANK
 
 Question 5: Determine the number of missing values in each variable.
 
@@ -282,13 +282,13 @@ BLANK
 
 *Question 6*: What is the most common education level in the dataset?
 
-Response: High school graduate with 37.64% of sample.
+Response: BLANK
 
 *Question 7*: What is the average number of years of experience (`exper`) among the participants?
 
 ```{r}
 BLANK
-# Response: 17.017 years of experience
+# Response: BLANK
 ```
 
 *Question 8*: Which education level has the highest average hourly earnings?
@@ -299,7 +299,7 @@ wage2 %>%
   summarise(
     Mean = BLANK(BLANK, na.rm = TRUE)
   )
-# Response: College graduates and above with $8.95/hourly earnings
+# Response: BLANK
 ```
 
 *Question 9*: What is the standard deviation of the education level with the second highest average hourly earnings?
@@ -311,12 +311,12 @@ wage2 %>%
     Mean = BLANK(BLANK, na.rm = TRUE),
     SD = BLANK(BLANK,na.rm = TRUE)
   )
-# Response: Some College Mean = 6.03 and SD = 3.32
+# Response: BLANK
 ```
 
 *Question 10*: Based on the descriptive statistics obtained, what kind of statistical analysis would you perform to make a more formal inference about the relationship between education level and wages? Why would you choose this method?
 
-Response: ANOVA. The DV is interval ratio and IV is composed of more than two educational categories.
+Response: BLANK
 
 ### Data Visualizations
 
