@@ -52,9 +52,8 @@ Here are some basic functions for measures of central tendency.
 
 Mode:
 ```{r}
-getmode <- function(v) {   # getmode is a function we create because the "mode" function does something else
-      uniqv <- unique(v)       # create a vector `uniqv` that has only unique values of `v`
-      uniqv[which.max(tabulate(match(v, uniqv)))]  # follows the steps from by-hand method above 
+getmode <- function(v) {
+  as.numeric(names(which.max(table(v))))
 }
 
 getmode(a)
@@ -101,7 +100,7 @@ Info about dataset: http://fmwww.bc.edu/ec-p/data/wooldridge/datasets.list.html
 Codebook: http://fmwww.bc.edu/ec-p/data/wooldridge/wage1.des
 
 ```{r}
-# Copy wage_org to a working dataset called wage1.
+# Copy wage_org to a working dataset called wage1. Best practices to not override original dataset. 
 wage1 <- wage_org
 ```
 
@@ -115,25 +114,25 @@ Inspect data in R viewer using `View` function.
 View(wage1)
 ```
 
-*Question 1*: What do the columns and rows represent?
+*Question*: What do the columns and rows represent?
 
 Response*:* Columns represent variables or characteristics of people, who are represented as rows; each row represents one person (unit) observed.
 
-*Question 2a*: Using code, how many rows and columns are there?
+*Question*: Using code, how many rows and columns are there?
 
 ```{r}
 dim(wage1)
 ```
 
-*Question 2b*: How big is the sample size? (n = ?)
+*Question*: How big is the sample size? (n = ?)
 
 Response: n = 526
 
-*Question 3a*: Find participant 35 in the View(wage1), how many years of education did they report?
+*Question*: Find participant 35 in the View(wage1), how many years of education did they report?
 
 Response: 12 years of education
 
-*Question 3b*: Instead of manually looking up the row and column, what code works to answer this?
+*Question*: Instead of manually looking up the row and column, what code works to answer this?
 
 ```{r}
 wage1[35,"educ"]
@@ -147,7 +146,7 @@ Use the `str` function to understand the structure of the dataset.
 str(wage1)
 ```
 
-*Question 4*: Are there any factor variables?
+*Question*: Are there any factor variables?
 
 Response: No, there aren't any factor variables.
 
@@ -275,6 +274,11 @@ region_freq <- table(wage2$region)
 region_percent <- prop.table(region_freq) * 100
 region_table <- cbind(Count = region_freq, Percentage = round(region_percent, 2))
 region_table
+```
+
+Use `datasummary_skim` to provide a descriptive table of wage2
+```{r}
+datasummary_skim(wage2)
 ```
 
 *Question 6*: What is the most common education level in the dataset?
