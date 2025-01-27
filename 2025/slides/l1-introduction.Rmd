@@ -663,7 +663,7 @@ t.test(x, y)
     - Sign errors: the sign of a relationship is incorrect
         - e.g. We observe a positive relationship between $x$ and $y$ when the true relationship is negative
     - Magnitude errors: the observed effect is severely over- or under-estimated
-        - e.g. We think $\bar{x} = 10$ but $\bar{x} = 0.1$
+        - e.g. We estimate that $\bar{x} = 10$ but $\mu = 0.1$
 
 # Statistics review
 ## Expected mean and variance of two random variables
@@ -773,7 +773,7 @@ include_graphics('temp.jpg')
 ## Common use cases
 
 - Explanation
-    - "I don't understand why we take the square root of a variance to get a standard deviation. Can you explaint this"
+    - "I don't understand why we take the square root of a variance to get a standard deviation. Can you explain this?
 - Summarization
     - [Upload paper PDF] "Summarize the main argument of this paper"
 - Question-answering
