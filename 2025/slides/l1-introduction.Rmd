@@ -56,10 +56,16 @@ library(latex2exp)
 
 - Introductions
 - Course outline
-- Review
+- Statistics review
     - Notation
-    - Statistics
-- Lab: R, RStudio, and statistics refresher
+    - Statistical inference
+- Tools
+    - R
+    - RStudio
+    - Github
+    - AI
+    
+# Part I: Course outline
 
 # Learning goals
 - The use of statistical analysis in empirical social science research
@@ -151,6 +157,8 @@ library(latex2exp)
     - A useful reference for data manipulation in R via the tidyverse
 - *Data Visualization: A Practical Introduction* by Kieran Healy.
     - Great introduction to data visualization using R and ggplot
+    
+# Part II: Statistics review
  
 # Notation review
 ## Vectors
@@ -700,6 +708,9 @@ $$\rho(x,y) = \frac{\frac{1}{n-1}\Sigma(x_i-\bar{x})(y_i-\bar{y})}{\sigma_x\sigm
 $$SE_{\rho} = \sqrt{\frac{1-\rho^2}{n-2}}$$
 -->
 
+# Part III: Tools
+
+
 
 # Why R?
 - Free and open-source
@@ -735,8 +746,59 @@ include_graphics('temp.jpg')
 -   RMarkdown is an interactive coding environment 
     -   RMarkdown documents can combine text, LaTeX code, R code, and any output.
     -   These slides are rendered using RMarkdown
-    -   You will be using RMarkdown for your homework assignments and hopefully your papers
+-   You will be using RMarkdown for your homework assignments and hopefully your papers
     
+# Github
+## Overview
+- Github is a platform for hosting code
+    -  Source code for open-source projects, such as R packages, is available
+    -  Version control keeps track of changes
+    -  Helps to ensure reproducible workflows
+- The course website, homework assignments, and your final projects will be hosted on Github
+
+# Github
+## Set-up
+- Follow the instructions on https://tinyurl.com/github542
+- Step 1: Make an account
+- Step 2: Install Github locally (depending on system)
+- Step 3: Sync with RStudio
+- Step 4: Clone the class repository
+
+# Artificial intelligence
+## Policy (from syllabus)
+
+"I encourage you to use AI tools such as ChatGPT, Claude, and Gemini to learn about statistics, interrogate the readings, and improve your R code. You are permitted to use these tools to help edit your writing and code. However, you must solve the homework questions yourself and to write responses in your own words. You should also carefully check any output from AI to ensure its accuracy and validity. Please document any AI usage in your submissions."
+
+# Artificial intelligence
+## Common use cases
+
+- Explanation
+    - "I don't understand why we take the square root of a variance to get a standard deviation. Can you explaint this"
+- Summarization
+    - [Upload paper PDF] "Summarize the main argument of this paper"
+- Question-answering
+    - [Upload paper PDF] "Does this paper use logistic regression?"
+- Debugging code
+    - [Paste R code and error message] "Why is my code failing?"
+- Enhancing code
+    - [Paste R code and data snippet] "Write an R function to create a standardized version of each of these variables"
+    
+# Artificial intelligence
+## Strengths
+- AI systems "know" a lot about statistics as they have "read" much of the publically available information and many scientific papers
+- Many models are trained to write code and can be helpful for debugging and assistance
+- Latest models have capacity to analyze new information including PDFs, spreadsheets, and other information
+
+# Artificial intelligence
+## Weaknesses
+- AI can "hallucinate" / "confabulate", including inaccurate information or incorrect code
+    - Carefully verify and cross-reference information
+- AI may not have syntax for more niche software, including some of the R packages we will use
+    - Understanding the basics and how to do things yourself is critical
+- AI can be biased, reproducing stereotypical representations and tropes
+- AI often provide a "one-size-fits-all" solution to problems and will struggle with more creative tasks in research where we push boundaries of human knowledge
+    
+
 # Next lecture
 - Ordinary Least Squares regression with two variables
 
