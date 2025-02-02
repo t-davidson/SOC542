@@ -5,6 +5,9 @@ date: "2025-01-27"
 output:
   pdf_document: default
   html_document: default
+editor_options: 
+  markdown: 
+    wrap: sentence
 ---
 
 ```{r setup, include=FALSE}
@@ -24,53 +27,64 @@ library(ggplot2) # For visualizations
 
 ```
 
+## Loading the Dataset
 
 ```{r}
-#*******************************
-# Loading the Dataset
-#*******************************
 crime <- read_dta("DATASETS/DC_2000_crime_data.dta")
 ```
 
-# Exploratory Data Analysis
+## Exploratory Data Analysis
 
 Viewing the first few rows of the dataset
+
 ```{r}
-view(crime)
+head(crime)
+
 ```
 
+*Question:* Provide a general characterization of the dataset.
+What kind of information does it contain?
 
-Question: Provide a general characterization of the dataset. What kind of information does it contain?
-Answer: The dataset contains various socio-economic and crime-related variables for different regions.
+*Answer:* The dataset contains various socio-economic and crime-related variables for different regions.
 
-Question: Did you notice the small text under the variable names in the data viewer? What does the label say for the variable 'per_nohs'?
-Answer: percent of track without a highschool degree
+*Question:* Did you notice the small text under the variable names in the data viewer?
+What does the label say for the variable 'per_nohs'?
 
-Extracting and learning more about the available variables
-Extract variable names
+*Answer:* percent of track without a highschool degree
+
+## Extracting and learning more about the available variables
+
+Extract variable names into a new object called `var_names`
+
 ```{r}
 var_names <- names(crime)
 ```
 
+Initialize an empty vector to store variable names and labels
 
-Initialize empty vectors the size of the .... to store variable names and labels
-Exercise: Debug the code below:
+#### Exercise: 
+
+Debug the code below:
+
 ```{r}
 var_labels <- vector("character", length(var_names))
 
 ```
 
-Loop through each variable to extract its label
+Here is a `for` loop that goes through each variable to extract and store its label
+
 ```{r}
 for(var in var_names) {
   var_labels[which(var_names == var)] <- attr(crime[[var]], "label")
 }
 ```
 
+*Question:* Identify the code in the for loop that was used to output the label associated with appropriate variable in the dataset?
 
-Question: Identify the code in the for loop that was used to output the label associated with a variable in the dataset?
+*Answer:*
 
 Create a data frame with variable names and labels
+
 ```{r}
 variables_df <- data.frame(
   Variable = var_names,
@@ -79,23 +93,27 @@ variables_df <- data.frame(
 )
 ```
 
+View the definition of the available variables in the dataset
 
-View the defintion of the available variables in the dataset
 ```{r}
 view(variables_df)
 
 ```
 
-Generating summary statistics of the entire data set using 'modelsummary' package by filling in the __BLANK__
+Generating some quick descriptive statistics of the `crime` dataset
+
 ```{r}
 datasummary_skim(crime)
 ```
 
+*Question:* Identify the variable in the dataset that has approximately 4% missing values.
 
-Question: Identify the variable in the dataset that has approximately 4% missing values.
-[Students can use the output of datasummary_skim(crime) to answer this question]
+*Answer:*
 
-Create a histogram for visualizing the distribution of violent crime rate in 2001 by filling in the __BLANK__ with the variable name of interest
+#### Exercise:
+
+Create a histogram for visualizing the distribution of violent crime rate in 2001 by filling in the **BLANK** with the variable name of interest
+
 ```{r}
 ggplot(crime, aes(x = vcr2001)) +
   geom_histogram(binwidth = 1, fill = "blue", color = "black") +
@@ -104,8 +122,8 @@ ggplot(crime, aes(x = vcr2001)) +
        y = "Frequency")
 ```
 
+Create a histogram of the violent crime rate in 2001 with bin increments of 25
 
-Exercise: Create a histogram of the violent crime rate in 2001 with bin increments of 25
 ```{r}
 ggplot(crime, aes(x = vcr2001)) +
   geom_histogram(binwidth = 25, fill = "blue", color = "black") +
@@ -114,11 +132,13 @@ ggplot(crime, aes(x = vcr2001)) +
        y = "Frequency")
 ```
 
+*Question:* How does changing the binwidth to 25 affect the visualization?
+Is the plot improved?
 
-Question: How does changing the binwidth to 25 affect the visualization? Is the plot improved?
-Answer: Worse, the bars loose information value by being too wide.
+*Answer:* Worse, the bars loose information value by being too wide.
 
-Create a density plot of violent crime rate for 2001 by filling in the __BLANK__ with the variable name of interest
+Create a density plot of violent crime rate for 2001 by filling in the **BLANK** with the variable name of interest
+
 ```{r}
 ggplot(crime, aes(x = vcr2001)) +
   geom_density() +
@@ -130,17 +150,17 @@ ggplot(crime, aes(x = vcr2001)) +
   theme(axis.text=element_text(size=12), axis.title=element_text(size=14))
 ```
 
+*Question:* What is the numeric value of the red line in the density plot?
 
-Question: What is the numeric value of the red line in the density plot? 
 ```{r}
+# Use code to answer:
 mean(crime$vcr2001, na.rm=TRUE)
 ```
-The numeric value of the red line can be found using the mean of 'vcr2001'
 
-# Identify a Bivariate Relationship
+## Identify a Bivariate Relationship
 
-Exploring the relationship between % Poverty and Violent Crime Rate
-Scatter Plot of Violent Crime Rate and % Poverty
+**Exploring the relationship between `poverty_rate` and `vcr2001` in a scatter plot**
+
 ```{r}
 crime %>%
   ggplot(aes(x = poverty_rate, y = vcr2001)) +
@@ -151,11 +171,13 @@ crime %>%
   theme_light()
 ```
 
+*Question:* What is your impression of the relationship between % poverty and violent crime rate?
+Is it positive, negative, or non-linear?
 
-Question: What is your impression of the relationship between % poverty and violent crime rate? Is it positive, negative, or non-linear?
-Answer: weak positive
+*Answer:* weak positive
 
-Visual Representation of Total Sum of Squares (TSS)
+**Visual Representation of Total Sum of Squares (TSS)**
+
 ```{r}
 mean_vcr <- mean(crime$vcr2001, na.rm = TRUE)
 
@@ -173,11 +195,19 @@ crime %>%
   theme_minimal()
 ```
 
-Question: In the above plot, the red lines represent the distance of each observation from the overall mean of violent crime rate. To calculate the Total Sum of Squares (TSS) an important concept for regression analysis, what mathematical operation should you perform on these distances?  What does TSS tell us about the data's variability?
+*Question:* In the above plot, the red lines represent the distance of each observation from the overall mean of violent crime rate.
+To calculate the Total Sum of Squares (TSS) an important concept for regression analysis, what mathematical operation should you perform on these distances?
+What does TSS tell us about the data's variability?
 
-Answer: Square the lengths and sum to get the total variability of the data from its mean. TSS quantifies the total variability in data by measuring the spread of all observations around the mean. A higher TSS indicates greater overall variability available to be explained.
+*Answer:* Square the lengths and sum to get the total variability of the data from its mean.
+TSS quantifies the total variability in data by measuring the spread of all observations around the mean.
+A higher TSS indicates greater overall variability available to be explained.
 
-Exercise: Complete the scatter plot with line of best fit and averages for % poverty and violent crime rate. Fill in the __BLANK__ with appropriate code
+#### Exercise: 
+
+Complete the scatter plot with line of best fit and averages for `poverty_rate` and `vcr200`.
+Fill in the **BLANK** with appropriate code
+
 ```{r}
 crime %>%
   ggplot(aes(x = poverty_rate, y = vcr2001))+
@@ -189,10 +219,12 @@ crime %>%
   labs(y="VCR (per 1,000)", x="% Poverty", caption="Notes: Washington D.C. census tracts, 2000 ") 
 ```
 
+#### Exploring the relationship between `homeownership_rate` and `vcr2001`
 
-# Exploring the relationship between % Homeownership and Violent Crime Rate
+#### Exercise: 
 
-Exercise: Create a Scatter Plot of Violent Crime Rate and % Homeownership with line of best fit and averages
+Create a Scatter Plot of `vcr2001`and `homeownership_rate` with line of best fit and averages
+
 ```{r}
 crime %>%
   ggplot(aes(x = homeownership_rate, y = vcr2001))+
@@ -204,62 +236,79 @@ crime %>%
   labs(y="Violent Crime Rate (per 1,000)", x="% Homeownership", caption="Notes: Washington D.C. census tracts, 2000 ") 
 ```
 
+*Question:* After creating the plot, describe the relationship between % homeownership and violent crime rate.
 
-Question: After creating the plot, describe the relationship between % homeownership and violent crime rate. 
-Answer: Weak negative 
+*Answer:* Weak negative
 
+## Simple Linear Regression
 
-# Simple Linear Regression
+Fitting a linear model: Using the `poverty_rate` to predict `vcr2001`
 
-Fitting a linear model: Using the poverty_rate to predict the violent crime rate
 ```{r}
 lm_model <- lm(vcr2001 ~ poverty_rate, data = crime)
 
 ```
 
 Displaying the summary of the linear model
-Exercise: Debug the code below
+
+#### Exercise: 
+
+Debug the code below
+
 ```{r}
 summary(lm_model)
 
 ```
 
-Question: Based on the above output, what is the estimated change in violent crime rate for each additional unit increase in poverty rate (poverty_rate)?
+*Question:* Based on the above output, what is the estimated change in violent crime rate for each additional unit increase in poverty rate (poverty_rate)?
 
-Answer: For a one-percentage point increase in poverty rate, we can expect a 0.338 increase in violent crimes per 1,000. In other words, a 10% increase in poverty rate, we should expect to see 3.38 more violent crimes per 1,000.
+*Answer:* For a one-percentage point increase in poverty rate, we can expect a 0.338 increase in violent crimes per 1,000.
+In other words, a 10% increase in poverty rate, we should expect to see 3.38 more violent crimes per 1,000.
 
-Question: What is the significance of the intercept in this model? What does it represent in the context of violent crime rate? 
-Answer: The p-value is less than 0.001, therefore we reject the null hypothesis that there is no relationship between the poverty rate and violent crime rate. 
+*Question:* What is the significance of the intercept in this model?
+What does it represent in the context of violent crime rate?
+Answer: The p-value is less than 0.001, therefore we reject the null hypothesis that there is no relationship between the poverty rate and violent crime rate.
 
-Exercise: Create another linear model exploring the relationship between % homeownership and violent crime rate
+#### *Exercise:* 
+
+Create another linear model exploring the relationship between `homeownership_rate` and `vcr2001`
+
 ```{r}
 lm_model2 <- lm(vcr2001 ~ homeownership_rate, data = crime)
 summary(lm_model2)
 ```
 
+Use `modelsummary` for a more visually appealing presentation of models (especially in reports or presentations)
 
-Using stargazer for a more visually appealing presentation of models (especially in reports or presentations)
 ```{r}
-stargazer(lm_model2, type = "text")
+modelsummary(lm_model2,
+             estimate = "{estimate}{stars}",
+             statistic = NULL,
+             gof_omit = "IC|Log|alg|pss|F|RMSE",
+             notes = "Notes: + p < 0.1, * p < 0.05, ** p < 0.01, *** p < 0.001",
+             output="huxtable")
 
 ```
 
-Question: Report your findings
+*Question:* Report your findings
 
+*Answer:*
 
+## Predicted Values and Residuals
 
-# Predicted Values and Residuals 
-
-We will use the linear model lm_model (vcr2001 ~ poverty_rate)
+We will use the linear model `lm_model (vcr2001 ~ poverty_rate)`
 
 Generating Predicted Values
+
 ```{r}
 crime$predicted_vcr <- predict(lm_model)
 
 ```
 
-Histograms of Actual and Predicted Violent Crime Rates
-Objective: Create two overlaid histograms to compare the distribution of actual and predicted violent crime rates.
+Histograms of Actual and Predicted Violent Crime Rates Objective:
+
+Create two overlaid histograms to compare the distribution of actual and predicted violent crime rates.
+
 ```{r}
 ggplot() +
   geom_histogram(data = crime, aes(x = vcr2001, y = ..density..), fill = "blue", alpha = 0.5, binwidth = 1) +
@@ -271,10 +320,13 @@ ggplot() +
   theme_minimal()
 ```
 
+*Question:* How do the histograms of the actual and predicted violent crime rates compare?
+What do you think of the model's predictive accuracy?
 
-Question: How do the histograms of the actual and predicted violent crime rates compare? What do you think of the model's predictive accuracy?
+*Answer:*
 
-Plotting Predicted vs Actual Violent Crime Rates
+**Plotting Predicted vs Actual Violent Crime Rates**
+
 ```{r}
 ggplot(crime, aes(x = vcr2001, y = predicted_vcr)) +
   geom_jitter(alpha = 0.5) +
@@ -285,12 +337,12 @@ ggplot(crime, aes(x = vcr2001, y = predicted_vcr)) +
   theme_minimal()
 ```
 
+*Question:* If our model accounted for all the variation in violent crime rates, how would the plot of predicted vs actual violent crime rates look different?
 
-Question: If our model accounted for all the variation in violent crime rates, how would the plot of predicted vs actual violent crime rates look different?
-
-Answer: All the dots would be on the blue dotted line.
+*Answer:* All the dots would be on the blue dotted line.
 
 Visualizing the Predicted versus Actual for each observation
+
 ```{r}
 crime %>%
   ggplot(aes(x = poverty_rate, y = vcr2001)) +
@@ -302,17 +354,19 @@ crime %>%
   theme_minimal()
 ```
 
+*Question:* What do the vertical blue dotted lines represent?
 
-Question: What do the vertical blue dotted lines represent?
-Answer: The blue lines represent the residuals for each observation in the data.
+*Answer:* The blue lines represent the residuals for each observation in the data.
 
-Generating Residuals
+**Generating Residuals**
+
 ```{r}
 crime$residual_vcr <- residuals(lm_model)
 
 ```
 
-Density Plot with Normal Distribution Overlay
+**Density Plot with Normal Distribution Overlay**
+
 ```{r}
 ggplot(crime, aes(x = residual_vcr)) +
   geom_density(aes(y = ..density..), color = "red") +
@@ -324,12 +378,14 @@ ggplot(crime, aes(x = residual_vcr)) +
   theme_minimal()
 ```
 
+*Question:* How does the distribution of residuals compare to a normal distribution?
+What implications does this have for our model?
 
-Question: How does the distribution of residuals compare to a normal distribution? What implications does this have for our model?
+*Answer:* Significant deviations from the normal distribution, such as skewness or the presence of outliers, may indicate issues with the model.
+It could suggest that the model is not capturing all the patterns in the data, there might be unaccounted-for variables influencing the response, or that a linear model might not be the best fit for this data.
 
-Answer: Significant deviations from the normal distribution, such as skewness or the presence of outliers, may indicate issues with the model. It could suggest that the model is not capturing all the patterns in the data, there might be unaccounted-for variables influencing the response, or that a linear model might not be the best fit for this data.
+**Plotting Residuals vs Predicted Values with Reference Line at 0 (predicted = actual)**
 
-Plotting Residuals vs Predicted Values with Reference Line at 0 (predicted = actual)
 ```{r}
 ggplot(crime, aes(x = predicted_vcr, y = residual_vcr)) +
   geom_jitter(color = "black") +
@@ -339,23 +395,28 @@ ggplot(crime, aes(x = predicted_vcr, y = residual_vcr)) +
   theme_minimal()
 ```
 
+*Question:* Analyze the Residual vs Predicted plot.
+Are there any patterns or is the distribution random?
+What does this imply about your model?
 
-Question: Analyze the Residual vs Predicted plot. Are there any patterns or is the distribution random? What does this imply about your model?
+*Answer:* A random scatter implies that the model is doing well in accounting for the variance in the data.
+Systematic patterns might indicate that the model is missing some explanatory variables or that the relationship between the variables is not purely linear.
 
-Answer: A random scatter implies that the model is doing well in accounting for the variance in the data. Systematic patterns might indicate that the model is missing some explanatory variables or that the relationship between the variables is not purely linear.
+## Supplemental Code on Centering
 
-
-# Supplemental Code on Centering
-
-Centering a Variable: The idea behind centering a variable (like poverty rate) is to adjust the data so that its mean becomes zero. This can help in interpreting the intercept of the regression model as it becomes the expected value of the dependent variable when the independent variable is at its average value.
+**Centering a Variable:** The idea behind centering a variable (like poverty rate) is to adjust the data so that its mean becomes zero.
+This can help in interpreting the intercept of the regression model as it becomes the expected value of the dependent variable when the independent variable is at its average value.
 
 Recoding to center the poverty rate variable
+
 ```{r}
 crime_centered <- crime %>%
   mutate(centered_poverty_rate = poverty_rate - mean(poverty_rate, na.rm = TRUE))
 ```
 
-Centering the poverty rate variable shifts the scale so that the mean is now at zero. You can run all your same analyses. The same rules apply, but now your interpretation of the intercept is different...check it out.
+Centering the poverty rate variable shifts the scale so that the mean is now at zero.
+You can run all your same analyses.
+The same rules apply, but now your interpretation of the intercept is different...check it out.
 
 ```{r}
 if (!require("gridExtra")) {
@@ -364,29 +425,29 @@ if (!require("gridExtra")) {
 }
 ```
 
-
 Fit linear models
+
 ```{r}
 lm_original <- lm(vcr2001 ~ poverty_rate, data = crime)
 lm_centered <- lm(vcr2001 ~ centered_poverty_rate, data = crime_centered)
 ```
 
-
 Extract coefficients
+
 ```{r}
 coef_original <- coef(lm_original)
 coef_centered <- coef(lm_centered)
 ```
 
-
 Create equation text
+
 ```{r}
 equation_text_original <- paste("y =", round(coef_original[1], 2), "+", round(coef_original[2], 2), "x")
 equation_text_centered <- paste("y =", round(coef_centered[1], 2), "+", round(coef_centered[2], 2), "x")
 ```
 
-
 Scatter Plot of Violent Crime Rate vs. Original % Poverty
+
 ```{r}
 plot1 <- crime %>%
   ggplot(aes(x = poverty_rate, y = vcr2001)) +
@@ -399,8 +460,8 @@ plot1 <- crime %>%
   theme_light()
 ```
 
-
 Scatter Plot of Violent Crime Rate vs. Centered % Poverty
+
 ```{r}
 plot2 <- crime_centered %>%
   ggplot(aes(x = centered_poverty_rate, y = vcr2001)) +
@@ -413,14 +474,13 @@ plot2 <- crime_centered %>%
   theme_light()
 ```
 
-
 Arrange the plots side by side
+
 ```{r}
 grid.arrange(plot1, plot2, ncol = 2)
 ```
 
+*Explanation:* The first plot uses the original poverty rate, where the intercept of the red line indicates the expected violent crime rate when the poverty rate is zero.
+The second plot uses the centered poverty rate, where the intercept of the blue line now represents the expected violent crime rate when the poverty rate is at its average.
 
-Explanation: The first plot uses the original poverty rate, where the intercept of the red line indicates the expected violent crime rate when the poverty rate is zero. The second plot uses the centered poverty rate, where the intercept of the blue line now represents the expected violent crime rate when the poverty rate is at its average. 
-
-
-# Way to Go! End of Week 2 Lab
+## Way to Go! End of Week 2 Lab
