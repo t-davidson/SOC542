@@ -59,7 +59,9 @@ library(MASS)
 - Course updates
 - Bivariate statistics review
 - Ordinary least squares regression
-- Lab: Simple regression in R / Github
+- Revisiting statistical significance
+- Estimands
+- Lab: Simple linear regression in R / Github
 
 
 # Course updates
@@ -419,7 +421,7 @@ ggplot(aes(x = coefs, y = results), data = d) +
 - \textbf{$R^2$} is a measure of the ratio of the variance of $\hat{y}$ to the variance of $y_i$
 
 $$R^2 = \frac{\sum_{i=1}^n(\hat{y_i}-\bar{y})^2}{\sum_{i=1}^n(y_i-\bar{y})^2} = \frac{ESS}{TSS}$$
-Where $ESS$ is the Expected Sum of Squares and $TSS$ is the total sum of squares.
+Where $ESS$ is the Expected Sum of Squares and $TSS$ is the Total Sum of Squares.
 
 - We can also write it as a fraction of the unexplained variance:
 
