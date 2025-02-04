@@ -1,0 +1,552 @@
+---
+title: "Week 3 - Bayesian Regression"
+author: "Brent H."
+date: "2/10/2025"
+output:
+  pdf_document: default
+  html_document: default
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE) # FALSE hides the code but shows the output (if any)
+knitr::opts_chunk$set(message = FALSE) # FALSE suppresses messages in the output document.
+knitr::opts_chunk$set(warning = FALSE) # FALSE suppresses warnings in the output document.
+
+options(scipen=999)  # Set to display small numbers in decimal form
+set.seed(1234) # Optional, for reproducibility
+
+# Check and load required libraries
+# tidyverse: A collection of packages for data manipulation and visualization
+if (!require(tidyverse)) install.packages("tidyverse")
+library(tidyverse)
+
+# rstanarm: Bayesian applied regression modeling using Stan
+if (!require(rstanarm)) install.packages("rstanarm")
+library(rstanarm)
+
+# viridis: Color palettes optimized for perceptual uniformity
+if (!require(viridis)) install.packages("viridis")
+library(viridis)
+
+# latex2exp: Allows LaTeX expressions in R plots
+if (!require(latex2exp)) install.packages("latex2exp")
+library(latex2exp)
+
+# tidybayes: Tools for working with Bayesian models in a tidy framework
+if (!require(tidybayes)) install.packages("tidybayes")
+library(tidybayes)
+
+# modelsummary: Functions for summarizing and visualizing statistical models
+if (!require(modelsummary)) install.packages("modelsummary")
+library(modelsummary)
+
+# broom.mixed: Tidying methods for mixed-effects models
+if (!require(broom.mixed)) install.packages("broom.mixed")
+library(broom.mixed)
+
+# Set modelsummary to use broom for tidying models
+options(modelsummary_get = "broom")
+
+
+```
+
+We're going to be using the `kidiq` dataset.
+A subset of data from the National Longitudinal Survey of Youth.
+You can read a little more about it here: <https://mc-stan.org/rstanarm/reference/rstanarm-datasets.html>
+
+```{r data, echo=TRUE, include=TRUE}
+data(kidiq)
+
+View(kidiq)
+
+```
+
+```{r scatter plot, echo=TRUE, include=TRUE}
+ggplot(kidiq,
+       aes(x = mom_iq,
+           y = kid_score)) +
+  geom_point() + theme_minimal()+
+  labs(title = "Scatterplot of Mom IQ vs Kid Score",
+       x = "Mother's IQ",
+       y = "Child's IQ")
+```
+
+# OLS model
+
+Let's start by estimating a simple OLS model.
+
+```{r ols-model}
+model_ols <- lm(kid_score ~ mom_iq, data = kidiq)
+modelsummary(list("OLS" = model_ols),
+             estimate = "{estimate}{stars} [{conf.low}, {conf.high}]",
+             statistic = NULL,
+             gof_omit = "IC|Log|alg|pss|F|RMSE",
+             notes = "Notes: + p < 0.1, * p < 0.05, ** p < 0.01, *** p < 0.001",
+             output="huxtable")
+```
+
+# Bayesian regression with `stan_glm`
+
+Bayesian regression models quantify uncertainty by treating unknown quantities as random variables with probability distributions.
+We will use the `stan_glm` function from `rstanarm` to estimate a series of regression models using the Bayesian approach and consider what the `prior` selection does in Bayesian inference.
+
+### 1. Flat (Uniform) Prior
+
+This model assumes an unknown quantity.
+
+Let's start with a uniform or "flat" prior.
+This assumes we have no prior belief about the parameters of the model.
+We can specify this by setting `prior = NULL` and `prior_intercept = NULL`.
+
+Running this will print information showing the output of the Hamiltonian Monte Carlo estimation procedure.
+In this case, we use a single chain with 2000 iterations.
+The first 1000 are used to optimize the model, the second 1000 to get estimates from the posterior.
+
+```{r no-prior}
+bayes_uniform <- stan_glm(kid_score ~ mom_iq, data = kidiq,
+                          prior = NULL,
+                          prior_intercept = NULL)
+```
+
+We can view a short summary of the results by printing the model object.
+
+```{r unform-prior-summary}
+print(bayes_uniform)
+```
+
+We can view confirm the information about the priors we used by running the `prior_summary` command.
+
+```{r uniform-summary}
+prior_summary(bayes_uniform)
+```
+
+Let's compare the coefficients of this model to the OLS.
+We see that the estimates are very close.
+
+```{r uniform-compare-ols}
+modelsummary(list("OLS" = model_ols,"Bayes Flat" = bayes_uniform),
+             estimate = "{estimate}{stars} [{conf.low}, {conf.high}]",
+             statistic = NULL,
+             gof_omit = "IC|Log|alg|pss|F|RMSE",
+             notes = "Notes: + p < 0.1, * p < 0.05, ** p < 0.01, *** p < 0.001",
+             output="huxtable")
+```
+
+### 2. Weakly Informative Prior
+
+In Bayesian regression, the coefficient itself is treated as a random variable with a central tendency and probability distribution, unlike in frequentist regression, where coefficients are fixed unknown values estimated from data.
+
+Let's rerun this same model but with some slightly more informative priors.
+Let's assume that we expect the coefficient for `mom_iq` to have a standard normal distribution (mean = 0, standard deviation = 1).
+This means that, a priori, the most plausible value for the coefficient is around 0, with a **95% probability interval approximately ±2 standard deviations** (i.e., between -2 and 2).
+
+Recall that in a normal distribution: - **68%** of values fall within **±1 standard deviation**.
+- **95%** of values fall within **±2 standard deviations**.
+- **99.7%** of values fall within **±3 standard deviations**.
+
+Thus, this weak prior allows for moderate deviations from 0, effectively assuming "no effect" with 95% confidence.
+
+```{r weak-prior}
+bayes_weak_prior <- stan_glm(kid_score ~ mom_iq, data = kidiq,
+                             prior = normal(location = 0,   # location = mean
+                                            scale = 1),     # scale = sd 
+                             refresh = 0) # The argument `refresh = 0` to avoid printing out all of the estimation information we saw in the last example.
+
+print(bayes_weak_prior)
+```
+
+```{r weak-compare-ols}
+modelsummary(list("OLS" = model_ols," Bayes Weak" = bayes_weak_prior),
+             estimate = "{estimate}{stars} [{conf.low}, {conf.high}]",
+             statistic = NULL,
+             gof_omit = "IC|Log|alg|pss|F|RMSE",
+             notes = "Notes: + p < 0.1, * p < 0.05, ** p < 0.01, *** p < 0.001",
+             output="huxtable")
+```
+
+#### Posterior predictive checks
+
+One way to evaluate the performance of our models is simulate data from the posterior distribution and to compare it to the original data.
+This is called *posterior predictive* check.
+
+```{r posterior-check-weak}
+pp_check(bayes_weak_prior) + ggtitle("Posterior Predictive Check: Weak Priors") + theme_tidybayes()
+```
+
+**Interpreting the Posterior Predictive Check Plots:** Posterior predictive checks help assess how well our Bayesian model generates data that aligns with observed outcomes.
+
+\- The **dark line** represents the empirical distribution of `kid_score` (actual observed data).
+\
+- The **light blue lines** represent **simulated datasets drawn from the posterior predictive distribution**.
+\
+- If the posterior predictive distributions **match the observed data well**, this suggests the model is making reasonable predictions.
+\
+- **Deviations indicate potential model misspecifications**---for example, if the posterior predictions are systematically lower than the observed distribution, the model may underestimate certain values.
+
+In this case: \
+1.
+The posterior predictive distribution is slightly **left-skewed**, meaning the model underestimates some higher `kid_score` values.
+\
+2.
+The distribution spread suggests that **uncertainty is well captured**, though extreme values are less frequent in simulated predictions compared to actual data.
+
+#### Prior Predictive Simulation
+
+One way to evaluate the role of priors in Bayesian models is to generate data purely from the **prior distribution**, without incorporating observed data.
+This is called a *prior predictive simulation* and allows us to visualize the model's assumptions before any learning occurs.
+
+We can do this by setting `prior_PD = TRUE`, which tells `stan_glm` to simulate data based only on the prior.
+
+```{r prior-predictive}
+bayes_weak_pp <- stan_glm(kid_score ~ mom_iq, data = kidiq,
+                          prior = normal(location = 0,
+                                         scale = 1),
+                          prior_PD = TRUE,
+                          refresh = 0)
+print(bayes_weak_pp)
+
+pp_check(bayes_weak_pp) + theme_tidybayes()
+```
+
+**Comparing Prior and Posterior Predictions**
+
+-   The **prior predictive distribution** represents what the model predicts **before seeing any data**.
+-   The **posterior predictive distribution** (as seen in the previous section) reflects updated predictions after incorporating observed data.
+-   **Prior predictive distributions tend to be much wider**, as they reflect all plausible values based solely on our assumptions about the coefficient.
+-   The **posterior predictive check (from `bayes_weak_prior`) is significantly more accurate** because it has been updated using the likelihood from the observed data.
+-   **Priors alone** can generate extremely broad predictions, demonstrating the role of prior uncertainty.
+-   The **posterior distribution refines predictions**, making them more data-driven.
+
+### 3. Strong Prior
+
+A strong prior encodes a firm belief about the relationship between `mom_iq` and `kid_score`, shifting our estimates toward an assumed effect.
+Here, we set a normal(10,1) prior, implying that before seeing any data, we expect a **1-point increase in `mom_iq` to increase `kid_score` by 10 points on average**.
+The posterior distribution will be **pulled toward** this assumed value unless the empirical data strongly contradicts it, at which point the model will balance the influence of prior beliefs with observed evidence.
+
+```{r strong-prior}
+bayes_strong_prior <- stan_glm(kid_score ~ mom_iq, data = kidiq,
+                               prior = normal(location = 10,
+                                            scale = 1),
+                               refresh = 0)
+print(bayes_strong_prior)
+```
+
+```{r weak-compare-ols}
+modelsummary(list("OLS" = model_ols,"Bayes Strong" = bayes_strong_prior),
+             estimate = "{estimate}{stars} [{conf.low}, {conf.high}]",
+             statistic = NULL,
+             gof_omit = "IC|Log|alg|pss|F|RMSE",
+             notes = "Notes: + p < 0.1, * p < 0.05, ** p < 0.01, *** p < 0.001",
+             output="huxtable")
+```
+
+### Comparing the models
+
+Let's see how that one compares to the other prior distributions we included.
+
+```{r posterior-check-compare}
+common_xlim <- range(kidiq$kid_score)  # Define common x-axis range
+
+pp_uniform <- pp_check(bayes_uniform) +
+  ggtitle("Uniform Priors") +
+  theme_tidybayes() +
+  xlim(common_xlim)
+
+pp_weak <- pp_check(bayes_weak_prior) +
+  ggtitle("Weak Priors") +
+  theme_tidybayes() +
+  xlim(common_xlim)
+
+pp_strong <- pp_check(bayes_strong_prior) +
+  ggtitle("Strong Priors") +
+  theme_tidybayes() +
+  xlim(common_xlim)
+
+ggpubr::ggarrange(pp_uniform, pp_weak, pp_strong, nrow = 3)
+```
+
+## Comparing OLS to Bayes
+
+Now let's compare the coefficients across the four models.
+
+```{r weak-prior-coef}
+rbind(ols = coefficients(model_ols),
+      uniform = coefficients(bayes_uniform),
+      weak = coefficients(bayes_weak_prior),
+      strong = coefficients(bayes_strong_prior))
+```
+
+Let's compare the three models visually.
+
+```{r model-comparisons}
+ggplot(kidiq,
+       aes(x = mom_iq,
+           y = kid_score)) +
+  geom_point() +
+  geom_abline(aes(slope = bayes_uniform[["coefficients"]][["mom_iq"]],
+              intercept = bayes_uniform[["coefficients"]][["(Intercept)"]],
+              color = "Uniform Prior"), linewidth = 1, alpha = .75) +
+  geom_abline(aes(slope = bayes_weak_prior[["coefficients"]][["mom_iq"]],
+              intercept = bayes_weak_prior[["coefficients"]][["(Intercept)"]],
+              color = "Weak Prior"), linewidth = 1, alpha = .75) +
+  geom_abline(aes(slope = bayes_strong_prior[["coefficients"]][["mom_iq"]],
+              intercept = bayes_strong_prior[["coefficients"]][["(Intercept)"]],
+              color = "Strong Prior"), linewidth = 1, alpha = .75) +
+  geom_abline(aes(slope = model_ols[["coefficients"]][["mom_iq"]],
+              intercept = model_ols[["coefficients"]][["(Intercept)"]],
+              color = "OLS Model"), linewidth = 1, alpha = .75) +
+  scale_color_viridis_d() +
+  theme_light()
+```
+
+From this plot, we can see that the lines are all nearly overlapping.
+
+Let's view the models side-by-side using `modelsummary()`.
+
+```{r modelsummary}
+modelsummary(list("OLS" = model_ols, 
+                  "Bayes Flat" = bayes_uniform,
+                  "Bayes Weak" = bayes_weak_prior, 
+                  "Bayes Strong" = bayes_strong_prior),
+             estimate = "{estimate}{stars} [{conf.low}, {conf.high}]",
+             statistic = NULL,
+             gof_omit = "IC|Log|alg|pss|F|RMSE",
+             notes = "Notes: + p < 0.1, * p < 0.05, ** p < 0.01, *** p < 0.001",
+             output="huxtable")
+```
+
+Note that we do not, by default, receive $r^2$, F, or other fit measures for the Bayesian models.
+This is because it has different values of these for each model it estimated.
+Fortunately, we can use the `rstanarm::bayes_R2()` function to calculate $r^2$ values for each model, then calculate the means and medians.
+Lastly, we'll throw that in the bottom of our `modelsummary()` output using the `add_rows` argument.
+
+```{r modelsummary_r2}
+bayesrows <- data.frame(
+  
+  c("Bayes R2 (Mean)", 
+    "Bayes R2 (Median)"),
+  
+  c("", ""), # OLS Model Blanks
+  
+  c(mean(bayes_R2(bayes_uniform)),
+    median(bayes_R2(bayes_uniform))),
+  
+  c(mean(bayes_R2(bayes_weak_prior)),
+    median(bayes_R2(bayes_weak_prior))),
+  
+  c(mean(bayes_R2(bayes_strong_prior)),
+    median(bayes_R2(bayes_strong_prior)))
+)
+
+modelsummary(list("OLS" = model_ols, 
+                  "Bayes Flat" = bayes_uniform,
+                  "Bayes Weak" = bayes_weak_prior, 
+                  "Bayes Strong" = bayes_strong_prior),
+              estimate = "{estimate}{stars}\n[{conf.low}, {conf.high}]",
+              statistic = NULL,
+              gof_omit = "IC|Log|alg|pss|F|RMSE",
+              add_rows = bayesrows)
+
+```
+
+Let's visually represent the models using a coefficients plot together.
+
+```{r post-model-viz2}
+d2 <- bayes_strong_prior %>% gather_draws(mom_iq)
+d3 <- bayes_weak_prior %>% gather_draws(mom_iq)
+
+d1$model <- "Uniform"
+d2$model <- "Strong"
+d3$model <- "Weak"
+
+d <- bind_rows(d1, d2, d3)
+
+o <- broom::tidy(model_ols)
+ols_coef <- o[[2, "estimate"]]
+ols_se <- o[[2, "std.error"]]
+
+d %>%
+  ggplot() +
+  stat_halfeye(aes(
+    y = model,  x = .value, 
+    group = model, fill = model), 
+    alpha = .7) +
+  geom_pointrange(aes(
+    y = "OLS",
+    x = ols_coef,
+    xmin = ols_coef - 1.96 * ols_se,
+    xmax = ols_coef + 1.96 * ols_se,
+    )) +
+  scale_fill_viridis_d() +
+  theme_tidybayes() +
+  labs(y = "Model",
+       x = "Coefficient Estimate") +
+  theme_light() + 
+  theme(legend.position = "none",
+        panel.grid.major.y = element_blank())
+```
+
+```{r}
+
+d %>%
+  ggplot(aes(x = .value, fill = model)) +
+  geom_density(alpha = 0.7) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "red") +
+  theme_light() +
+  labs(title = "Bayesian Posterior Distributions with Zero Reference",
+       x = "Posterior Draws of mom_iq Coefficient",
+       y = "Density") +
+  scale_fill_viridis_d()
+
+
+```
+
+What this shows: The red dashed line represents zero effect.
+The proportion of mass on each side of zero directly quantifies the probability of an effect.
+
+## Key Takeaways:
+
+**OLS vs. Bayesian Regression:**
+
+-   **OLS treats coefficients as fixed unknown values**, estimating them by minimizing the sum of squared residuals (Least Squares Estimation).
+
+-   **Bayesian regression treats coefficients as probability distributions**, incorporating prior knowledge and updating beliefs using data.
+
+# Post-Estimation Visualization
+
+We can visualize the uncertainty around estimates from the Bayesian models by analyzing the posterior distribution.
+The `gather_draws()` function is used to produce a table showing the estimates of the coefficient for `mom_iq` produced by the MCMC estimation procedure.
+
+The `tidybayes` package has lots of useful functions for plotting these results.
+In this case, we can see the entire posterior distribution, along with a summary.
+The point indicates the *median* of the posterior distribution and the bars the 66% and 95% *highest posterior density intervals*.
+
+```{r post-model-viz1}
+d1 <- bayes_uniform %>% 
+  gather_draws(mom_iq)
+head(d1)
+
+d1 %>%
+  ggplot(aes(y = .variable, x = .value)) +
+  stat_halfeye() +
+  theme_tidybayes() + 
+  labs(x = "Coefficient", y = "Variable")
+```
+
+```{r}
+d <- bind_rows(
+  bayes_uniform %>% gather_draws(mom_iq) %>% mutate(model = "Uniform"),
+  bayes_weak_prior %>% gather_draws(mom_iq) %>% mutate(model = "Weak"),
+  bayes_strong_prior %>% gather_draws(mom_iq) %>% mutate(model = "Strong")
+)
+
+ols_coef <- coef(model_ols)["mom_iq"]
+ols_se <- summary(model_ols)$coefficients["mom_iq", "Std. Error"]
+
+ggplot(d, aes(x = .value, fill = model)) +
+  stat_halfeye(alpha = 0.6) +
+  geom_vline(xintercept = ols_coef, color = "red", linetype = "dashed") +
+  geom_vline(xintercept = c(ols_coef - 1.96 * ols_se, ols_coef + 1.96 * ols_se),
+             color = "red", linetype = "dotted") +
+  labs(title = "Bayesian Posterior vs OLS Confidence Interval",
+       x = "Coefficient Estimate (mom_iq)",
+       y = "Density") +
+  scale_fill_viridis_d() +
+  theme_minimal()
+
+```
+
+# Parking Garage Code
+
+The key idea behind resampling with replacement is that each dataset is a new realization of a possible sample from the population, introducing variation.
+
+```{r}
+
+ols_samples <- replicate(1000, {
+  sample_indices <- sample(nrow(kidiq), replace = TRUE) # The rationale is that each observation represents a random draw from the population. By resampling with replacement, we approximate what would happen if we repeatedly drew new samples.
+  coef(lm(kid_score ~ mom_iq, data = kidiq[sample_indices, ]))["mom_iq"]
+})
+
+ggplot(data.frame(beta_ols = ols_samples), aes(x = beta_ols)) +
+  geom_histogram(bins = 30, fill = "steelblue", alpha = 0.7) +
+  geom_vline(xintercept = coef(model_ols)["mom_iq"], color = "red", linetype = "dashed") +
+  labs(title = "Sampling Distribution of OLS Coefficient Estimates",
+       x = "Coefficient Estimate (mom_iq)",
+       y = "Frequency") +
+  theme_minimal()
+
+
+
+```
+
+## Viewing the MCMC chains
+
+To understand the estimation procedure we can view the trace plot.
+This shows how the estimate of the parameters in the model shifted during the estimation process.
+These plots and various related statistics are often used to diagnose potential issues that can arise in the estimation process.
+The plot shows the estimated value of the slope at each iteration in the MCMC process.
+
+Unlike the example in lecture with two chains, here we just use a single chain.
+The models below all use the default 4 chains (see McElreath C9 for discussion of why we might want to vary the number of chains).
+
+This plot also communicates some of the uncertainty surrounding the parameter $\beta_1$.
+We can see that the estimate seems to bounce around an average value.
+
+Note: `rstanarm` discards the "warmup" samples used to calibrate the HMC algorithm.
+We therefore see that the chain has already converged towards the final value.
+
+```{r trace}
+plot(bayes_uniform, "trace", pars = "mom_iq") + 
+  labs(y = TeX("$\\beta_1$"), 
+       x = "Iteration") + theme_tidybayes()
+```
+
+Here's another example of a way we can express the uncertainty contained in the estimates.
+
+```{r post-model-viz3, warning=F}
+d %>%
+  ggplot() +
+  stat_gradientinterval(aes(
+    y = model,
+    x = .value, 
+    group = model, 
+    fill = model)) + 
+  geom_pointrange(aes(
+    y = "OLS",
+    x = ols_coef,
+    xmin = ols_coef - 1.96 * ols_se,
+    xmax = ols_coef + 1.96 * ols_se,
+    )) +
+  scale_fill_viridis_d() +
+  labs(y = "Model",
+       x = "Coefficient Estimate") +
+  theme_light() + 
+  theme(legend.position = "none",
+        panel.grid.major.y = element_blank())
+```
+
+```{r}
+p_values <- replicate(500, {
+  sample_indices <- sample(nrow(kidiq), replace = TRUE)
+  summary(lm(kid_score ~ mom_iq, data = kidiq[sample_indices, ]))$coefficients["mom_iq", "Pr(>|t|)"]
+})
+
+ggplot(data.frame(p_value = p_values), aes(x = p_value)) +
+  geom_histogram(bins = 30, fill = "tomato", alpha = 0.7) +
+  labs(title = "Unreliability of p-values in Resampling",
+       x = "p-value",
+       y = "Frequency") +
+  theme_minimal()
+
+```
+
+Let's compare the mean and standard deviation for samples and the data to get a better look at this.
+
+```{r posterior-check-scatter}
+pp_check(bayes_weak_pp, plotfun = "stat_2d", 
+         stat = c("mean", "sd")) + 
+  theme_tidybayes()
+```
