@@ -53,9 +53,23 @@ options(modelsummary_get = "broom")
 
 ```
 
-We're going to be using the `kidiq` dataset.
-A subset of data from the National Longitudinal Survey of Youth.
-You can read a little more about it here: <https://mc-stan.org/rstanarm/reference/rstanarm-datasets.html>
+## **Introduction**
+
+This lab introduces **Bayesian regression** and compares it to **Ordinary Least Squares (OLS) regression**.
+We will explore how Bayesian methods quantify uncertainty differently, incorporate prior knowledge, and handle model evaluation.
+By the end, you will have a deeper understanding of when and why you might choose Bayesian regression over OLS.
+
+### **Key Objectives**
+
+-   Understand the fundamental differences between OLS and Bayesian regression.
+-   Learn how priors influence Bayesian estimates.
+-   Interpret posterior distributions and compare them to OLS estimates.
+-   Use posterior predictive checks to evaluate model fit.
+
+## **Dataset Overview**
+
+We will analyze the `kidiq` dataset from the National Longitudinal Survey of Youth.
+[More info](https://mc-stan.org/rstanarm/reference/rstanarm-datasets.html).
 
 ```{r data, echo=TRUE, include=TRUE}
 data(kidiq)
@@ -74,9 +88,10 @@ ggplot(kidiq,
        y = "Child's IQ")
 ```
 
-# OLS model
+## **OLS Regression: The Frequentist Approach**
 
-Let's start by estimating a simple OLS model.
+In **Ordinary Least Squares (OLS) regression**, we estimate coefficients by **minimizing the sum of squared residuals**.
+The model assumes that the relationship between `mom_iq` and `kid_score` is **linear**, and errors are normally distributed.
 
 ```{r ols-model}
 model_ols <- lm(kid_score ~ mom_iq, data = kidiq)
@@ -88,9 +103,22 @@ modelsummary(list("OLS" = model_ols),
              output="huxtable")
 ```
 
-# Bayesian regression with `stan_glm`
+Familiar, right?
+But...
 
-Bayesian regression models quantify uncertainty by treating unknown quantities as random variables with probability distributions.
+### **Limitations of OLS**
+
+-   **Point estimates only:** OLS provides a single best estimate for each coefficient.
+-   **Dealing with uncertainty:** Confidence intervals depend on assumptions about normality and large-sample properties.
+-   **What if we have prior knowledge about the relationship:** OLS treats every dataset as if it starts from zero prior information.
+
+## **Bayesian Regression: The Probabilistic Approach**
+
+Unlike OLS, **Bayesian regression treats coefficients as probability distributions rather than fixed values**.
+This allows us to:\
+- Quantify **uncertainty empirically** using **full posterior distributions,** rather than relying on point estimates and derived confidence intervals using assumptions from statistical theory.\
+- **Incorporate prior beliefs**, balancing prior knowledge with observed data.
+
 We will use the `stan_glm` function from `rstanarm` to estimate a series of regression models using the Bayesian approach and consider what the `prior` selection does in Bayesian inference.
 
 ### 1. Flat (Uniform) Prior
@@ -143,8 +171,9 @@ Let's rerun this same model but with some slightly more informative priors.
 Let's assume that we expect the coefficient for `mom_iq` to have a standard normal distribution (mean = 0, standard deviation = 1).
 This means that, a priori, the most plausible value for the coefficient is around 0, with a **95% probability interval approximately ±2 standard deviations** (i.e., between -2 and 2).
 
-Recall that in a normal distribution: - **68%** of values fall within **±1 standard deviation**.
-- **95%** of values fall within **±2 standard deviations**.
+Recall that in a normal distribution:\
+- **68%** of values fall within **±1 standard deviation**.\
+- **95%** of values fall within **±2 standard deviations**.\
 - **99.7%** of values fall within **±3 standard deviations**.
 
 Thus, this weak prior allows for moderate deviations from 0, effectively assuming "no effect" with 95% confidence.
@@ -167,9 +196,9 @@ modelsummary(list("OLS" = model_ols," Bayes Weak" = bayes_weak_prior),
              output="huxtable")
 ```
 
-#### Posterior predictive checks
+#### Quick Segue: Posterior predictive checks
 
-One way to evaluate the performance of our models is simulate data from the posterior distribution and to compare it to the original data.
+One way to evaluate the performance of our Bayes model is simulate data from the posterior distribution and compare it to the original data.
 This is called *posterior predictive* check.
 
 ```{r posterior-check-weak}
@@ -178,22 +207,20 @@ pp_check(bayes_weak_prior) + ggtitle("Posterior Predictive Check: Weak Priors") 
 
 **Interpreting the Posterior Predictive Check Plots:** Posterior predictive checks help assess how well our Bayesian model generates data that aligns with observed outcomes.
 
-\- The **dark line** represents the empirical distribution of `kid_score` (actual observed data).
-\
-- The **light blue lines** represent **simulated datasets drawn from the posterior predictive distribution**.
-\
-- If the posterior predictive distributions **match the observed data well**, this suggests the model is making reasonable predictions.
-\
+\- The **dark line** represents the empirical distribution of `kid_score` (actual observed data).\
+- The **light blue lines** represent **simulated datasets drawn from the posterior predictive distribution**.\
+- If the posterior predictive distributions **match the observed data well**, this suggests the model is making reasonable predictions.\
 - **Deviations indicate potential model misspecifications**---for example, if the posterior predictions are systematically lower than the observed distribution, the model may underestimate certain values.
 
-In this case: \
+In this case:\
 1.
-The posterior predictive distribution is slightly **left-skewed**, meaning the model underestimates some higher `kid_score` values.
-\
+The posterior predictive distribution is slightly **left-skewed**, meaning the model underestimates some higher `kid_score` values.\
 2.
 The distribution spread suggests that **uncertainty is well captured**, though extreme values are less frequent in simulated predictions compared to actual data.
 
-#### Prior Predictive Simulation
+**Reflection: What would have happen if we never used observed data to build a model?**
+
+*Prior Predictive Simulation*
 
 One way to evaluate the role of priors in Bayesian models is to generate data purely from the **prior distribution**, without incorporating observed data.
 This is called a *prior predictive simulation* and allows us to visualize the model's assumptions before any learning occurs.
@@ -213,12 +240,20 @@ pp_check(bayes_weak_pp) + theme_tidybayes()
 
 **Comparing Prior and Posterior Predictions**
 
+```{r compare-prior-posterior}
+pp_prior <- pp_check(bayes_weak_pp) + ggtitle("Prior Predictive Check") + theme_tidybayes()
+pp_posterior <- pp_check(bayes_weak_prior) + ggtitle("Posterior Predictive Check") + theme_tidybayes()
+
+ggpubr::ggarrange(pp_prior, pp_posterior, ncol = 2)
+```
+
+### **Interpretation:**
+
 -   The **prior predictive distribution** represents what the model predicts **before seeing any data**.
--   The **posterior predictive distribution** (as seen in the previous section) reflects updated predictions after incorporating observed data.
+-   The **posterior predictive distribution** reflects updated predictions **after incorporating observed data**.
 -   **Prior predictive distributions tend to be much wider**, as they reflect all plausible values based solely on our assumptions about the coefficient.
--   The **posterior predictive check (from `bayes_weak_prior`) is significantly more accurate** because it has been updated using the likelihood from the observed data.
--   **Priors alone** can generate extremely broad predictions, demonstrating the role of prior uncertainty.
--   The **posterior distribution refines predictions**, making them more data-driven.
+-   The **posterior predictive check is significantly more accurate** because it has been updated using the likelihood from the observed data.
+-   This comparison highlights how the posterior distribution **refines predictions**, making our model more data-driven.
 
 ### 3. Strong Prior
 
@@ -243,9 +278,9 @@ modelsummary(list("OLS" = model_ols,"Bayes Strong" = bayes_strong_prior),
              output="huxtable")
 ```
 
-### Comparing the models
+### Evaluating Bayes models
 
-Let's see how that one compares to the other prior distributions we included.
+Let's see how the models compare to the other prior distributions we created.
 
 ```{r posterior-check-compare}
 common_xlim <- range(kidiq$kid_score)  # Define common x-axis range
@@ -268,7 +303,7 @@ pp_strong <- pp_check(bayes_strong_prior) +
 ggpubr::ggarrange(pp_uniform, pp_weak, pp_strong, nrow = 3)
 ```
 
-## Comparing OLS to Bayes
+## Comparing OLS and Bayes
 
 Now let's compare the coefficients across the four models.
 
@@ -302,9 +337,9 @@ ggplot(kidiq,
   theme_light()
 ```
 
-From this plot, we can see that the lines are all nearly overlapping.
+From this plot, we can see that the regression lines are all nearly overlapping, suggesting that Bayesian estimates with weak priors closely resemble OLS estimates.
 
-Let's view the models side-by-side using `modelsummary()`.
+### **Comparing Model Estimates**
 
 ```{r modelsummary}
 modelsummary(list("OLS" = model_ols, 
@@ -318,10 +353,7 @@ modelsummary(list("OLS" = model_ols,
              output="huxtable")
 ```
 
-Note that we do not, by default, receive $r^2$, F, or other fit measures for the Bayesian models.
-This is because it has different values of these for each model it estimated.
-Fortunately, we can use the `rstanarm::bayes_R2()` function to calculate $r^2$ values for each model, then calculate the means and medians.
-Lastly, we'll throw that in the bottom of our `modelsummary()` output using the `add_rows` argument.
+Note that we do not, by default, receive $r^2$, F, or other fit measures for the Bayesian models. This is because it has different values of these for each model it estimated. Fortunately, we can use the `rstanarm::bayes_R2()` function to calculate $r^2$ values for each model, then calculate the means and medians. We can include these model fit measures by using `modelsummary()` output and the `add_rows` argument.
 
 ```{r modelsummary_r2}
 bayesrows <- data.frame(
@@ -382,6 +414,7 @@ d %>%
     )) +
   scale_fill_viridis_d() +
   theme_tidybayes() +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "red") +
   labs(y = "Model",
        x = "Coefficient Estimate") +
   theme_light() + 
@@ -389,33 +422,31 @@ d %>%
         panel.grid.major.y = element_blank())
 ```
 
-```{r}
+### **Interpretation:**
 
-d %>%
-  ggplot(aes(x = .value, fill = model)) +
-  geom_density(alpha = 0.7) +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "red") +
-  theme_light() +
-  labs(title = "Bayesian Posterior Distributions with Zero Reference",
-       x = "Posterior Draws of mom_iq Coefficient",
-       y = "Density") +
-  scale_fill_viridis_d()
+-   The **red dashed line represents the null effect (zero influence of `mom_iq` on `kid_score`)**.
+-   Just like we interpret the **95% confidence interval in OLS**, the Bayesian distributions allow us to quantify **uncertainty** by directly examining the proportion of the posterior that lies above or below zero.
+-   The **OLS estimate (black dot with confidence interval)** represents a single best guess with an associated range of uncertainty.
+-   Bayesian posterior distributions provide a **full probability distribution over possible coefficient values**, offering a richer perspective on uncertainty and the likelihood of different effects.
 
+This visualization highlights the fundamental difference: 
+-   **Frequentist confidence intervals** only tell us where the coefficient might fall in repeated samples, whereas **Bayesian inference provides a direct probability distribution over plausible values.** 
+- The **proportion of mass on either side of zero** quantifies the probability of a positive or negative effect.
+- The Bayesian posterior distributions provide a richer representation of uncertainty compared to the single OLS estimate with confidence intervals.
 
-```
+## **OLS vs. Bayesian Regression: Key Differences**
 
-What this shows: The red dashed line represents zero effect.
-The proportion of mass on each side of zero directly quantifies the probability of an effect.
+| Feature                | OLS Regression                        | Bayesian Regression                      |
+|------------------------|-------------------------------------|-----------------------------------------|
+| **Coefficient Estimates** | Point estimates                     | Full posterior distributions           |
+| **Uncertainty**        | Confidence intervals based on sampling | Credible intervals based on posterior distribution |
+| **Handling Small Data** | Assumes data dominates               | Priors help stabilize estimates        |
+| **Interpretation**     | Fixed effect size                     | Probabilistic range of plausible values |
+| **Flexibility**        | No prior knowledge incorporated       | Can incorporate domain expertise via priors |
 
-## Key Takeaways:
+# Parking garage for unused but potentially useful code in the future:
 
-**OLS vs. Bayesian Regression:**
-
--   **OLS treats coefficients as fixed unknown values**, estimating them by minimizing the sum of squared residuals (Least Squares Estimation).
-
--   **Bayesian regression treats coefficients as probability distributions**, incorporating prior knowledge and updating beliefs using data.
-
-# Post-Estimation Visualization
+Post-Estimation Visualization
 
 We can visualize the uncertainty around estimates from the Bayesian models by analyzing the posterior distribution.
 The `gather_draws()` function is used to produce a table showing the estimates of the coefficient for `mom_iq` produced by the MCMC estimation procedure.
@@ -458,8 +489,6 @@ ggplot(d, aes(x = .value, fill = model)) +
   theme_minimal()
 
 ```
-
-# Parking Garage Code
 
 The key idea behind resampling with replacement is that each dataset is a new realization of a possible sample from the population, introducing variation.
 
