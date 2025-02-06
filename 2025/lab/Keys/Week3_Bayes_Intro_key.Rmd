@@ -269,7 +269,7 @@ bayes_strong_prior <- stan_glm(kid_score ~ mom_iq, data = kidiq,
 print(bayes_strong_prior)
 ```
 
-```{r weak-compare-ols}
+```{r weak-compare-ols2}
 modelsummary(list("OLS" = model_ols,"Bayes Strong" = bayes_strong_prior),
              estimate = "{estimate}{stars} [{conf.low}, {conf.high}]",
              statistic = NULL,
@@ -387,8 +387,10 @@ modelsummary(list("OLS" = model_ols,
 Let's visually represent the models using a coefficients plot together.
 
 ```{r post-model-viz2}
+d1 <- bayes_uniform %>% gather_draws(mom_iq)
 d2 <- bayes_strong_prior %>% gather_draws(mom_iq)
 d3 <- bayes_weak_prior %>% gather_draws(mom_iq)
+
 
 d1$model <- "Uniform"
 d2$model <- "Strong"
@@ -456,10 +458,6 @@ In this case, we can see the entire posterior distribution, along with a summary
 The point indicates the *median* of the posterior distribution and the bars the 66% and 95% *highest posterior density intervals*.
 
 ```{r post-model-viz1}
-d1 <- bayes_uniform %>% 
-  gather_draws(mom_iq)
-head(d1)
-
 d1 %>%
   ggplot(aes(y = .variable, x = .value)) +
   stat_halfeye() +
