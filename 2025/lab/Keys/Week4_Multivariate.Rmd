@@ -1,0 +1,530 @@
+---
+title: "Case Study - Explaining Hate Crimes Across the United States"
+author: "Brent Hoagland"
+date: "2025-02-17"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r Instructions, include = FALSE}
+
+# Preparation:
+# Please read the article Higher Rates of Hate Crimes Are Tied to Income Inequality on FiveThirtyEight. This will give you an overview of the analysis you'll be recreating. 
+# 
+# https://fivethirtyeight.com/features/higher-rates-of-hate-crimes-are-tied-to-income-inequality/
+# 
+# Lab Instructions: 
+# Recreating FiveThirtyEight's Analysis
+# 
+# Your task is to recreate the analysis presented in the FiveThirtyEight article. 
+# 
+# I have provided all the necessary code snippets in the "Week_4_Code_Bank.R" script. You won't need to write any code from scratch; instead, you'll select and arrange pre-written code chunks into your RMarkdown document.
+# 
+# So far we've only run code using R scripts (a kind of infinite document for code and comments). Well, there is a cool thing called an Rmarkdown file that can be used to blend code and text to produce highly pleasing outputs, like pdfs, html, and more. 
+# 
+# Steps:
+# 1) Start with the this file you are reading and familiarize yourself with the different sections (kinda like reading a table of contents)
+# 
+# 2) Work your way down the this file and source the required code chunks from the "Week_4_Code_Bank.R" script provided. This contains all the code snippets you'll need. I suggest you cut and paste from the Code Bank (by the end there should be nothing left) into the correct location in this Rmarkdown document making sure to include it within R code chunk delimiters ({r...} to ).
+# 
+# 3) After inserting a code chunk, run it to make sure it works as expected. You can run code chunks in RMarkdown by clicking the play button in the upper right corner of the code chunk area.
+# 
+# 4) Some sections will include questions as text in this document, please answer based on the output of your code. 
+# 
+# 5) Knit to HTML: Once all code chunks have been placed correctly and all questions answered, save your document and knit it to HTML (instructions at the bottom). This will generate an HTML file with your complete analysis, including text, tables, and figures without all the messy code that goes into making it. 
+# 
+# 6) Congratulations! You've stitched together a report that looks amazing and all the corresponding code to replicate it. 
+# 
+# Tips for Success
+# 
+# Read Carefully: Each code chunk has a specific purpose. Ensure you understand what is intended for the section and then find the appropriate chunk. Read through the chunks and look for functions or objects you already know. Feel free to use ChatGPT to have it describe what a chunk of code is intended to do. You are putting together the pieces of a puzzle, not writing code from scratch.
+# 
+# Incrementally Run each R code chunk. You can run the code chunk in the gray area by clicking the little green play button on the upper right of the box. 
+
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE) # FALSE hides the code but shows the output (if any)
+knitr::opts_chunk$set(message = FALSE) # FALSE suppresses messages in the output document.
+knitr::opts_chunk$set(warning = FALSE) # FALSE suppresses warnings in the output document.
+
+options(scipen=999)  # Set to display small numbers in decimal form
+set.seed(1234) # Optional, for reproducibility
+
+# Check and load required libraries
+# tidyverse: A collection of packages for data manipulation and visualization
+if(!require(tidyverse)) install.packages("tidyverse")
+library(tidyverse)
+
+if(!require(broom)) install.packages("broom")
+library(broom)
+
+# tidyr: Helps to tidy data; transforming it to a desirable format
+if(!require(tidyr)) install.packages("tidyr")
+library(tidyr)
+
+# readr: Provides a fast and friendly way to read rectangular data (like csv, tsv, and fwf)
+if(!require(readr)) install.packages("readr")
+library(readr)
+
+# ggplot2: A system for creating graphics
+if(!require(ggplot2)) install.packages("ggplot2")
+library(ggplot2)
+
+# modelsummary: Summarizes and presents regression models and data frames in tables
+if(!require(modelsummary)) install.packages("modelsummary")
+library(modelsummary)
+
+# stargazer: Well-formatted regression and summary statistics tables
+if(!require(stargazer)) install.packages("stargazer")
+library(stargazer)
+
+# jtools: Provides functions for analyzing and presenting regression models
+if(!require(jtools)) install.packages("jtools")
+library(jtools)
+
+# gridExtra: Provides functions for arranging multiple grid-based plots on one page
+if(!require(gridExtra)) install.packages("gridExtra")
+library(gridExtra)
+
+# kableExtra: Enhances `knitr::kable()` function with additional formatting and styling
+if(!require(kableExtra)) install.packages("kableExtra")
+library(kableExtra)
+
+# maps: Provides a simple framework for accessing and displaying map projections
+if(!require(maps)) install.packages("maps")
+library(maps)
+
+# sf: Supports simple features, a standardized way to encode spatial vector data
+if(!require(sf)) install.packages("sf")
+library(sf)
+
+# viridis: Provides color maps that are perceptually uniform in both color and black-and-white
+if(!require(viridis)) install.packages("viridis")
+library(viridis)
+
+# corrplot: Visualization of a correlation matrix
+if(!require(corrplot)) install.packages("corrplot")
+library(corrplot)
+
+# 
+if(!require(patchwork)) install.packages("patchwork")
+library(patchwork)
+
+# fivethirtyeight: Data for the case
+if(!require(fivethirtyeight)) install.packages("fivethirtyeight")
+library(fivethirtyeight)
+
+```
+
+# Introduction
+
+Amidst rising concerns about hate crimes across the United States, researchers and policymakers are seeking to understand the factors that contribute to the variation in hate crime rates across different states. *Why do some states report higher rates of hate incidents than others?* Is it economic conditions, the level of educational attainment, the diversity of the population, or perhaps the political climate that contributes most significantly to these disparities?
+
+To explore these questions, we will recreate an approach taken by [FiveThirtyEight](https://fivethirtyeight.com/features/higher-rates-of-hate-crimes-are-tied-to-income-inequality/) analyzing state-level data on a range of factors.
+
+Our investigation unfolds in two parts:
+
+First, we will analyze data gathered through the **FBI Uniform Crime Reporting (UCR) Program**, which collects hate crime data from law enforcement agencies. However, the federal government doesn't systematically require the tracking of hate crimes, so the data gathered through the UCT Program only includes reports from agencies that voluntarily submit data. Moreover, the UCR Program collects data on "prosecutable" hate *crimes*, which only make up a fraction of hate *incidents* (which represent "non-prosecutable" offenses, such as the circulation of white nationalist recruitment materials on college campuses).
+
+In Part 2, we will expand our analysis to include data compiled by the **Southern Poverty Law Center (SPLC)** from media accounts and self-reports, which include both hate *crimes* and hate *incidents* (those that are not prosecutable under the law). We will then compare our analyses to see if the general relationships hold despite the different reporting methodologies.
+
+# Part 1: Analyzing FBI Data on Hate Crimes
+
+```{r loading and recoding data set, include=FALSE}
+
+# Load the hate_crimes dataset
+data("hate_crimes")
+
+# Rename variables so that their shorter and easier to type
+hate_crimes <- hate_crimes %>%
+  mutate(
+    hatecrimes_fbi = avg_hatecrimes_per_100k_fbi,
+    hatecrimes_splc = hate_crimes_per_100k_splc
+  )
+
+# Adjusting share variables to be in percentage points
+hate_crimes$share_unemp_seas <- hate_crimes$share_unemp_seas * 100
+hate_crimes$share_pop_metro <- hate_crimes$share_pop_metro * 100
+hate_crimes$share_pop_hs <- hate_crimes$share_pop_hs * 100
+hate_crimes$share_non_citizen <- hate_crimes$share_non_citizen * 100
+hate_crimes$share_white_poverty <- hate_crimes$share_white_poverty * 100
+hate_crimes$gini_index <- hate_crimes$gini_index * 100
+hate_crimes$share_non_white <- hate_crimes$share_non_white * 100
+hate_crimes$share_vote_trump <- hate_crimes$share_vote_trump * 100
+
+```
+
+Let's begin our investigation by demonstrating the variation in hate crime rates across the United States.
+We believe this variation is not random; rather, it is shaped by social, economic, and political factors. To establish this, we will first examine how hate crimes are distributed across states.
+
+To visualize these disparities, we will employ two key methods:
+Histogram: This will illustrate the distribution of hate crime rates, highlighting central tendencies and variation across states.
+Geospatial Mapping: By mapping hate crime rates across the U.S., we can identify regional clustering and disparities in reported incidents.
+
+These visualizations provide an initial foundation for understanding how and where hate crimes are reported, setting the stage for deeper statistical analysis.
+
+```{r Code for creating a histogram and map distributions of hate crimes, include=FALSE}
+# Creating the FBI data histogram with a mean line
+fbi_histogram <- ggplot(hate_crimes %>% 
+                                 filter(!is.na(hatecrimes_fbi) & is.finite(hatecrimes_fbi)),
+                                 aes(x = hatecrimes_fbi)) +
+  geom_histogram(fill = "skyblue", bins = 30, alpha = 1) +
+  geom_vline(aes(xintercept = mean(hatecrimes_fbi, na.rm = TRUE)), 
+             color = "red", linetype = "dashed", size = 1) +
+  labs(x = "Average Annual Hate Crimes per 100k", y = "Frequency") +
+  theme_minimal()
+
+
+# Overlaying data on map of United States
+states_map <- map_data("state")
+
+# Prepare the hate crimes data for mapping
+hate_crimes_map_data <- hate_crimes %>%
+  mutate(state = tolower(state)) %>%
+  inner_join(states_map, by = c("state" = "region"))
+
+# Plot the map with theme_void() to remove axis text and labels
+hate_crimes_map <- ggplot() +
+  geom_polygon(data = hate_crimes_map_data, aes(x = long, y = lat, group = group, fill = hatecrimes_fbi), color = "white") +
+  coord_fixed(1.3) +
+  scale_fill_viridis(option = "magma", name = "Hate Crimes\nper 100k", guide = guide_colorbar(direction = "vertical")) +
+  theme_void() +  # Use theme_void to remove most theme elements
+  theme(legend.position = "right", plot.title = element_text(hjust = 0.5))  # Adjust legend position and center title
+
+# Combine the plots side by side
+combined_plot <- fbi_histogram + hate_crimes_map + plot_layout(ncol = 2) +
+                labs(caption = "Notes: Years 2010 thru 2015")
+                theme(plot.caption = element_text(hjust = 0, face = "italic"))
+
+```
+
+**Figure 1.** Average Annual Hate Crimes per 100k as reported by FBI
+
+```{r printing Figure 1, fig.width=8, fig.height=4, out.width='100%'}
+
+print(combined_plot)
+
+```
+
+## Investigating Factors Influencing Hate Crime Rates
+
+Having established that hate crime rates vary across the United States, we now turn our attention to identifying the potential drivers behind this phenomenon. Based on a review of literature on factors tied to neighborhood violence, FiveThirtyEight compiled a data set with a number of factors that include:
+
+-   **Education:** Proportion of adults with at least a high school education.
+-   **Diversity:** Measures of the nonwhite and noncitizen populations.
+-   **Geographic Distribution:** Share of the population residing in metropolitan areas.
+-   **Economic Indicators:** Median household income, unemployment rates, poverty levels among white populations.
+-   **Income Inequality:** Measured by the Gini index (0 represents everyone has the same income and 1 means most unequal).
+-   **Political Leanings:** Percentage of the population that supported Donald Trump in the 2016 Presidential Election.
+
+**Table 1.** Descriptive Statistics
+
+```{r Present Descriptive Statistics, fig.width=8, fig.height=4, out.width='100%'}
+
+# Reorder the columns so that the DV is first
+hate_crimes_reordered <- hate_crimes %>% 
+  select(hatecrimes_fbi, everything())
+
+# Use datasummary_skim() on the reordered data
+datasummary_skim(hate_crimes_reordered, type="numeric", fmt=2, histogram=FALSE)
+
+
+```
+
+## Hypothesizing Socioeconomic Influences
+
+Before diving into any regression analyses, let's think about each bivariate association between the possible independent variables and how each might relate to hate crime rates.
+
+**Table 2**. Hypothesized Relationships Between Socioeconomic Variables and Hate Crime Rates
+
+```{r creating and presenting hypothesis table, fig.width=8, fig.height=4, out.width='100%'}
+
+# In this portion, write what you think the relationship will be and its formulation in words. I've done the first one, and be sure to stay in the quotation marks.
+
+
+# There is no "right" answer per se. These are just how I filled it out.
+var_table <- matrix(
+  c(  
+      "median_house_inc",    "Negative", "Higher income states are associated with lower hate crime rates.",
+      "share_unemp_seas",    "Positive", "Higher unemployment is associated to higher hate crime rates.",
+      "share_pop_metro",     "Negative", "Metropolitan areas will reflect fewer hate crimes",
+      "share_pop_hs",        "Negative", "A higher share of the poopulation with a high school diploma is associated with lower hate crime rates.",
+      "share_non_citizen",   "Positive", "Areas with higher non-citizen populations are associated with more hate crimes.",
+      "share_white_poverty", "Positive", "A greater poor white population will be associated with more hate crimes.",
+      "gini_index",          "Positive", "Higher income inequality is associated with higher hate crime rates.",
+      "share_non_white",     "Positive", "Areas with diverse populations will experience more hate crimes.",
+      "share_vote_trump",    "Positive", "Regions with higher support for Trump are associated with higher hate crime rates."
+    ), 
+    ncol = 3, 
+    byrow = TRUE
+  )
+
+# Convert the matrix to a data frame for kable
+table_df <- as.data.frame(var_table)
+
+# Create the table with knitr::kable and shade the first row
+kable(table_df, "html", booktabs = T, col.names = c("Variable Name", "Hypothesized Direction", "Hypothesis Formulation")) %>%
+  kable_styling(latex_options = "striped", stripe_color = "gray!30") %>%
+  row_spec(0, background = "gray!30")
+
+
+```
+
+Examining bivariate associations serves as the building blocks of our understanding of the interplay between independent variables and an outcome. Each model outlined below addresses the relationship between a single independent variable and our dependent variable, the average annual hate crimes per 100,000 people, as reported by the FBI.
+
+```{r defining bivariate linear models for each grouping of factors}
+
+# Education 
+model_edu <- lm(hatecrimes_fbi ~ share_pop_hs, data = hate_crimes)
+
+# Diversity
+model_div <- lm(hatecrimes_fbi ~ share_non_white, data = hate_crimes)
+model_div2 <- lm(hatecrimes_fbi ~ share_non_citizen, data = hate_crimes)
+
+# Geographic Distribution 
+model_geo <- lm(hatecrimes_fbi ~ share_pop_metro, data = hate_crimes)
+
+# Economic 
+model_eco <- lm(hatecrimes_fbi ~ median_house_inc, data = hate_crimes)
+model_eco2 <- lm(hatecrimes_fbi ~ share_unemp_seas, data = hate_crimes)
+model_eco3 <- lm(hatecrimes_fbi ~ share_white_poverty, data = hate_crimes)
+
+# Income Inequality 
+model_ine <- lm(hatecrimes_fbi ~ gini_index, data = hate_crimes)
+
+# Political Leanings 
+model_pol <- lm(hatecrimes_fbi ~ share_vote_trump, data = hate_crimes)
+
+```
+
+**Table 2.** Summary of Bivariate Regression Models
+
+```{r presentation of summary of bivariate regression models, fig.width=8, fig.height=4, out.width='100%'}
+
+model_list <- list(
+  "Education" = model_edu,
+  "Diversity" = model_div,
+  "Geographic Distribution" = model_geo,
+  "Economic Indicators" = model_eco,
+  "Income Inequality" = model_ine,
+  "Political Leanings" = model_pol
+)
+
+modelsummary(model_list,
+             estimate = "{estimate}{stars}",
+             statistic = NULL,
+             gof_omit = "IC|Log|alg|pss|F|RMSE",
+             notes = "Notes: + p < 0.1, * p < 0.05, ** p < 0.01, *** p < 0.001",
+             output="huxtable")
+
+```
+
+While simple bivariate regression models provide a method for estimating the linear associations between two variables, their simplicity overlooks the multifaceted nature potentially leading to biased estimates. For instance, the correlation between income inequality and hate crime rates could be obscured or exaggerated by unaccounted factors like education or unemployment.
+
+Understanding the pairwise correlations between our variables sheds light on the potential dynamics at play. These correlations offer insights into how each independent variable might relate to our dependent variable but also how they relate to each other. This step is important for identifying potential biases that might arise in a more straightforward bivariate regression model.
+
+**Figure 2.** Correlation Matrix of All Variables of Interest
+
+```{r correlation table, fig.width=8, fig.height=4, out.width='100%'}
+
+selected_vars <- hate_crimes %>% 
+  select(hatecrimes_fbi,
+         gini_index, 
+         median_house_inc, 
+         share_unemp_seas, 
+         share_pop_metro, 
+         share_pop_hs, 
+         share_non_white, 
+         share_non_citizen, 
+         share_white_poverty,
+         share_vote_trump)
+
+cor_matrix <- cor(selected_vars, use = "complete.obs")
+
+corrplot(cor_matrix, method = "circle", diag = FALSE, type = "lower",
+                       order = "hclust",      # Orders variables based on hierarchical clustering
+                       tl.srt = 45,           # Set text label angle for the top labels
+                       tl.offset = 0.5,       # Increase offset to move text labels closer to the grid
+                       tl.cex = 0.6,          # Font size of text labels
+                       tl.col = "black",      # Label color
+                       number.cex = 0.8,      # Adjust size of numbers inside circles
+                       addCoef.col = "black", # Color of the correlation coefficients
+                       cl.pos = 'n',          # Removes legend
+                       is.corr = TRUE)        # Ensure it interprets values as correlations for formatting
+
+```
+
+In the correlation matrix above, each cell shows the strength and direction of the relationship between two variables, offering initial clues about potential influences on hate crime rates.
+
+**Direction of Correlation:** Positive correlations indicate that as one variable increases, so does the other; negative correlations suggest that as one variable increases, the other decreases.
+
+**Strength of Correlation:** How strongly are variables related to each other? Strong correlations (close to -1 or 1) suggest a significant linear relationship, while correlations near 0 indicate little to no linear relationship.
+
+**Relationships Among Variables:** Correlations between independent variables themselves (not just with the dependent variable) are also important. When variables are omitted, their associations with other variables are absorbed into the error term and bias our results.
+
+**Reflecting on these correlations:**
+
+*1) Which correlations were expected, and which are surprising? Are these results in the same direction as your hypotheses above?*
+
+# Multivariate Linear Regressions
+
+By using multivariate linear regression, we will untangle the impact of each of these variables on hate crime rates.
+
+```{r creating a multivariate linear model of hate crimes on a number of independent variables}
+
+model_fbi <- lm(hatecrimes_fbi ~ median_house_inc + 
+                                             share_unemp_seas + 
+                                             share_pop_metro + 
+                                             share_pop_hs + 
+                                             share_non_citizen + 
+                                             share_white_poverty + 
+                                             gini_index + 
+                                             share_non_white + 
+                                             share_vote_trump, 
+                data = hate_crimes)
+
+```
+
+**Table 3.** Multivariate Regression Model
+
+```{r presenting the multivariate regression model for fbi data }
+
+modelsummary(list("avg annual per 100,000" = model_fbi),
+             estimate = "{estimate}{stars}",
+             statistic = NULL,
+             gof_omit = "IC|Log|alg|pss|F|RMSE",
+             notes = "Notes: + p < 0.1, * p < 0.05, ** p < 0.01, *** p < 0.001",
+             output="huxtable")
+
+```
+
+Instead of overwhelming us with seven models in a regression table. Let's plot the coefficients and compare how the estimates change from simple bivariate models of each independent variables and hate crime rates to a multivariate model.
+
+**Figure 3.** Coefficient Plots of Bivariate Model Estimates versus Multivariate Model Estimates
+
+```{r coefficent plot ,fig.width=8, fig.height=4, out.width='100%'}
+
+# First, create a vector of model names for labeling purposes
+model_names <- c("Multivariate", rep("Bivariate", 9))
+
+# Define colors: Green for Multivariate, Pink for Bivariate
+colors <- c("#1B9E77", rep("#E7298A", 9))
+
+# Tidy the coefficients from each model
+tidy_fbi <- tidy(model_fbi, conf.int = T) %>% mutate(Model = "Multivariate")
+tidy_edu <- tidy(model_edu, conf.int = T) %>% mutate(Model = "Bivariate")
+tidy_div <- tidy(model_div, conf.int = T) %>% mutate(Model = "Bivariate")
+tidy_div2 <- tidy(model_div2, conf.int = T) %>% mutate(Model = "Bivariate")
+tidy_geo <- tidy(model_geo, conf.int = T) %>% mutate(Model = "Bivariate")
+tidy_eco <- tidy(model_eco, conf.int = T) %>% mutate(Model = "Bivariate")
+tidy_eco2 <- tidy(model_eco2, conf.int = T) %>% mutate(Model = "Bivariate")
+tidy_eco3 <- tidy(model_eco3, conf.int = T) %>% mutate(Model = "Bivariate")
+tidy_ine <- tidy(model_ine, conf.int = T) %>% mutate(Model = "Bivariate")
+tidy_pol <- tidy(model_pol, conf.int = T) %>% mutate(Model = "Bivariate")
+
+# Combine all tidied models into a single dataframe
+all_models_df <- bind_rows(tidy_fbi, tidy_edu, tidy_div, tidy_div2, tidy_geo, tidy_eco, tidy_eco2, tidy_eco3, tidy_ine, tidy_pol) %>%
+                    filter(term != "(Intercept)") %>%
+                    mutate(adjustment = if_else(Model == "Multivariate", 0, -0.02 * estimate),
+                           estimate_adj = estimate + adjustment,
+                           ymin = conf.low + adjustment,
+                           ymax = conf.high + adjustment)
+
+# Plotting the adjusted estimates with confidence intervals
+ggplot(all_models_df, aes(x = term, y = estimate_adj, color = Model)) +
+  geom_point(position = position_dodge(width = 0.5)) +
+  geom_errorbar(aes(ymin = ymin, ymax = ymax), width = 0.2, position = position_dodge(width = 0.5)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", size = 0.5) +
+  scale_color_manual(values = c("Multivariate" = "#1B9E77", "Bivariate" = "#E7298A")) +
+  theme_minimal() +
+  theme(legend.position = "right") +
+  labs(x = "Variable", y = "Coefficient Estimate", color = "Model Type") +
+  coord_flip()
+
+```
+
+# Part 2: Comparing Data from Southern Povery Law Center on Hate Crimes
+
+We now turn to the Southern Poverty Law Center (SPLC) data. Unlike the FBI data, which is limited to prosecutable hate crimes, the SPLC data offers a broader view by including media reports and self-reported incidents. These can range from acts of intimidation and harassment to propaganda distribution, capturing a fuller spectrum of hate-motivated behavior. It's important to note, however, that the SPLC dataset covers only 10 days of reports, leading to much smaller values compared to the average annual values in FBI data.
+
+## SPLC Data Distribution
+
+Let's visualize how hate incidents reported to the SPLC are distributed.
+
+```{r creating histogram of the distribution of hate crimes/incidents reported by SPLC}
+
+splc_histogram <- ggplot(hate_crimes %>% 
+                           filter(!is.na(hatecrimes_splc) & is.finite(hatecrimes_splc)),
+                           aes(x = hatecrimes_splc)) +
+  geom_histogram(fill = "lightgreen", bins = 30, alpha = 1) +
+  geom_vline(aes(xintercept = mean(hatecrimes_splc, na.rm = TRUE)), 
+             color = "blue", linetype = "dashed", size = 1) +
+  labs(x = "Hate Incidents per 100k (SPLC)", y = "Frequency") +
+  theme_minimal()
+
+```
+
+**Figure 4. Comparison of SPLC vs. FBI Hate Crime Distributions**
+
+```{r presenting SPLC and FBI histograms,fig.width=8, fig.height=4, out.width='100%'}
+
+print(splc_histogram)
+print(fbi_histogram)
+
+```
+
+
+**Some Questions:**
+
+*2) How does this distribution of hate crimes compare with the FBI's?*
+
+*3) Despite the SPLC reports showing lower numbers of hate incidents (because it's only 10 days worth of reports), do you think regression analysis is appropriate for explaining the variation in these incidents? Why?*
+
+## Multivariate Analysis of SPLC Data
+
+Next, let's conduct a multivariate regression to assess the influence of factors on the SPLC-reported hate incidents:
+
+```{r creating multivariate linear regression of SPLC hatecrimes on independent variables}
+
+# Multivariate regression model using SPLC data
+model_splc <- lm(hatecrimes_splc ~ median_house_inc + 
+                                         share_unemp_seas + 
+                                         share_pop_metro + 
+                                         share_pop_hs + 
+                                         share_non_citizen + 
+                                         share_white_poverty + 
+                                         gini_index + 
+                                         share_non_white + 
+                                         share_vote_trump, 
+                 data = hate_crimes)
+
+```
+
+By comparing the FBI and SPLC data, this part of the analysis seeks to broaden our understanding of hate crimes and incidents, considering a wider array of reported events and their underlying drivers.
+
+**Table 4.** Multivariate Models Comparison: FBI vs. SPLC Data
+
+```{r presenting the multivariate models comparison, ,fig.width=8, fig.height=4, out.width='100%'}
+
+modelsummary(list("FBI\n(avg annual per 100,000)" = model_fbi, "SPLC\n(hate incidents per 100,000 in 10 day period )"= model_splc),
+             estimate = "{estimate}{stars}",
+             statistic = NULL,
+             gof_omit = "IC|Log|alg|pss|F|RMSE",
+             notes = "Notes: + p < 0.1, * p < 0.05, ** p < 0.01, *** p < 0.001",
+             output="huxtable")
+
+```
+
+**Final Reflections:**
+
+*4) How do the distributions and factors influencing hate crimes/incidents reported by the SPLC compare with those reported by the FBI? Let's just stick with direction at this point. Do the factors share a similar relationship to the outcome variable of interest?*
+
+*5) What does the coefficient for the gini_index in the FBI model represent? Report the finding.*
+
+*6) Based on your analysis, what are the implications for policymakers and researchers in understanding and stopping hate crimes?*
+
+*7) Do you find the conclusions drawn from the FBI and SPLC analyses convincing? Why or why not? Consider the limitations of the data sets, potential biases, and the methods employed, are there any aspects that you believe may have been overlooked or warrant further investigation?*
+
+[*Knitting Instructions:*]{.underline} Click on the arrow next to `Knit` menu at the top of the screen and select `Knit to HTML`. Assuming there are no errors in the above code, this will render the RMarkdown document in a pleasing HTML window for viewing.
