@@ -5,7 +5,7 @@ date: "2025-02-17"
 output: html_document
 ---
 
-```{r Instructions, include = FALSE}
+<!-- Instructions:
 
 # Preparation:
 # Please read the article Higher Rates of Hate Crimes Are Tied to Income Inequality on FiveThirtyEight. This will give you an overview of the analysis you'll be recreating. 
@@ -40,7 +40,7 @@ output: html_document
 # 
 # Incrementally Run each R code chunk. You can run the code chunk in the gray area by clicking the little green play button on the upper right of the box. 
 
-```
+-->
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE) # FALSE hides the code but shows the output (if any)

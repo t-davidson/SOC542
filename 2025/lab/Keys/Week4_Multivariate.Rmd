@@ -7,8 +7,7 @@ output:
   pdf_document: default
 ---
 
-```{r Instructions, include = FALSE}
-
+<!-- Instructions:
 # Preparation:
 # Please read the article Higher Rates of Hate Crimes Are Tied to Income Inequality on FiveThirtyEight. This will give you an overview of the analysis you'll be recreating. 
 # 
@@ -41,8 +40,7 @@ output:
 # Read Carefully: Each code chunk has a specific purpose. Ensure you understand what is intended for the section and then find the appropriate chunk. Read through the chunks and look for functions or objects you already know. Feel free to use ChatGPT to have it describe what a chunk of code is intended to do. You are putting together the pieces of a puzzle, not writing code from scratch.
 # 
 # Incrementally Run each R code chunk. You can run the code chunk in the gray area by clicking the little green play button on the upper right of the box. 
-
-```
+-->
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE) # FALSE hides the code but shows the output (if any)
