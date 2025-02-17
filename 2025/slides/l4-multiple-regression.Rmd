@@ -1,0 +1,672 @@
+---
+title: "SOC542 Statistical Methods in Sociology II" 
+subtitle: "Multiple Regression"
+author: Thomas Davidson
+institute: Rutgers University
+date: February 17, 2025
+urlcolor: blue
+output:
+    beamer_presentation:
+      theme: "Szeged"
+      colortheme: "beaver"
+      fonttheme: "structurebold"
+      toc: false
+      incremental: false
+      fig_width: 3.5
+      fig_height: 2.5
+header-includes:
+  - \usepackage{hyperref}
+  - \usepackage{multicol}
+  - \usepackage{caption}
+  - \captionsetup[figure]{font=scriptsize}
+  - \captionsetup[figure]{labelformat=empty}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(dev = 'pdf')
+library("knitr")
+library("formatR")
+
+opts_chunk$set(tidy.opts=list(width.cutoff=80),tidy=TRUE)
+opts_chunk$set(tidy = FALSE)
+
+knitr::knit_hooks$set(mysize = function(before, options, envir) {
+  if (before) 
+    return(options$size)
+})
+
+# See https://benjaminlouis-stat.fr/en/blog/2020-05-21-astuces-ggplot-rmarkdown/
+knitr::opts_chunk$set(
+ fig.width = 4,
+ fig.asp = 0.8,
+ out.width = "70%",
+ fig.align = "center"
+)
+
+set.seed(08901)
+
+library(ggplot2)
+library(tidyverse)
+library(latex2exp)
+library(kableExtra)
+library(dagitty)
+library(ggdag)
+```
+
+# Plan
+- Recap
+- Multiple regression: An overview
+- Lab: Multiple regression in R
+
+# Recap
+## What we have learned so far
+1. Fundamentals of frequentist inference
+2. Simple linear regression
+3. Probability and Bayesian inference
+
+# Multiple regression
+## OLS assumptions review
+- $x$ and $y$ are independently and identically distributed (IID).
+    - The sample $x$ must contain some variability. Specifically, $var(x) > 0$. 
+- The conditional distribution of $u$ given $x$ has a mean of zero.
+    - Errors are independent $E[u_i|x_i] = E[u_i] = 0$.
+    - Errors have constant variance $var(u_i) = \sigma^2$.
+    - Errors are uncorrelated.
+- If these assumptions are met, then OLS is \textbf{BLUE}
+    - The \textbf{Best Linear conditionally Unbiased Estimator}
+    
+# Multiple regression
+## Simple linear regression
+- Let's say we estimate a simple linear regression of the form:
+
+$$\hat{y} = \hat{\beta_0} + \hat{\beta_1}x + \hat{u}$$
+
+
+- In this case, we assume that the outcome $y$ is a linear function of a single predictor $x$.
+- But what if we think have reason to believe that $y$ is also a function of other predictors?
+
+# Multiple regression
+## Omitted variable bias
+- Omitted variable bias occurs when we leave out, or *omit*, a predictor that should be in our model.
+- It exists when
+    - $x$ is correlated with the omitted variable $z$.
+    - The omitted variable is a predictor of the dependent variable $y$.
+    
+# Omitted variable bias
+```{r, echo=FALSE, out.width = "60%"}
+D <- dagify(y ~ x,
+    x ~ z,
+  y ~ z,
+  exposure = "x",
+  outcome = "y",
+  coords = list(x = c(x = 1, z =1, y = 3),
+                y = c(x = 0, z = 2, y = 1))
+)
+ggdag_status(D) +
+  theme_dag() + theme(legend.position = "none")
+#tidy_dagitty(dagified)
+#library(rethinking)
+#drawdag(dagified)
+#ggdag(dagified, layout = "circle") + theme_dag()
+```
+    
+
+# Multiple regression
+## Consequences omitted variable bias
+- The assumption that $E(u_i|x_i) = 0$ is violated.
+    - If $z$ is correlated with $x$ but not included, then the error term $u$ captures the unmeasured effect of $z$ *and* thus $u$ is correlated with $x$.
+- The slope coefficient $\beta_1$ will be *biased*.
+    - The mean of the sampling distribution of the OLS estimator may not equal the true effect of $x$.
+    - $\hat{\beta_1} = \beta_1 + bias$
+- The OLS estimator is *inconsistent* as $\hat{\beta_1}$ does not converge in probability to $\beta_1$.
+    - Bias remains even with large samples.
+- The greater the correlation between $x$ and $u$, the greater the bias.
+
+
+# Multiple regression
+## Example
+
+$$Wealth_i = \beta_0 + \beta_1Educ + u$$
+
+- Let's say we have a model of wealth as a function of education:
+- We estimate the model and see a strong, positive relationship between education and wealth (i.e. $\hat{\beta_1}$ is positive)
+- What other factors might be correlated with education *and* predict wealth?
+- Education is correlated with parental socioeconomic status (SES) and predicts wealth. Our estimate of the effect of education is *biased* without taking parental SES into account.
+
+# Drawing the DAG
+```{r, echo=FALSE, out.width = "60%"}
+D2 <- dagify(Wealth ~ Educ,
+    Educ ~ pSES,
+  Wealth ~ pSES,
+  exposure = "Educ",
+  outcome = "Wealth",
+  coords = list(x = c(pSES = 1, Educ =1, Wealth = 3),
+                y = c(pSES = 0, Educ = 2, Wealth = 1))
+)
+ggdag_status(D2, layout = "circle") +
+  theme_dag() + theme(legend.position = "none")
+```
+
+# Simulating omitted variable bias
+```{r, echo=TRUE, mysize=TRUE, size='\\footnotesize'}
+N <- 100
+x <- rnorm(N,2,1)
+z <- 0.2*x + rnorm(N,3,1)
+y <- 0.8*x + -2*z + rnorm(N, 0, 1)
+```
+
+# Simulating omitted variable bias
+```{r, echo=TRUE, mysize=TRUE, size='\\footnotesize'}
+m.omit <- lm(y ~ x)
+m.both <- lm(y ~ x + z)
+m.omit$coefficients %>% round(2) %>% print()
+m.both$coefficients %>% round(2) %>% print()
+```
+
+# Simulating omitted variable bias
+```{r, echo=TRUE, mysize=TRUE, size='\\footnotesize'}
+coefs.omitted <- c()
+coefs.complete <- c()
+sims <- 1E3
+for (i in 1:sims) {
+    x <- rnorm(N,2,1)
+    z <- 0.2*x + rnorm(N,3,1)
+    y <- 0.8*x + -2*z + rnorm(N, 0, 1)
+    m.omit <- lm(y ~ x)
+    m.both <- lm(y ~ x + z)
+    coefs.omitted[i] <- m.omit$coefficients[2]
+    coefs.complete[i] <- m.both$coefficients[2]
+}
+```
+
+# Simulating omitted variable bias
+```{r, echo=FALSE, mysize=TRUE, size='\\footnotesize'}
+data <- data.frame(beta = c(coefs.omitted, coefs.complete),
+                   type = c(rep("Omitted", sims), rep("Complete", sims)))
+data %>%
+  ggplot( aes(x=beta, fill=type)) +
+    geom_density(alpha=0.6, position = 'identity') +
+    theme_classic() +
+    scale_fill_viridis_d(option="turbo") +
+    geom_vline(xintercept = mean(coefs.omitted), linetype = "dotted", color = "black") +
+    geom_vline(xintercept = mean(coefs.complete), linetype = "solid", color = "black") +
+    annotate("text", x = 0.8, y = 1, label = TeX("$\\beta_1$"), vjust = -1, color = "white",size=5) +
+    labs(fill="", x = TeX("$\\hat{\\beta_1}$"), y = "Density", caption = TeX("Distribution of $\\hat{\\beta_1}$ over 1000 simulations.")) + theme(legend.position ="top")
+```
+\tiny Dotted line shows estimate when $z$ is omitted; solid line when $z$ is included in the regression.
+
+# Multiple regression
+## The multiple regression model
+- In a multiple regression model, we specify a linear relationship between an outcome and a set of $k$ predictors.
+
+$$E[y|x_1,x_2,...,x_k] = \beta_0 + \beta_1x_1 + \beta_2x_2 + ... +\beta_kx_k + u$$
+
+# Multiple regression
+## Independent variables and controls
+- The predictors added to the model can be considered as additional \textbf{independent variables} or as \textbf{controls}.
+- In general, we use the former term when we have a theoretical reason to be interested in a effect of a variable and the latter when we expect it to matter but are not interested in analyzing the relationship directly.
+- We typically add control variables to mitigate omitted variable bias.
+
+# Multiple regression
+## Interpreting coefficients
+- Consider the following population model:
+
+$$y_i = \beta_0 + \beta_1x + \beta_2z +u$$
+
+- $\beta_1$ is the effect of a unit change in $x$ *when $z$ is held constant*.
+
+$$\beta_1 = \frac{\Delta y}{\Delta x}, holding\:z\:constant$$
+
+# Multiple regression
+## Interpreting the intercept
+- Consider the same model:
+
+$$y_i = \beta_0 + \beta_1x + \beta_2z +u$$
+
+- $\beta_0$ is the expected value of $y_i$ when $x = 0$ and $z = 0$.
+
+# Multiple regression
+## The OLS estimator
+- The OLS estimator minimizes the sum of the squared residuals. 
+- Over $n$ observations and $k$ predictors, we minimize the following quantity:
+
+$$\sum_{i=1}^n (y_i-\beta_0 - \beta_1x_{1i} - \beta_1x_{2i} - ... - \beta_kx_{ki})^2 $$
+
+- Thus, the predicted values are
+
+$$\hat{y_i} = \hat{\beta_0} + \hat{\beta_1}x_{1i} + \hat{\beta_2}x_{2i} + ... + \hat{\beta_k}x_{ki}$$
+
+- And the residuals are defined as $\hat{u_i} = y_i - \hat{y_i}$ for $i = 1, ..., n$.
+
+# Multiple regression
+## OLS in matrix form
+- We can write the equation for multiple regression more compactly using matrix notation. Here $X$ is an $n$ by $k$ matrix of predictors and $B$ is vector of coefficients with length $k$.
+
+
+$$y = \beta_0 + \beta X + u$$
+
+
+- Ordinary least squares estimates can be computed directly using matrix multiplication, where $X$ is a matrix of predictors and the first column is a vector of 1s (for the intercept) and $y$ is the outcome.
+
+$$\hat{\beta} = X^TX^{-1}X^Ty$$
+
+# Multiple regression
+## OLS in matrix form
+```{r, echo=TRUE, mysize=TRUE, size='\\footnotesize'}
+Intercept <- rep(1,N)
+X <- cbind(Intercept,x,z)
+
+Betas <- solve(t(X) %*% X) %*% (t(X)  %*% y)
+print(t(Betas))
+
+m <- lm(y ~ x + z)
+print(m$coefficients)
+```
+\tiny `t()` is the transpose operation, `solve()` finds the inverse of a matrix, and `%*%` is the matrix multiplication operator.
+
+# Multiple regression
+## OLS in matrix form
+- OLS estimates are derived directly from algebraic manipulation of the data.
+- OLS is a special case. Other approaches we will encounter in a few weeks require more complicated *maximum likelihood estimation*.
+- Bayesian regression with uniform priors will converge to the least squares solution, despite a radically different estimation procedure.
+
+# Multiple regression
+## Model fit and the Standard Error of the Regression
+- The \textbf{Standard Error of the Regression (SER)} is an estimate of the standard deviation of the error term $u_i$. It captures the spread of $y$ around the regression line.
+- For a single regressor,
+
+
+$$SER = \sqrt{\sigma_{\hat{u}}} = \sqrt{\frac{1}{n-2}\sum_{i=1}^n\hat{u_i}^2} = \sqrt{\frac{SSR}{n-2}}$$
+
+- $n-2$ accounts for degrees of freedom used by slope and intercept.
+- A smaller SER indicates better fit.
+
+# Multiple regression
+## Model fit and the Standard Error of the Regression
+- If we have multiple predictors we need to include an degrees of freedom adjustment $k$, where $k$ is the number of predictors. The $-1$ accounts for the intercept.
+
+$$SER = \sqrt{\sigma_{\hat{u}}} = \sqrt{\frac{1}{n-k-1}\sum_{i=1}^n\hat{u_i}^2} = \sqrt{\frac{SSR}{n-k-1}}$$
+
+- The adjustment has a small effect when $n$ is large.
+
+# Multiple regression
+## Model fit and $R^2$
+- We define $R^2$ in the same way as a simple regression:
+
+$$R^2 = \frac{\sum_{i=1}^n(\hat{y_i}-\bar{y})^2}{\sum_{i=1}^n(y_i-\bar{y})^2} = \frac{ESS}{TSS}$$
+
+$$R^2 = 1 - \frac{SSR}{TSS}$$
+
+
+
+# Multiple regression
+## Adjusted $R^2$
+- $R^2$ increases mechanistically as we add predictors because the SSR declines as long as $\hat{\beta_k} \neq 0$, inflating model fit.
+- A degrees of freedom correction is used to adjust for this:
+
+$$Adjusted\:R^2 = 1 - \frac{n-1}{n -k - 1}\frac{SSR}{TSS}$$
+
+# Multiple regression
+## Properties of adjusted $R^2$
+- Adjusted $R^2$ is *always less than* $R^2$.
+- Adding a predictor can increase Adjusted $R^2$, but it can decline if the change to the SSR is weaker than the offset $n-1/n-k-1$.
+- Adjusted $R^2$ can be negative if the reduction in SSR does not offset $n-1/n-k-1$.
+
+# Multiple regression
+## The penalty $\frac{n-1}{n-k-1}$ increases as we add predictors
+```{r, echo=FALSE, mysize=TRUE, size='\\footnotesize'}
+n <- 100
+k.vals <- c(1:50)
+ssrtss <- 0.8
+results <- c()
+for (k in k.vals) {
+    r2a <- 1-((n-1)/(n-k-1))*ssrtss
+    results <- append(results, r2a)
+}
+d <- as.data.frame(cbind(results, k.vals))
+colnames(d) <- c("r2a", "k")
+ggplot(aes(y = r2a, k), data = d) + geom_line(color = "red") + geom_point() +
+    labs(y = TeX("Adjusted $R^2$")) + theme_minimal()
+
+# 
+```
+\tiny This example shows the effect of the degree of freedom adjustment, assuming $\beta_k = 0$ for all $k > 1$.
+
+# Multiple regression
+## Bayesian $R^2$
+- There is no direct analogue for $R^2$ in Bayesian statistics
+    - Recall that frequentist models assume *fixed* parameters, whereas Bayesian parameters have *distributions*.
+- If we treat the Bayesian estimates as fixed, for example by taking the median of the posterior distribution $\hat{\beta_k}$, we could calculate something using the formula above, but it would not account for the *uncertainty* contained in the posterior distribution.
+
+# Multiple regression
+## Bayesian $R^2$
+- Instead, we use posterior simulations to repeat the calculation across all samples from the posterior.
+- Bayesian $R^2$ therefore has a posterior distribution.\footnote{\tiny "Everything that depends upon parameters has a posterior distribution" - McElreath 98.} We can summarize this into a single metric using the same approach as the regression coefficients, e.g. using the median of the posterior distribution.\footnote{\tiny See GHV 170-171}
+
+# Multiple regression
+## Significance tests: t-tests
+- Like simple linear regression, we can interpret the statistical significance of regression coefficients using the t-statistics.
+- Typically, we are interested in testing the null hypothesis that $\beta_k = 0$. We get the t-statistic by dividing a coefficient by its standard error:
+
+$$t = \frac{\hat{\beta_k}-0}{SE(\hat{\beta_k})} = \frac{\hat{\beta_k}}{SE(\hat{\beta_k})}$$
+
+- We can the use the t-statistic to look up the relevant *p-value*.
+
+# Multiple regression
+## Confidence interval
+- Most regression software provides a 95% confidence interval around each estimate. For $\beta_j$ this would take the following form:
+
+$$[\hat{\beta_j}-1.96SE(\hat{\beta_j}), \hat{\beta_j} + 1.96SE(\hat{\beta_j})]$$
+
+- Recall that only 5% of the probability density of a t-distribution is greater than $|1.96|$.
+
+# Multiple regression
+## Joint tests
+- The F-statistic is used to test a \textbf{joint hypothesis}.
+- If we consider a two variable example, we might test the following *null hypothesis*:
+
+$$H_N : \beta_1 = 0, \beta_2 = 0$$
+
+- A joint test has $q$ restrictions. In this case, $q = 2$.
+- The *alternative hypothesis* $H_A$ is that one or more of the $q$ restrictions does not hold.
+
+# Multiple regression
+## Joint tests and the F-statistic
+- Since we expect the predictors to have a *joint sampling distribution*, we cannot conduct a joint test by summarizing a series of paired tests (e.g. a t-test for every predictor) because the t-statistics are not independent.
+- Instead, we must calculate the F-statistic. Where $q = 2$ it is defined as:
+
+$$F = \frac{1}{2}(\frac{t_1^2 + t_2^2 - 2\hat{\rho}_{t_1,t_2}t_1t_2}{1-\hat{\rho}^2_{t_1,t_2}})$$
+
+
+# Multiple regression
+## Joint tests and the F-statistic
+- If $\hat{\rho}_{t_1,t_2} = 0$ the equation simplifies to the average of the squared t-statistics:
+
+$$F = \frac{1}{2}(t_1^2 + t_2^2)$$
+
+- The p-value can then be derived from the relevant *F-distribution*, where $F \sim F_{q, \infty}$
+- Typically, we use an F-test to test the restriction that $\beta_1 = 0, \beta_2 = 0, ..., \beta_k = 0$.
+
+# Multiple regression
+## Joint tests and the F-statistic
+- If we assume the residuals are *homoskedastic*, we can test the restriction $\beta_1 = 0, \beta_2 = 0, ..., \beta_k = 0$ using the following formula:
+
+$$F_0 = \frac{(SSR_r - SSR_u)/q}{SSR_u/(n-k+1)}$$
+
+- The $SSR_r$ is obtained from *restricted* model where we calculate the SSR assuming the null hypothesis is true. The SSR from the fitted model, $SSR_u$, is known as the *unrestricted* SSR.
+- The test statistic is assessed using an *F-distribution* with $q$ degrees of freedom and $n-k+1$ observations.
+- In most cases the homoskedasticity assumption is likely violated, so we use the more complicated formula from the previous slide, known as the *heteroskedasticity robust* F-statistic.
+
+# Multiple regression
+## Interpreting regression output
+```{r, echo=FALSE, mysize=TRUE, size='\\tiny', comment = "", collapse = TRUE}
+summary(m.both)
+```
+
+
+# Multiple regression
+## Bayesian approaches
+- "We have essentially no interest in using hypothesis tests for regression because we almost never encounter problems where it would make sense to think of the coefficients as being exactly zero" - GHV 147
+- Bayesian regression is assessed by analyzing the posterior distribution of parameters to understand uncertainty.
+- Nonetheless, Bayesian equivalents to t-tests and F-tests can be used if desired.\footnote{See Kruschke and Liddell 2018.}
+
+# Multiple regression
+## Multicollinearity
+- \textbf{Multicollinearity} occurs when a predictor $x$ is highly correlated one or more other predictors $z$.
+    - \textbf{Perfect multicollinearity} arises when $cor(x,z) = 1$ or -1.
+        - Usually due to some type of misspecification. e.g. accidentally including the same variable twice.
+    - \textbf{Imperfect multicollinearity} means that two or more regressors are highly correlated.
+
+# Multiple regression
+## Multicollinearity and its implications
+- Assume the following model and that $x$ and $z$ are highly correlated:
+
+$$\hat{y_i} = \hat{\beta_0} + \hat{\beta_1}x_i + \hat{\beta_2}z_i + u_i$$
+
+- The variance of $\hat{\beta_1}$\footnote{\tiny The same issue also applies to $\hat{\beta_2}$} is inversely proportional to $1 - \rho^2_{x,z}$, where $\rho_{x,z}$ is the correlation between $x$ and $z$.
+    - If $\rho_{x,z}$ is large, then this term is small and thus the variance is large.
+- Multicollinearity *increases variance* and *reduces precision*, potentially making $\beta_1$ \textbf{non-identifiable}.
+
+# Simulating multicollinearity
+```{r, echo=TRUE, mysize=TRUE, size='\\footnotesize'}
+N <- 100
+x <- rnorm(N,2,1)
+x2 <- rnorm(N,0,1)
+z <- 0.5*x + rnorm(N,0,1)
+y <- 0.5*x + -0.5*x2 + 0.5*z + rnorm(N, 0, 2)
+```
+
+# Simulating multicollinearity
+```{r, echo=TRUE, mysize=TRUE, size='\\footnotesize'}
+m1 <- summary(lm(y ~ x + x2))
+m2 <- summary(lm(y ~ x + x2 + z))
+round(m1$coefficients,2) # omitted variable bias
+round(m2$coefficients,2) # multicolinearity
+```
+
+# Simulating multicollinearity
+```{r, echo=TRUE, mysize=TRUE, size='\\footnotesize'}
+se.omitted <- c()
+se.complete <- c()
+sims <- 1E3
+for (i in 1:sims) {
+    x <- rnorm(N,2,1)
+    x2 <- rnorm(N,0,1)
+    z <- 0.5*x + rnorm(N,0,1)
+    y <- 0.5*x + -0.5*x2 + 0.5*z + rnorm(N, 0, 2)
+    m.omit <- summary(lm(y ~ x + x2))
+    m.complete <- summary(lm(y ~ x + x2 + z))
+    se.omitted[i] <- m.omit$coefficients[2,2]
+    se.complete[i] <- m.complete$coefficients[2,2]
+}
+```
+
+# Simulating multicollinearity
+```{r, echo=FALSE, mysize=TRUE, size='\\footnotesize'}
+data2 <- data.frame(se = c(se.omitted, se.complete),
+                   type = c(rep("No Z", sims), rep("With Z", sims)))
+data2 %>%
+  ggplot(aes(x = se, fill=type)) +
+    geom_density(alpha=0.4, position = 'identity') +
+    theme_classic() +
+    scale_fill_viridis_d(option="turbo") +
+    labs(fill="", x = TeX("Standard error of $\\hat{\\beta_1}$"), y = "Density", caption = TeX("Distribution of standard error over 1000 simulations."))
+```
+
+
+# Multiple regression
+## Fixing multicollinearity
+- In general, multicollinearity is less severe than omitted variable bias.
+    - The inflated variance will lead to more Type II errors than Type I errors.
+    - Omitted variable bias can produce Type I errors, sign errors, and magnitude errors.
+
+# Multiple regression
+## Fixing multicollinearity
+- *Solution 1*: Use more data. If we have a larger sample then we might be able to learn from additional variation in $x$ and $z$.
+- *Solution 2*: If we are only concerned about $x$ then we could exclude $z$. But this risks omitted variable bias if $z$ is also a predictor of $y$. 
+- *Solution 3*: Transform or combine predictors (e.g. factor analysis).
+
+# Multiple regression
+## Revisiting our assumptions
+- $E(u_i|x_{1i}, x_{2i}, ..., x_{ki}) = 0$
+- All $y_i, x_{1i}, x_{2i}, .., x_{ki}$ are IID.
+- Large outliers are unlikely.
+- No perfect multicollinearity.
+
+# Variable selection\footnote{\tiny See Cinelli et al. 2022; Kohler et al. 2020; Keele et al. 2023.}
+- It is often conventional practice to include a wide array of potential confounders in a regression model ("kitchen sink" or "garbage can" regressions), but this approach can cause problems!
+- We must carefully consider omitted variable bias, multicollinearity, and collider bias when specifying models.
+- We must use domain knowledge and theory to guide model specifications, we cannot identify these issues from the data alone.
+
+# Variable selection
+- "[A]uthors should not just list covariates that may affect the outcome but should disclose how they think those covariates and the exposure are causally related." \begin{tiny} Kohler et al. 2020, p. 12 \end{tiny}
+- DAGs are a useful tool for representing our assumptions, guiding variable selection, and identifying problematic specifications.
+
+# Variable selection
+## Mediators
+- *Mediators* are variables that partially explain the causal effect of $x$ on $y$ 
+    - e.g. \textbf{first job} might mediate explain some of the effect of education on wealth.
+- Controlling for a mediator will change the estimate of $x$ from the *total* effect to the *conditional effect*
+
+# Variable selection
+## Mediators 
+```{r, echo=FALSE, out.width = "60%"}
+D2 <- dagify(Wealth ~ Educ,
+    Job ~ Educ,
+  Wealth ~ Job,
+  exposure = "Educ",
+  outcome = "Wealth",
+  coords = list(x = c(Job = 1, 
+                      Educ =1, Wealth = 3),
+                y = c(Job = 0, 
+                      Educ = 2, Wealth = 1))
+)
+ggdag_status(D2, layout = "circle") +
+  theme_dag() + theme(legend.position = "none")
+```    
+
+# Variable selection
+## Spurious relationships and confounding
+- Sometimes we observe \textbf{spurious} relationships in regression models where a correlation between two variables exists, despite the absence of any causal relationship.
+    - e.g. Finding that hurricanes with female names *caused* more deaths than male named hurricanes.
+- Sometimes this occur purely due to chance, but it can be due to \textbf{confounding}: a confounding variable $z$ influences both $x$ and $y$.
+
+# Variable selection
+## Spurious relationships and confounding
+- Adding more predictors can often help to reduce the risk of spurious associations.
+    - If we control for the confounder $z$, the spurious relationship between $y$ and $x$ disappears.
+- This is sometimes referred to as "blocking the backdoor path"
+- This is related to OVB, which addresses bias in the estimation, rather than the causal structure.
+
+# Confounding  
+## Blocking the backdoor path
+```{r, echo=FALSE, out.width = "60%"}
+D2 <- dagify(Wealth ~ Educ,
+    Educ ~ pSES,
+  Wealth ~ pSES,
+  exposure = "Educ",
+  outcome = "Wealth",
+  coords = list(x = c(pSES = 1, Educ =1, Wealth = 3),
+                y = c(pSES = 0, Educ = 2, Wealth = 1))
+)
+ggdag_status(D2, layout = "circle") +
+  theme_dag() + theme(legend.position = "none")
+```
+
+# Variable selection
+## Masked relationships
+- Assume a true relationship between $y$ and $x$.
+- We estimate a model $y = \beta_0 + \beta_1x$.
+- The results do not show evidence of an association (i.e. $\hat{\beta_1} \approx 0$).
+- We estimate a second model including a new predictor $z$.
+- Controlling for $z$ allows us to observe a relationship between $y$ and $x$.
+
+# Bad control
+## Causes of the independent variable can reduce precision\footnote{\tiny But we will see later in the semester how these can be helpful for causal indentification as instrumental variables.}
+```{r, echo=FALSE, out.width = "60%"}
+D2 <- dagify(Wealth ~ Educ,
+  Educ ~ B,
+  exposure = "Educ",
+  outcome = "Wealth",
+  coords = list(x = c(B = 1, Educ =1, Wealth = 3),
+                y = c(B = 0, Educ = 2, Wealth = 1))
+)
+ggdag_status(D2, layout = "circle") +
+  theme_dag() + theme(legend.position = "none")
+```
+
+# Neutral control
+## Ancestors of the independent variable are causally unrelated
+```{r, echo=FALSE, out.width = "60%"}
+D2 <- dagify(Wealth ~ Educ,
+  N ~ Educ,
+  exposure = "Educ",
+  outcome = "Wealth",
+  coords = list(x = c(N = 1, Educ =1, Wealth = 3),
+                y = c(N = 0, Educ = 2, Wealth = 1))
+)
+ggdag_status(D2, layout = "circle") +
+  theme_dag() + theme(legend.position = "none")
+```
+
+# Good control
+## Independent causes of the outcome can increase precision
+```{r, echo=FALSE, out.width = "60%"}
+D2 <- dagify(Wealth ~ Educ,
+  Wealth ~ G,
+  exposure = "Educ",
+  outcome = "Wealth",
+  coords = list(x = c(G = 1, Educ =1, Wealth = 3),
+                y = c(G = 0, Educ = 2, Wealth = 1))
+)
+ggdag_status(D2, layout = "circle") +
+  theme_dag() + theme(legend.position = "none")
+```
+
+# Bad control
+## Descendents of the outcome can induce bias
+```{r, echo=FALSE, out.width = "60%"}
+D2 <- dagify(Wealth ~ Educ,
+  B ~ Wealth,
+  exposure = "Educ",
+  outcome = "Wealth",
+  coords = list(x = c(B = 1, Educ =1, Wealth = 3),
+                y = c(B = 0, Educ = 2, Wealth = 1))
+)
+ggdag_status(D2, layout = "circle") +
+  theme_dag() + theme(legend.position = "none")
+```
+
+# Variable selection
+## Colliders
+- $c$ is *caused by* $y$ *and* $x$.
+- In this case, $c$ is a \textbf{collider} and controlling for $c$ can introduce bias.
+
+# Colliders\footnote{\tiny See Elwert, Felix, and Christopher Winship. 2014. “Endogenous Selection Bias: The Problem of Conditioning on a Collider Variable.” \textit{Annual Review of Sociology} 40(1):31–53. doi: 10.1146/annurev-soc-071913-043455.}
+## Don't condition on a collider
+```{r, echo=FALSE, out.width = "60%"}
+D3 <- dagify(Wealth ~ Educ,
+    C ~ Wealth,
+  C ~ Educ,
+  exposure = "Educ",
+  outcome = "Wealth",
+  coords = list(x = c(C = 1, Educ =1, Wealth = 3),
+                y = c(C = 0, Educ = 2, Wealth = 1))
+)
+ggdag_status(D3, layout = "circle") +
+  theme_dag() + theme(legend.position = "none")
+```
+
+
+# DAGs in the wild
+```{r, echo=FALSE, out.width = "60%"}
+include_graphics("../../img/educ_wealth_dag.png")
+```
+Click here \url{https://dagitty.net/m8sgBgp2s} to access the interactive DAG.
+
+# Exercise
+## Drawing your DAG
+1. Consider a relationship between two variables that you are interested in modeling
+2. List some possible control variables 
+3. Based on knowledge and theoretical considerations, draw a DAG
+4. What kinds of good and bad controls do you observe?
+
+
+# Multiple regression
+## Interpreting multiple controls
+- So far all of the specifications have focused on a single predictor $x$ and its relationship to the outcome $y$, net of controls
+- It is common practice to give an interpretation to one or more, or even all, of the control variables
+    - However, our focus is only on the identification of the main relationship, so these quantities may not be meaningful
+- "Researchers should avoid providing any interpretation for estimates of control variables." \begin{tiny} Keele et al. 2023, p.12. \end{tiny}
+
+# Next week
+## Non-linear predictors
+- Dummy variables
+- Categorical variables
+- Non-linear transformations
+
+# Lab
+- Estimating and interpreting multiple regression models
