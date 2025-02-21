@@ -12,12 +12,11 @@ options(scipen = 999)
 library(tidyverse)
 library(haven)
 library(modelsummary)
-library("jtools") # For nice coefficient plots
 library(rstanarm)
 library(tidybayes)
 
 if (!require("fastDummies")) {  
-  install.packages("jtools", dependencies = TRUE)
+  install.packages("fastDummies", dependencies = TRUE)
 
 }
 library(fastDummies)
@@ -97,7 +96,7 @@ summary(gss$workhrs)
   
 ```
 
-The above are two code chuncks represent effective ways to recode data. The first uses the logic of base R and the second the logic and tools of tidyverse and piping. Both work and you will develop a preference. While it can look more complicated, I recommend building your skills to recode using tidyverse. 
+The above are two code chunks represent effective ways to recode data. The first uses the logic of base R and the second the logic and tools of tidyverse and piping. Both work and you will develop a preference. While it can look more complicated, I recommend building your skills to recode using tidyverse. 
 
 ```{r recoding practice}
 # Rename the `conrinc` as a numeric variable "income", `prestg10` to "prestige" and wtssnrps to "weights"
@@ -288,11 +287,10 @@ modelsummary(ols_dummy3,
 
 ```{r lets make it a picture}
 
-coef_plot <- plot_coefs(ols_dummy3, 
-                        model.names = c("ols_dummy3"),
-                        ci_level = 0.95) 
-
-print(coef_plot)
+modelplot(ols_dummy3,
+          coef_omit = "Inter") +
+  geom_vline(aes(xintercept = 0), linetype = "dashed") +
+  theme(legend.position = "bottom")
 
 ```
 ## Scaling and Non-Linearization 
