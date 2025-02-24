@@ -248,12 +248,12 @@ var_table <- matrix(
       "median_house_inc",    "Negative", "Higher income states are associated with lower hate crime rates.",
       "share_unemp_seas",    "Positive", "Higher unemployment is associated to higher hate crime rates.",
       "share_pop_metro",     "Negative", "Metropolitan areas will reflect fewer hate crimes",
-      "share_pop_hs",        "Negative", "A higher share of the poopulation with a high school diploma is associated with lower hate crime rates.",
+      "share_pop_hs",        "Negative", "A higher share of the population with a high school diploma is associated with lower hate crime rates.",
       "share_non_citizen",   "Positive", "Areas with higher non-citizen populations are associated with more hate crimes.",
       "share_white_poverty", "Positive", "A greater poor white population will be associated with more hate crimes.",
       "gini_index",          "Positive", "Higher income inequality is associated with higher hate crime rates.",
       "share_non_white",     "Positive", "Areas with diverse populations will experience more hate crimes.",
-      "share_vote_trump",    "Positive", "Regions with higher support for Trump are associated with higher hate crime rates."
+      "share_vote_trump",    "Positive", "States with higher support for Trump are associated with higher hate crime rates."
     ), 
     ncol = 3, 
     byrow = TRUE
