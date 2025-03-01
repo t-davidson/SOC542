@@ -295,5 +295,5 @@ modelsummary(list(con_con_base, con_con_int),
 ```
 
 ## Interactions Between Multiple Variables
-You aren't limited to only interacting two variables. You could have 3-way interactions, 4-way interactions, etc. If you find that you need to do this, don't hesitate to reach out. 
+You aren't limited to only interacting two variables. You could have 3-way interactions, 4-way interactions, etc. However, these models become difficult to interpret and should be used with extreme caution (And rarely would we want to implement a 4-way interaction). If you find that you need to do this, don't hesitate to reach out. 
 
