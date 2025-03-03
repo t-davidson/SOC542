@@ -1,0 +1,299 @@
+---
+title: "Week 6 - Interaction Terms"
+author: "Brent Hoagland, Lab TA"
+date: "3/3/2025"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE)
+options(scipen = 999)
+
+library(tidyverse)
+library(haven)
+
+library(modelsummary)
+library(broom.mixed)
+  options(modelsummary_get = "broom") 
+
+set.seed(1234) # Optional, for reproducibility
+```
+
+# Data Recoding & Wrangling
+
+Let's play with the GSS again. This week, we don't have a specific hypothesis about what leads to income or occupational prestige, but instead we'll be playing around with various relationships between sets of variables.
+
+```{r gss-loading}
+# Write the code or change your working directory to properly load the GSS2022.dta file and assign it to the object gss2022
+gss2022 <- read_dta("../DATASETS/GSS/GSS2022.dta")
+
+gss <- gss2022 %>% 
+  select(conrinc,                 # DV: Inflation-adjusted personal income 
+         hrs1, wrkslf, prestg10, degree,  
+         # IVs: career variables (number of hours worked last week, r self-emp or works for somebody,
+         # r's occupational prestige score, r's highest degree )
+         sex, race, age, educ, partyid) # IVs: some demographic information
+
+gss <- haven::zap_label(gss) # This function takes away any long labels that NORC might have included in the dataset; it just helps for readability for view(gss)
+
+
+# This time I've done all the recoding
+gss <- gss %>%
+  mutate(
+    # Rename 'conrinc' variable to a numeric variable called 'income'
+    income = as.numeric(conrinc),
+    
+    # Log transform of income
+    logincome = log(income),
+    
+    # Recode 'age' by replacing -100, -99, -98 with NA
+    age = ifelse(age %in% c(-100, -99, -98), NA, age),
+    
+    # Recoding a new variable based on age
+    workexp = age - 18,
+    
+    # Recode 'hrs1' into 'workhrs' by replacing certain values with NA
+    workhrs = as.numeric(case_when(
+      hrs1 >= 89 ~ NA,      # Recoding to remove possible outliers
+      hrs1 <= -97 ~ NA,     # Recoding all negative values to NA
+      TRUE ~ hrs1)),         # For all remaining values of hrs1, keep the original value
+    
+    # Recode 'wrkslf' into 'self_employed' with descriptive labels
+    wrkslf = factor(wrkslf,
+                    levels = c(1, 2),
+                    labels = c("Self-employed", "Works for someone")),
+    
+    # Create a dummary variable for self_employed
+    self_employed = ifelse(wrkslf == "Self-employed", 1, 0),
+    
+    # Recoding 'prestg10' into a numeric variable called 'pristige'
+    prestige = as.numeric(prestg10),
+    
+    # Recode 'degree' variable into a factor with labels
+    degree = factor(degree,
+                    levels = c(0, 1, 2, 3, 4),
+                    labels = c("Less_HS", "HS", "Assoc", "Bach", "Grad")),
+    
+    # Recode 'sex' variable into a factor variable
+    sex = factor(sex,
+                 levels = c(1, 2),
+                 labels = c("Male", "Female")),
+    
+    # Create a dummy variable for female
+    female = ifelse(sex=="Female", 1, 0),
+    
+    # Recode 'race' variable into a factor with descriptive labels
+    race = factor(race, levels = c(1, 2, 3),
+                  labels = c("White", "Black", "Other")),
+    
+    # Recode 'partyid' variable into political affiliation categories
+    partyid = case_when(
+      partyid %in% c(0:2) ~ "Dem",
+      partyid %in% c(4:6) ~ "Rep",
+      partyid %in% c(3, 7) ~ "Other"
+    ),
+    
+    # Recode 'educ' for missing values; leaving as continuous 
+    educ = ifelse(educ %in% c(-99, -98), NA, educ)
+  ) %>%
+  
+  select(-hrs1, -conrinc, -prestg10) %>%
+  
+  drop_na()
+
+```
+
+## Descriptive Statistics
+
+As always, let's do some descriptive statistics. One thing to note is that I created dummy variables for `female`, indicating `1` whether the respondent is female and `0` if the respondent is male , and `self_employed`, indicating `1` whether they are self-employed (as opposed to working for somebody else `0`).
+
+```{r desc-tables}
+
+datasummary_skim(gss,
+                 type = "numeric",
+                 fmt = 2, # Show 2 decimal places 
+                 histogram = F,
+                 title = "Sample Descriptive Statistics: Continuous Variables",
+                 notes = "Data: 2022 General Social Survey",
+                 output = "data.frame")
+
+datasummary_skim(gss, 
+                 type = "categorical",
+                 title = "Sample Descriptive Statistics: Categorical Variables",
+                 notes = "Data: 2022 General Social Survey",
+                 output = "data.frame")
+
+```
+
+**Question:** What do you notice about the numeric dummy variables for `female` and `self_employed` and their corresponding categorical/factor variable?
+
+*Answer:* The mean for the dummy variables (0.50 and 0.12) matches the percent column for the `Female` 49.8% and `Self-employed` 12.1% response values.
+
+# Interactions between different variable types ("X" indicates interaction)
+
+## Dichotomous Variable (0 or 1) X Dichotomous Variable
+
+To start, let's investigate the relationship between a person's income (in absolute dollars) and their years of education, their status as self-employed, and their sex.
+
+I created two models below:
+
+1.  The first is an "additive" model, where the three independent variables act independently on income.
+2.  The second is a "multiplicative" model, which includes a term dependent on the status of self-employment and sex together.
+
+```{r dum-dum}
+dum_base <- lm(income ~ educ + self_employed + female,
+                   data = gss)
+dum_int <- lm(income ~ educ + self_employed * female, # the variable * variable indicates an interaction term
+                  data = gss)
+
+modelsummary(list("Additive" = dum_base, "Multiplicative" = dum_int),
+             estimate = "{estimate}{stars}",
+             fmt = 0,
+             statistic = NULL,
+             gof_omit = "IC|Log|alg|pss|F|RMSE",
+             notes = "Notes: * p < 0.05, ** p < 0.01, *** p < 0.001",
+             output="huxtable")
+
+```
+
+In the first model, we see that each year of education has a significant effect on income, increasing it by \$5,212 for each additional year on average. Additionally, women earned about \$17,085 less than men all else equal, while self-employment individuals made \$1,117 more holding all else equal.
+
+**Question:** Who does the constant/intercept represent in the first model?
+
+*Answer:* Men who work for someone else with 0 years of education.
+
+Turning now to the second model, we must change how we interpret our table. Let's start with the interaction term: Self-employed women earned \$2,190 less income than everyone else. But who is that everyone else, and what are their values? The term `female` still denotes all women, both self- and other-employed. And the term `selfemp` represents all self-employed individuals, male and female.
+
+Here's another way to think about it. let's create a new variable that is a cross of `female` and `selfemp`. Then, let's use that new variable in a regression and compare the output to the other.
+
+```{r dum-dum-cross}
+
+gss <- gss %>% 
+  mutate(female_selfemp = case_when(
+    female == 1 & self_employed == 1 ~ "Female, Self Emp",
+    female == 1 & self_employed == 0 ~ "Female, Not Self Emp",
+    female == 0 & self_employed == 1 ~ "Male, Self Emp",
+    female == 0 & self_employed == 0 ~ "0 Male, Not Self Emp" 
+          # putting 0 so this row is 'dropped' in regression
+  ))
+
+ftable(gss$female, gss$self_employed, gss$female_selfemp) # Double-checking the coding
+
+dum_cross <- lm(income ~ educ + female_selfemp,
+                  data = gss)
+
+modelsummary(list("Interactive" = dum_int, "Cross" = dum_cross),
+             estimate = "{estimate}{stars}",
+             fmt = 1,
+             statistic = NULL,
+             gof_omit = "IC|Log|alg|pss|F|RMSE",
+             notes = "Notes: * p < 0.05, ** p < 0.01, *** p < 0.001",
+             output="huxtable")
+
+```
+
+Looking at the output, we can see a couple of numbers that standout. Working our way down:
+
+1.  Education: The coefficient for education is \$5,206 in both models, indicating the consistent impact (given we specified our model this way) of each additional year of education on income, while accounting for self-employment status and sex.
+
+2. Interpreting the Intercept (constant in this table): The coefficients match and represent the income for not-self-employed males with 0 education, which acts as the baseline against which the other coefficients are compared. 
+
+Let's just focus on the model (2) to begin with where we accounted each combination of being self-employed and sex by creating a dummy variable (either 1 or 0) for each combination, which can be represented by a 2x2 table:
+
+|        | Not Self-Employed | Self-Employed |
+|:-------|:------------------|:--------------|
+| Female | -\$16,841         | -\$17,130     |
+| Male   | (intercept).      | +\$1,902      |
+
+This table organizes the coefficients from model (2) for each combination of self-employment status and sex. By understanding model (2), we can back into model (1) and fill in our understanding of the interaction term. Here's what we observe:
+
+3.  Female Income Penalty:  The -$16,841 coefficient in model (2) quantifies the income penalty for females versus males among those not self-employed. This figure corresponds to the female coefficient in model (1), indicating an income reduction for females relative to the reference group of not-self-employed males.
+
+4.  Self-Employed Effect: Self-employed males earn +$1,902 more than the reference group. In contrast, self-employed females experience a -$17,130 income difference from the same reference group.
+
+**Question:** So, does the effect of being self-employed have the same consequence for females as it does for males? That is to ask, do self-employed females make +$1,902 more than employed females (the difference between 17,130 and 16,841)?
+
+*Answer (YES or NO):* ~ NO ~ 
+
+5. Interpreting Self-Employed Females' Income: The -$17,130 coefficient for self-employed females in model (2) represents the combined effect of sex and self-employment status. It's not just the sum of the female penalty (-$16,841) and the self-employment income increment (+$1,901). We need to consider the main effect of female (average difference between sexes), the main effect of being self-employed, but also how being female AND self-employed combine uniquely (aka an interaction effect).
+
+6. Interaction Effect: Model (1) suggests that self-employment corresponds to a +$1,902 income increase, and the average difference between females and males corresponds to a -$16,841 decrease against females. The interaction term self_employed:female, with a coefficient of -$2,190, implies an additional income reduction for self-employed females. The interaction effect captures the compounding disadvantage of self-employment AND female, reflected in the sum: $1,907 (selfemp) - $16,841 (female) - $2,190 (self_employed:female) ≈ -$17,130.
+
+**Trick Question:** Does being self-employed increase someone's income? 
+
+*Answer* It depends! Self-employment means different things/has different consequences/moderates the effect of being self-employed for males versus females. While self-employment is associated with an income increase (+$1,907) for males, it does not confer the same benefit to females, who actually face a compounded income penalty due to the interaction between sex and self-employment status (-$2,190 interaction effect + $1,907 main effect = -$288).
+
+Wow, way to go. Interactions terms open up new possibilities to explore a different kind of relationship (aka multiplicative - it can change direction and magnitude at different points) between variables as we've done with two dichotomous variables (female x self-employed). However, with more than a simple 2X2 set of categories, it gets...well as you can probably expect...increasingly complex to create and interpret. But it can be done :) 
+
+Interpreting the coefficients of interaction terms directly from the regression output can be non-intuitive because the coefficients of the main effects and the interaction term need to be considered together. This is where functions like `predict` and packages like `marginaleffects` or `margins` become extremely useful. We touched upon predict in the past but will cover more of it and marginal effects in a future lab. 
+
+## Dichotomous Variable X Multinominal Variable (more than two categories)
+
+We can create and interpret an interaction model with self-employment status (dichotomous) and political party affiliation (multinominal).
+```{r dum-cat}
+dum_cat_base <- lm(income ~ self_employed + partyid,
+                   data = gss)
+dum_cat_int <- lm(income ~ self_employed * partyid,
+                  data = gss)
+
+modelsummary(list(dum_cat_base, dum_cat_int),
+             estimate = "{estimate}{stars}",
+             fmt = 3,
+             statistic = NULL,
+             gof_omit = "IC|Log|alg|pss|F|RMSE",
+             notes = "Notes: * p < 0.05, ** p < 0.01, *** p < 0.001",
+             output="huxtable")
+```
+
+
+## Dummy X Continuous
+
+We can also create interactions between dummy variables and continuous variables. In the example below, we can hypothesize that income is affected by the hours a person works and whether they have a college degree or higher.
+
+```{r dum-con}
+gss <- gss %>% 
+  mutate(college = case_when(
+    degree %in% c("Bach", "Grad") ~ 1,  # College or Grad
+    degree %in% c("Less_HS", "HS", "Assoc") ~ 0   # Non-college
+  ))
+# table(gss$college, gss$degree)
+
+dum_con_base <- lm(income ~ workhrs + college,
+                   data = gss)
+dum_con_int <- lm(income ~ workhrs * college,
+                  data = gss)
+
+modelsummary(list(dum_con_base, dum_con_int),
+             estimate = "{estimate}",
+             fmt = 3,
+             statistic = NULL,
+             gof_omit = "IC|Log|alg|pss|F|RMSE",
+             notes = "Notes: * p < 0.05, ** p < 0.01, *** p < 0.001",
+             output="huxtable")
+```
+
+
+## Continuous X Continuous
+
+Rounding out the simple cases of interactions, we have continuous X continuous interactions.
+```{r con-con}
+con_con_base <- lm(income ~ workhrs + educ,
+                   data = gss)
+con_con_int <- lm(income ~ workhrs * educ,
+                  data = gss)
+
+modelsummary(list(con_con_base, con_con_int),
+             estimate = "{estimate}",
+             fmt = 3,
+             statistic = NULL,
+             gof_omit = "IC|Log|alg|pss|F|RMSE",
+             notes = "Notes: * p < 0.05, ** p < 0.01, *** p < 0.001",
+             output="huxtable")
+```
+
+## Interactions Between Multiple Variables
+You aren't limited to only interacting two variables. You could have 3-way interactions, 4-way interactions, etc. However, these models become difficult to interpret and should be used with extreme caution (And rarely would we want to implement a 4-way interaction). If you find that you need to do this, don't hesitate to reach out. 
+
