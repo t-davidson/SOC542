@@ -1,0 +1,494 @@
+---
+title: "Week 7 - Handling Missing Data and Developing Robust Models "
+author: "Brent Hoagland, Lab TA"
+date: "2025-03-06"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE)
+options(scipen = 999)
+
+library(tidyverse)
+library(haven)
+
+library(modelsummary)
+library(broom.mixed)
+  options(modelsummary_get = "broom") 
+
+set.seed(1234) # Optional, for reproducibility
+```
+
+# Data Loading and Management
+
+```{r gss-loading}
+# You may need to write the code or change your working directory to properly load the GSS2022.dta file and assign it to the object gss2022
+gss2022 <- read_dta("../DATASETS/GSS/GSS2022.dta")
+
+gss <- gss2022 %>% 
+  select(conrinc, unemp,                 # DV: Inflation-adjusted personal income 
+         hrs1, wrkslf, prestg10, degree,  
+         # IVs: career variables (number of hours worked last week, r self-emp or works for somebody,
+         # r's occupational prestige score, r's highest degree )
+         sex, race, hispanic, age, educ, partyid, # IVs: some demographic information
+         region, # a level-2 variable for multi-level modeling 
+         wtssnrps) # WTSSNRPS accounts for all stages of selection and raking to known population totals with one additional step: a non-response adjustment.
+
+gss <- haven::zap_label(gss) # This function takes away any long labels that NORC might have included in the dataset; it just helps for readability for view(gss)
+
+# This time I've done all the recoding
+gss <- gss %>%
+  mutate(
+    # Numeric transformations
+    income = as.numeric(conrinc),
+    logincome = log(conrinc + 1),  # Adding 1 to avoid log(0)
+    workhrs = as.numeric(case_when(
+      hrs1 >= 89 ~ NA,       # Setting NA values
+      hrs1 <= -97 ~ NA,      # Negative values to NA
+      TRUE ~ hrs1            # Keeping original value for other cases
+    )),
+    prestige = as.numeric(prestg10),
+    educ = ifelse(educ %in% c(-99, -98), NA, educ),  # Handling missing values
+    
+    # Recoding for 'age'
+    age = ifelse(age %in% c(-100, -99, -98), NA, age),
+    agesq = age^2,  # Creating squared age
+    workexp = age - 18,  # New variable based on age
+    
+    # Factor recodings
+    wrkslf = factor(wrkslf, levels = c(1, 2), labels = c("Self-employed", "Works for someone")),
+    sex = factor(sex, levels = c(1, 2), labels = c("Male", "Female")),
+    degree = factor(degree, levels = c(0, 1, 2, 3, 4), labels = c("Less_HS", "HS", "Assoc", "Bach", "Grad")),
+    partyid = factor(case_when(
+      partyid %in% c(0:2) ~ "Dem",
+      partyid %in% c(4:6) ~ "Rep",
+      TRUE ~ "Other"  # Default to 'Other' if neither of the above conditions is true
+    ), levels = c("Dem", "Rep", "Other")),
+    
+    # Handling Hispanic as a race category
+    hisp = case_when(hispanic == 1 ~ 0, TRUE ~ 1),
+    race = case_when(
+      hisp == 1 ~ 4,
+      TRUE ~ race
+    ),
+    race = factor(race, levels = c(1, 2, 4, 3), labels = c("White", "Black", "Hispanic", "Other")),
+    
+    # Creating dummy variables
+    self_employed = as.numeric(ifelse(wrkslf == "Self-employed", 1, 0)),
+    female = as.numeric(ifelse(sex == "Female", 1, 0)),
+    
+    # Handling unemployment variable
+    unemp = 2 - unemp,
+    
+    region = factor(region, levels = 1:9, labels = c(
+      "New England", "Middle Atlantic", "East North Central",
+      "West North Central", "South Atlantic", "East South Atlantic",
+      "West South Central", "Mountain", "Pacific"
+    )),
+    
+    wtssnrps = as.numeric(wtssnrps)
+  ) %>%
+  select(-hrs1, -conrinc, -prestg10, -hispanic) 
+
+```
+
+In past week's we've run `drop_na()` on our dataset to ensure we only have observations with no missingness. This week, we're going to leave those cases in.
+
+## Handling Missing Data
+
+### Complete-Case Analysis
+
+Complete-case analysis is where you drop observations which are missing on any variable in the dataset, even if you're not using them. This is never really a good idea because you lose data points that didn't need to be tossed.
+
+```{r gss-complete case}
+
+gss_comp <- gss %>% drop_na()
+
+```
+
+### Available-Case Analysis
+
+This is what we have done in this course thus far. Available-case analysis is where you drop observations which have missing values on any of the variables you are working with *in a specific model*. This is also called "**listwise deletion**." This requires you somewhat anticipate the model specifications before hand (though you can always come back--that's what's great about coding in the source pane). 
+
+```{r available-case analysis}
+
+gss_avail <- gss %>% 
+  select(logincome, prestige, self_employed, race, female, wtssnrps) %>% drop_na()
+
+```
+
+
+## Descriptives
+
+As always, let's look at our descriptive statistics. This time, pay attention to the number of missing observations for each variable.
+
+```{r desc-tables}
+
+datasummary_skim(gss,
+                 type = "numeric",
+                 fmt = 2, # Show 2 decimal places 
+                 histogram = T,
+                 title = "Sample Descriptive Statistics: Continuous Variables",
+                 notes = "Data: 2022 General Social Survey",
+                 output = "kableExtra")
+
+datasummary_skim(gss, 
+                 type = "categorical",
+                 title = "Sample Descriptive Statistics: Categorical Variables",
+                 notes = "Data: 2022 General Social Survey",
+                 output = "huxtable")
+
+```
+
+Unfortunately, this function doesn't give us missingness on categorical variables. What we can do instead is run the below code, which will create a category `NA` for missing values.
+
+```{r tidy-cat}
+
+gss_cat_table <- gss %>% 
+  select(where(~ !is.numeric(.))) %>%  # Select columns that are NOT numeric
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "value") %>% 
+  group_by(variable, value) %>% 
+  summarise(n = n(), .groups = "drop") %>%  # Counting number of values within each variable 
+  mutate(percent = round(n / sum(n), 2)) %>%
+  ungroup() %>%
+  as.data.frame()
+
+gss_cat_table
+
+```
+
+# Some Models
+
+Now that we know what our data looks like, and know there are missing values, let's run some models. The models use the same predictors, but the second model (`mod2`) only uses observations that have no missing data across all variables and the third model (mod3) only uses observations that have no missing data across only the variables selected for in the model (`data = gsscomp`).
+
+```{r some-mods}
+
+mod1 <- lm(logincome ~ prestige + self_employed + race + female,
+           data = gss, weights = wtssnrps, na.action = na.exclude) # The default is to exclude NAs. I wrote it out to show that cases were left out
+
+mod2 <- lm(logincome ~ prestige + self_employed + race + female,
+           data = gss_comp, weights = wtssnrps) # NOTE The use of gss_comp here 
+
+mod3 <- lm(logincome ~ prestige + self_employed + race + female,
+           data = gss_avail, weights = wtssnrps) # NOTE The use of gss_avail here 
+
+ourmods <- list("w/ NAs" = mod1, "Complete-case" = mod2, "Available-case" = mod3)
+
+
+modelsummary(ourmods, 
+             estimate = "{estimate} ({std.error}) {stars}",
+             statistic = NULL,
+             gof_omit = "F|RMSE|Log|IC",
+             output = "huxtable")
+
+```
+
+# Model Diagnostics and Developing Robust Models
+
+## 1. Dealing with Missing Data
+
+We will begin by examining how model coefficients change when we exclude cases with missing data. The `modelsummary::modelplot()` function automates the transformation of our models into `ggplot2` objects, allowing us to visualize these changes easily.
+
+```{r  mod-comp}
+
+modelplot(list("Complete-case" = mod2, "Available-case" = mod3), 
+          coef_omit = 'Interc') +
+  geom_vline(aes(xintercept = 0), 
+             linetype = "dotted", size = 1, alpha = .5)
+
+```
+
+Missing data can bias our results, so it's crucial to understand its patterns and address it accordingly.
+
+### Patterns of Missingness
+To visualize which variables have missing data, we can create an "upset plot" using the naniar package. This plot will show the combination of variables with missing observations.
+
+```{r miss-upset}
+library(naniar)
+
+gg_miss_upset(gss)
+
+```
+
+Notably, `income` and `logincome` are equivalent, so any missing data in one is also missing in the other. The variable `workhrs` also has a significant number of missing values, which, according to the [GSS Data Explorer](https://gssdataexplorer.norc.org/variables/4/vshow), correspond to individuals not working full-time or part-time.
+
+(This website provides other great ways to visualize missingess: <https://cran.r-project.org/web/packages/naniar/vignettes/naniar-visualisation.html>)
+
+What do we do with the missing data? The approach should be driven by our research question and the variables it deems important. We should use a subset of data that have no missing values across all variables of interest and the variables in our anticipated final model -- creating subsets accordingly (e.g., gss_avail). When missingness is random, imputation is a viable option, and the `mice` package provides an excellent set of tools for this purpose. However, if missingness is not random, it will introduce bias in our model and you should seek advice on more advanced techniques to appropriately handle the missing data. 
+
+### Mean (and Median) Imputation
+
+An easy alternative to listwise deletion is mean imputation. This means you "impute" (AKA substitute in) the mean of a variable (or mode, for categorical variable) in the place of any missing value. This allows you to retain cases that would be listwise deleted.
+
+Of course, these are not simple fixes. You run the risk of pushing too many things to the middle, especially when it isn't warranted or even useful. Make sure you know your data when you do this.
+
+The function is `naniar::impute_mean()`. If you think your data are skewed, you can also use `impute_median()` instead.
+
+```{r central-imp}
+gss <- gss %>% 
+  mutate(imp_income = impute_median(income),
+         imp_loginc = impute_mean(logincome))
+
+gss %>% select(income, imp_income, logincome, imp_loginc) %>%
+  datasummary_skim()
+```
+
+Notice how imputing using median and mean puts more density around these values and reduces the standard deviation. This is especially visible in the density plots below.
+
+```{r imp-density}
+incomeplot <- gss %>% 
+  ggplot() + 
+  geom_density(aes(x = income, color = "Original")) +
+  geom_density(aes(x = imp_income, color = "Imputed")) +
+  theme_minimal() + ggtitle("INCOME")
+logimcomeplot <- gss %>% 
+  ggplot() + 
+  geom_density(aes(x = logincome, color = "Original")) +
+  geom_density(aes(x = imp_loginc, color = "Imputed")) +
+  theme_minimal() + ggtitle("LOGINCOME")
+
+cowplot::plot_grid(incomeplot, logimcomeplot, nrow = 2)
+  
+```
+
+### Regression Imputation
+
+Regression imputation is like mean imputation, but using multiple variables. It runs a regression equation on each missing observation to estimate the value of the missing data. Now, we can account for differences in missingness based on relationships with other variables.
+
+(If you're wondering how R does this for categorical variables, we'll get to it after spring break.)
+
+### Multivariate Imputation by Chained Equations (MICE)
+
+Multiple imputation is a term that means we're doing (regression) imputation multiple times.
+
+The benefit is that we no longer have to settle for just one version of the final imputed variable. We can now make a series of datasets, all with imputed data on the missing values. MICE is just a case of multiple imputation that uses chained equations.
+
+In short: We mean impute values for all variables, use these to regression impute the missing values of them, then repeat until we no longer are using the mean imputed values. Of course, regression imputation gives different values than mean imputation, so we repeat the procedure over and over until the values "converge," another way of saying they stop changing.
+
+If you're curious, more detail on the steps that make these equations chained can be found here: <https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3074241/#mpr329-sec-0002title>
+
+Below, we use the `mice` command to create five new, imputed datasets. (If we only wanted one dataset, a la normal regression imputation, we set `m = 1`.) The `maxit` option tells it how many iterations it should do before giving up. The default is 5. 
+
+```{r mice1}
+imp <- mice(gss, m = 5, maxit = 2, seed = seed)
+```
+
+The output tells us which variables were imputed and that there are several "logged events." There are several reasons this can occur. The biggest ones are due to collinearity. Let's take a look and see.
+
+```{r mice-logged}
+imp$loggedEvents
+```
+
+The column `meth` tells us that collinearity is to blame for our problem variables. We can then select these columns out to create a new dataset that doesn't include the variables we don't want in our final regression. (We'll keep `logincome` since we're removing `income`.) I also set `printFlag = T` so that we don't get the output from above. 
+
+```{r mice2}
+newimp <- gss %>% 
+  select(-wrkslf, -workexp, -income, -imp_loginc, -imp_income, -sex) %>% 
+  mice(., m= 5, maxit = 2,
+       seed = seed, printFlag=F)
+newimp$loggedEvents
+
+```
+
+The `NULL` output when we ask for logged events means there were no issues here. 
+
+### MICE Diagnostics
+
+There are several ways to evaluate our imputation. One diagnostic plot we can make is to map the densities of our imputed variables (in red) against the actual (in blue). This might remind you of the posterior predictive checks we use for Bayesian models. 
+
+```{r mice_diag}
+densityplot(newimp, layout = c(3,3))
+```
+
+These suggest that certain variables like `workhrs` and `unemp` are well imputed by relationships with the other variables, while `educ` and `prestige` have difficulty. A way to improve the imputations would be to specify which variables should be used to predict the others, but that's beyond our scope for today. For example, saying that $agesq = age^2$ would greatly improve prediction of `agesq`. Even better would be to create `agesq` *after* imputation. 
+
+### Modeling with Imputed Data
+
+To create a linear regression with imputed data, we cannot use our normal function. Instead we use the `with()` function to tell R to regress "with" our imputed dataset. (As an aside, we could've always used `with(data, lm(y ~x))`, but it didn't make much sense.) 
+
+```{r imp-reg}
+# CAN'T USE THIS WITH MICE DATA
+# impmod1 <- lm(imp_loginc ~ prestige + self_employed + race + female, data = newimp)
+
+impmod1 <- with(newimp, lm(logincome ~ prestige + self_employed + race + female))
+
+summary(impmod1)
+```
+
+What's this?! Remember that multiple imputation gives you multiple datasets, so now R ran a separate regression on each of these datasets.
+
+If you simply run `summary` on the regression object, R will give you one row for each term, for each dataset.
+
+Instead, we can use `mice::pool()` to take the average of the parameters. 
+
+```{r imp-sum}
+
+impmod_pool <- pool(impmod1)
+summary(impmod_pool)
+
+```
+
+The `modelsummary()` command will run this for us and will pool the R-squared, but it won't give us other goodness-of-fit info, including the number of observations and how many imputed datasets we have. For this reason, it's generally better to pool your models first. 
+
+```{r imp_msumm}
+
+modelsummary(impmod_pool, estimate = "{estimate} ({std.error}) {stars}",
+             statistic = NULL,
+             output = "huxtable")
+
+```
+
+
+Now, let's put together a table comparing out two MICE data models alongside the base model with no imputed data, the complete case model, and the model with mean-imputation.
+
+```{r imp-compare, message=FALSE, warning=FALSE}
+
+mod6 <- lm(imp_loginc ~ prestige + self_employed + race + female,
+           data = gss)
+lastmods <- list("Avail. Case" = mod3,
+                 "Comp. Case" = mod2,
+                 "Mean Imp" = mod6,
+                 "Reg Imp (M=5)" = impmod_pool,)
+
+modelsummary(lastmods, stars = T,
+             title = "Comparison of Methods of Handling Missing Data",
+             gof_omit = "RMSE|F",
+             output = "huxtable")
+
+```
+
+We can also, of course, visualize this as a coefficient plot.
+
+```{r imp-complot}
+modelplot(lastmods, coef_omit = 'Interc') +
+  geom_vline(aes(xintercept = 0), linetype = "dotted", linewidth = 1, alpha = .5)
+```
+
+## 2. Dealing with Outliers
+
+Detecting and addressing outliers is an essential step, as they can significantly influence the results of a regression model. One common method for identifying outliers is Cook's Distance. This statistic measures the influence of each data point on the fitted values. An observation with a high Cook's Distance can unduly affect the model's estimates and may need to be examined more closely.
+
+#### Detecting with Cook's Distance
+```{r cook-distance}
+
+# Calculate Cook's distance for mod3, which includes only observations without missing data on the variables selected for the model
+gss_avail <- gss_avail %>% 
+  mutate(cooksd_mod3 = cooks.distance(mod3))
+
+```
+
+#### Setting thresholds and identifying outliers
+```{r thresholds-outliers}
+
+# Calculate the number of observations (n) and predictors (k) for mod3
+n <- nrow(gss_avail)
+k <- length(coef(mod3)) # Number of predictors, including the intercept
+
+# Establish thresholds for identifying influential observations based on Cook's Distance
+threshold1 <- 4 / n
+threshold2 <- 3 * mean(gss_avail$cooksd_mod3)
+threshold3 <- 4 / (n - k - 1)
+
+# Add row numbers to gss_avail to identify outliers later
+gss_avail <- gss_avail %>% 
+  mutate(row_id = row_number())
+
+# Identify observations where Cook's distance exceeds any of the thresholds and mark them as outliers
+outliers_mod3 <- gss_avail %>% 
+  filter(cooksd_mod3 > threshold1 | cooksd_mod3 > threshold2 | cooksd_mod3 > threshold3) %>%
+  arrange(desc(cooksd_mod3))
+
+# Displaying the identified outliers for mod3 along with their row IDs
+print(select(outliers_mod3, row_id, cooksd_mod3))
+
+```
+The code first calculates Cook's Distance for each observation in the dataset used for mod3 (gss_avail), which only includes observations without missing data for the variables in the model. We then set three different thresholds to flag influential observations. By filtering and printing the results, we can inspect which observations are the most influential for the model's estimates.
+
+*Remember to provide a unique identifier for each observation in your dataset; this will help you track and inspect the outliers more effectively.* If your dataset does not include a unique identifier, you may need to create one or use row numbers to identify the influential observations.
+
+After identifying outliers, it's important to consider whether they represent errors, unique cases, or a variation that should be accounted for in the model. Depending on the context and the research question, you might decide to further investigate these points, exclude them from the analysis, or include additional variables in the model to account for the variance they represent.
+
+## 3. Multicollinearity
+
+Multicollinearity occurs when two or more predictors in a regression model are correlated and provide redundant information about the response. This can lead to increased standard errors for the coefficient estimates, which can affect tests of significance and the reliability of the model.
+
+### Calculating Multicollinearity
+To detect multicollinearity, we use the Variance Inflation Factor (VIF), which assesses how much the variance of an estimated regression coefficient increases if your predictors are correlated. If VIF is high (> 5 or 10), this indicates significant multicollinearity.
+
+```{r calc-multicol}
+library(car)
+
+mcol <- vif(mod3) 
+print(mcol)
+
+```
+
+These are all very weakly predicted by the others. Hooray!
+
+You'll notice that these don't align perfectly. This is because the `car::vif()` command calculates the Generalized VIF. Additionally, the term $GVIF^{1 / (2*Df)}$ is useful in comparing GVIF's across models since it accounts for the number of total predictors.
+
+-   For more information, see John Fox's response to the question here: <https://stats.stackexchange.com/questions/70679/which-variance-inflation-factor-should-i-be-using-textgvif-or-textgvif>
+-   And the linked paper here: <https://www.tandfonline.com/doi/abs/10.1080/01621459.1992.10475190>
+
+### High Multicollinearity
+
+Let's try to now create a model that *will* have high multicollinearity. Work experience and age should be correlated. Without looking at the numbers, you can imagine how someone older would generally have more work experience than someone younger. Let's see if that plays out in the model
+
+```{r high-multicol}
+
+multicol_model <- lm(logincome ~ prestige + educ + workexp + agesq, data = gss)
+
+summary(multicol_model)
+
+# Calculate VIF for the adjusted model
+multicol_vif <- vif(multicol_model)
+multicol_vif <- as.data.frame(multicol_vif)
+
+print(multicol_vif)
+```
+
+You can see here that `workexp` and `agesq` are collinear with each other.
+
+Multicollinearity can present as a problem in modeling because we aim for each predictor to capture unique portions of the variance in $\hat{y}$. Instead, variables that are highly multicollinear are not capturing unique portions of the variance, affecting the standard errors. 
+
+## 4. Bayesian Specific
+
+Predictive performance can be calculated using cross-validation. These approaches are infrequently used in frequentist statistics but are central to modern Bayesian inference.
+
+### Leave-One-Out Cross Validation
+
+One form of cross validation is Leave-One-Out, where we leave out one data point and see how good the model does. **NOTE**: While this can be done on OLS models, the `rstanarm::loo()` function only works on `stan_glm` objects (not `lm`). Because of this, let's create two Bayesian models and see how they do. (Also, you sadly can't use data weights with `loo()`, so we'll create unweighted models.)
+
+```{r bayesmod-create}
+bayes_mod1 <- stan_glm(logincome ~ prestige + self_employed + race + female,
+                       data = gss_comp,  seed = seed,
+                       chains = 1, refresh = 0)
+bayes_mod2 <- stan_glm(logincome ~ prestige + self_employed + race + female * (workexp + workexp^2),
+                       data = gss_comp,  seed = seed,
+                       chains = 1, refresh = 0)
+
+bmods <- list(bayes_mod1, bayes_mod2)
+modelsummary(bmods,
+             statistic = "conf.int", gof_omit = "F|RMSE",
+             output = "huxtable")
+```
+
+Let's run `loo()` on each of our models and then use `loo_compare()` to compare the results.
+
+```{r loo}
+loo1 <- loo(bayes_mod1)
+loo2 <- loo(bayes_mod2)
+loo_compare(loo1, loo2)
+```
+
+The comparison shows that the first model tends to perform worse according to the ELPD metric than model 2.
+
+We can also plot the Pareto k values, which can indicate whether there are data points that may bias the results. Ideally, all values should be less than 0.7.
+
+```{r}
+plot(loo1)
+plot(loo2)
+```
