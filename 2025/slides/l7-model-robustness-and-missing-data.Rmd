@@ -1,0 +1,955 @@
+---
+title: "SOC542 Statistical Methods in Sociology II" 
+subtitle: "Missing Data & Model Checking and Robustness"
+author: Thomas Davidson
+institute: Rutgers University
+date: March 10, 2025
+urlcolor: blue
+output:
+    beamer_presentation:
+      theme: "Szeged"
+      colortheme: "beaver"
+      fonttheme: "structurebold"
+      toc: FALSE
+      incremental: FALSE
+      fig_width: 3.5
+      fig_height: 2.5
+header-includes:
+  - \usepackage{hyperref}
+  - \usepackage{multicol}
+  - \usepackage{caption}
+  - \usepackage{booktabs}
+  - \usepackage{siunitx}
+  - \newcolumntype{d}{S[input-symbols = ()]}
+  - \captionsetup[figure]{font=scriptsize}
+  - \captionsetup[figure]{labelformat=empty}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(dev = 'pdf')
+library("knitr")
+library("formatR")
+
+opts_chunk$set(tidy.opts=list(width.cutoff=80),tidy=TRUE)
+opts_chunk$set(tidy = FALSE)
+
+knitr::knit_hooks$set(mysize = function(before, options, envir) {
+  if (before) 
+    return(options$size)
+})
+
+knitr::opts_chunk$set(
+ fig.width = 4,
+ fig.asp = 0.8,
+ out.width = "70%",
+ fig.align = "center"
+)
+
+set.seed(08901)
+
+library(ggplot2)
+library(tidyverse)
+library(latex2exp)
+library(kableExtra)
+library(modelsummary)
+library(viridis)
+library(cowplot)
+library(mice)
+library(reshape2)
+library(rstanarm)
+library(scales)
+
+options("modelsummary_format_numeric_latex" = "plain")
+```
+
+
+# Updates
+- Feedback on project proposals
+- Homework 2 grades and feedback released
+
+# Plan
+- Missing data
+- Model checking
+- Model robustness
+
+        
+# Missing data
+## What is missing data?
+- Missing data occurs when we do not have an record of any data for one or more variables for an observation.
+- Causes
+    - Skip patterns
+    - Survey non-response
+    - Survey error
+    - Data entry errors
+- The severity of the problem depends on why the data are missing and the amount of data missing
+
+# Missing data
+## Missing completely at random (MCAR)
+- \textbf{Missing Completely at Random (MCAR)}
+    - Probability $x_i$ is missing is constant across all observations
+- Discarding missing cases does not result in any bias
+
+
+# Missing data
+## Missing at random (MAR)
+- \textbf{Missing at Random (MAR)}
+    - Probability $x_i$ is missing depends on observed variables.
+- Discarding missing cases does not result in any bias if predictors of missingness are adjusted for.
+
+
+
+# Missing data
+## Missing not at random (MNAR)
+- Missingness that depends on the missing value is considered \textbf{Missing not at Random (MNAR)}
+    - e.g. High or low income respondents less likely to report income
+- No straightforward solution
+    
+
+# Missing data
+## McElreath's homework example
+```{r mce-hw, out.width="70%",out.height="70%", fig.align="center"}
+include_graphics('../../img/mcelreath_homework.png')
+```
+\tiny \centering Richard McElreath. 2023. Statistical Thinking - Lecture 18. \url{https://www.youtube.com/watch?v=Oeq6GChHOzc}
+
+
+# Missing data
+## Simulating missingness
+- We can use simulations to better understand the effects to different kinds of missingness
+- Consider the following population model
+
+$$y = 1 + x + 3z + u$$
+
+- The following regression model is estimated
+
+$$\hat{y_i} = \hat{\beta_0} + \hat{\beta_1}x_i + \hat{\beta_2}z_i + \hat{u_i}$$
+
+- We can simulate each kind of missingess in $x$ and analyze how it affects $\hat{\beta_1}$ and its standard error.
+
+```{r missing-sims, echo =FALSE, mysize=TRUE, size='\\footnotesize'}
+N <- 5E1
+results <- tibble()
+for (i in 1:1E3) {
+    z <- rnorm(N, mean = 0)
+    x <- rnorm(N, mean = 0)
+    y <- 1 + x + 3*z + rnorm(N)
+    x.mcar <- ifelse(rbinom(N,1,prob = 1-0.6), x, NA)
+    x.mar <- ifelse(z > 0, ifelse(rbinom(N,1,prob = 1-0.6), x, NA), x)
+    x.mc <- ifelse(x > -0.5, ifelse(rbinom(N,1,prob = 1-0.6), x, NA), x)
+    m1 <- lm(y ~ x + z)
+    m2 <- lm(y ~ x.mcar + z)
+    m3 <- lm(y ~ x.mar + z)
+    m4 <- lm(y ~ x.mar)
+    m5 <- lm(y ~ x.mc +  z)
+    coefs <- c(m1$coefficients[[2]],
+               m2$coefficients[[2]],
+               m3$coefficients[[2]],
+               m4$coefficients[[2]],
+               m5$coefficients[[2]])
+    SE <- c(summary(m1)$coefficients[[2,2]],
+               summary(m2)$coefficients[[2,2]],
+               summary(m3)$coefficients[[2,2]],
+               summary(m4)$coefficients[[2,2]],
+               summary(m5)$coefficients[[2,2]])
+    names <- c("No missing", "MCAR", "MAR", "MAR - Omitted", "MNAR")
+    idx <- rep(i,5)
+    df <- as_tibble(cbind(coefs, SE, names, idx))
+    results <- bind_rows(results, df)
+}
+```
+
+
+# Missing data
+## MCAR, $p(Missing) = 0.6$
+```{r mcar-scatter, echo =FALSE, mysize=TRUE, size='\\footnotesize'}
+df <- data.frame(x, y, z, x.mcar, x.mar, x.mc)
+
+# Fit regression models
+lm_all <- lm(y ~ x, data = df)       # Regression on all data
+lm_xm <- lm(y ~ x.mcar, data = df)       # Regression using xm
+
+# Extract coefficients
+coef_all <- coef(lm_all)  # Intercept and slope for all data
+coef_xm <- coef(lm_xm)    # Intercept and slope for xm
+
+# Plot
+ggplot(df, aes(x = x, y = y)) +
+  geom_point(aes(color = is.na(x.mcar), shape = is.na(x.mcar)), size = 3) +
+  scale_color_manual(values = c("black", "red")) +
+  scale_shape_manual(values = c(16, 4)) +  # Normal dots (16), red crosses (4)
+  labs(x = "x", y = "y") +
+  theme_classic() +
+  theme(legend.position = "none")
+```
+
+# Missing data
+## MCAR, $p(Missing) = 0.6$
+```{r mcar-scatter2, echo =FALSE, mysize=TRUE, size='\\footnotesize', warning = F}
+ggplot(df, aes(x = x, y = y)) +
+  geom_point(aes(color = is.na(x.mcar), shape = is.na(x.mcar)), size = 3) +
+  scale_color_manual(values = c("black", "red")) +
+  scale_shape_manual(values = c(16, 4)) +  # Normal dots (16), red crosses (4)
+  geom_abline(intercept = coef_all[1], slope = coef_all[2], color = "black") +  # Constant regression line
+  geom_abline(intercept = coef_xm[1], slope = coef_xm[2], color = "red", linetype ="dashed") +  # Regression on xm
+  labs(x = "x", y = "y") +
+  theme_classic() +
+  theme(legend.position = "none")
+```
+
+# Missing data
+## Simulating MCAR
+```{r mcar-plot, echo =FALSE, mysize=TRUE, size='\\footnotesize'}
+b <- ggplot(results %>% filter(names == "No missing" | names == "MCAR"), aes(x = as.numeric(coefs), group = names, fill = names)) +  geom_density(alpha = 0.5) + scale_fill_viridis_d(option = "cividis") + theme_classic() + theme(legend.position = "none")  + labs(x = TeX("$\\hat{\\beta_1}$")) +
+        scale_x_continuous(labels = scales::number_format(accuracy = 0.5), breaks = seq(1.5, 2.5, 0.5))
+
+s <- ggplot(results %>% filter(names == "No missing" | names == "MCAR"), aes(x = as.numeric(SE), group = names, fill = names)) +  geom_density(alpha = 0.5) + scale_fill_viridis_d(option = "cividis") + theme_classic() + labs(y = "", x = TeX("$\\hat{SE_{\\hat{\\beta_1}}}$"), fill = "Model") +
+        scale_x_continuous(labels = scales::number_format(accuracy = 0.1), breaks = seq(0,1,0.1))
+s2 <- s + theme(legend.position = "none")
+l <- get_legend(s)
+plot_grid(b, s2, l, nrow= 1, rel_widths = c(3,3,1))
+```
+
+# Missing data
+## MAR, $p(Missing) = 0.6$ if $z > 0$
+```{r mar-scatter, echo =FALSE, mysize=TRUE, size='\\footnotesize'}
+# Fit regression models
+lm_all <- lm(y ~ x, data = df)       # Regression on all data
+lm_xm <- lm(y ~ x.mar, data = df)       # Regression using xm
+
+# Extract coefficients
+coef_all <- coef(lm_all)  # Intercept and slope for all data
+coef_xm <- coef(lm_xm)    # Intercept and slope for xm
+
+# Plot
+ggplot(df, aes(x = x, y = z)) +
+  geom_point(aes(color = is.na(x.mar), shape = is.na(x.mar)), size = 3) +
+  geom_hline(yintercept =0, linetype ="dotted") +
+  scale_color_manual(values = c("black", "red")) +
+  scale_shape_manual(values = c(16, 4)) +  # Normal dots (16), red crosses (4)
+  labs(x = "x", y = "z") +
+  theme_classic() +
+  theme(legend.position = "none")
+```
+
+# Missing data
+## MAR, $p(Missing) = 0.6$ if $z > 0$
+```{r mar-scatter2, echo =FALSE, mysize=TRUE, size='\\footnotesize', warning = F}
+ggplot(df, aes(x = x, y = y)) +
+  geom_point(aes(color = is.na(x.mar), shape = is.na(x.mar)), size = 3) +
+  scale_color_manual(values = c("black", "red")) +
+  scale_shape_manual(values = c(16, 4)) +  # Normal dots (16), red crosses (4)
+  labs(x = "x", y = "y") +
+  theme_classic() +
+  theme(legend.position = "none")
+```
+
+# Missing data
+## MAR, $p(Missing) = 0.6$ if $z > 0$
+```{r mar-scatter3, echo =FALSE, mysize=TRUE, size='\\footnotesize', warning = F}
+ggplot(df, aes(x = x, y = y)) +
+  geom_point(aes(color = is.na(x.mar), shape = is.na(x.mar)), size = 3) +
+  scale_color_manual(values = c("black", "red")) +
+  scale_shape_manual(values = c(16, 4)) +  # Normal dots (16), red crosses (4)
+    geom_abline(intercept = coef_all[1], slope = coef_all[2], color = "black") +  # Constant regression line
+  geom_abline(intercept = coef_xm[1], slope = coef_xm[2], color = "red", linetype ="dashed") +  #
+  labs(x = "x", y = "y") +
+  theme_classic() +
+  theme(legend.position = "none")
+```
+
+# Missing data
+## Simulating MAR
+```{r mar-plot, echo =FALSE, mysize=TRUE, size='\\footnotesize'}
+b <- ggplot(results %>% filter(names == "No missing" | names == "MAR"), aes(x = as.numeric(coefs), group = names, fill = names)) +  geom_density(alpha = 0.5) + scale_fill_viridis_d(option = "cividis") + theme_classic() + theme(legend.position = "none")  + labs(x = TeX("$\\hat{\\beta_1}$")) +
+        scale_x_continuous(labels = scales::number_format(accuracy = 0.5), breaks = seq(1.5, 2.5, 0.5))
+
+s <- ggplot(results %>% filter(names == "No missing" | names == "MAR"), aes(x = as.numeric(SE), group = names, fill = names)) +  geom_density(alpha = 0.5) + scale_fill_viridis_d(option = "cividis") + theme_classic() + labs(y = "", x = TeX("$\\hat{SE_{\\hat{\\beta_1}}}$"), fill = "Model") +
+        scale_x_continuous(labels = scales::number_format(accuracy = 0.1), breaks = seq(0,1,0.1))
+s2 <- s + theme(legend.position = "none")
+l <- get_legend(s)
+plot_grid(b, s2, l, nrow= 1, rel_widths = c(3,3,1))
+```
+
+# Missing data
+## Simulated MAR, $z$ omitted
+```{r mar-plot2, echo =FALSE, mysize=TRUE, size='\\tiny', warning = F, message = F, results = "hide"}
+b <- ggplot(results %>% filter(names == "No missing" | names == "MAR" | names == "MAR - Omitted"), aes(x = as.numeric(coefs), group = names, fill = names)) +  geom_density(alpha = 0.5) + scale_fill_viridis_d(option = "cividis") + theme_classic() + theme(legend.position = "none")  + labs(x = TeX("$\\hat{\\beta_1}$"))# +
+        scale_x_continuous(labels = scales::number_format(accuracy = 0.5), breaks = seq(0, 3, 1))
+
+s <- ggplot(results %>% filter(names == "No missing" | names == "MAR" | names == "MAR - Omitted"), aes(x = as.numeric(SE), group = names, fill = names)) +  geom_density(alpha = 0.5) + scale_fill_viridis_d(option = "cividis") + theme_classic() + labs(y = "", x = TeX("$\\hat{SE_{\\hat{\\beta_1}}}$"), fill = "Model") +
+        scale_x_continuous(labels = scales::number_format(accuracy = 0.25), breaks = seq(0,1,0.25))
+s2 <- s + theme(legend.position = "none")
+l <- get_legend(s)
+suppressMessages(plot_grid(b, s2, l, nrow= 1, rel_widths = c(3,3,1)))
+# TODO: Figure out how to prevent from showing message in grid when printng
+```
+
+# Missing data
+## MNAR, $p(Missing) = 0.6$ if $x > -0.5$
+```{r mnar-scatter, echo =FALSE, mysize=TRUE, size='\\footnotesize'}
+# Fit regression models
+lm_all <- lm(y ~ x, data = df)       # Regression on all data
+lm_xm <- lm(y ~ x.mc, data = df)       # Regression using xm
+
+# Extract coefficients
+coef_all <- coef(lm_all)  # Intercept and slope for all data
+coef_xm <- coef(lm_xm)    # Intercept and slope for xm
+
+# Plot
+ggplot(df, aes(x = x, y = y)) +
+  geom_point(aes(color = is.na(x.mc), shape = is.na(x.mc)), size = 3) +
+  geom_vline(xintercept = -0.5, linetype = "dotted") +
+  scale_color_manual(values = c("black", "red")) +
+  scale_shape_manual(values = c(16, 4)) +  # Normal dots (16), red crosses (4)
+  labs(x = "x", y = "y") +
+  theme_classic() +
+  theme(legend.position = "none")
+```
+
+# Missing data
+## MNAR, $p(Missing) = 0.6$ if $x > -0.5$
+```{r mnar-scatter2, echo =FALSE, mysize=TRUE, size='\\footnotesize', warning = F}
+ggplot(df, aes(x = x, y = y)) +
+  geom_point(aes(color = is.na(x.mc), shape = is.na(x.mc)), size = 3) +
+  scale_color_manual(values = c("black", "red")) +
+  scale_shape_manual(values = c(16, 4)) +  # Normal dots (16), red crosses (4)
+  geom_abline(intercept = coef_all[1], slope = coef_all[2], color = "black") +  # Constant regression line
+  geom_abline(intercept = coef_xm[1], slope = coef_xm[2], color = "red", linetype ="dashed") +  # Regression on xm
+  labs(x = "x", y = "y") +
+  theme_classic() +
+  theme(legend.position = "none")
+```
+
+# Missing data
+## Simulating MNAR
+```{r mfx-plot, echo =FALSE, mysize=TRUE, size='\\footnotesize', warning = F}
+b <- ggplot(results %>% filter(names == "No missing" | names == "MNAR"), aes(x = as.numeric(coefs), group = names, fill = names)) +  geom_density(alpha = 0.5) + scale_fill_viridis_d(option = "cividis") + theme_classic() + theme(legend.position = "none")  + labs(x = TeX("$\\hat{\\beta_1}$")) +
+        scale_x_continuous(labels = scales::number_format(accuracy = 0.5), breaks = seq(1.5, 2.5, 0.5))
+
+s <- ggplot(results %>% filter(names == "No missing" | names == "MNAR"), aes(x = as.numeric(SE), group = names, fill = names)) +  geom_density(alpha = 0.5) + scale_fill_viridis_d(option = "cividis") + theme_classic() + labs(y = "", x = TeX("$\\hat{SE_{\\hat{\\beta_1}}}$"), fill = "Model") +
+        scale_x_continuous(labels = scales::number_format(accuracy = 0.1), breaks = seq(0,1,0.1))
+s2 <- s + theme(legend.position = "none")
+l <- get_legend(s)
+plot_grid(b, s2, l, nrow= 1, rel_widths = c(3,3,1))
+```
+
+# Missing data
+## Missingness in practice
+- It is often difficult to determine why data are missing
+    - Knowledge of domain and data generation process helpful
+- MCAR is a very strong assumption. MAR is more reasonable, but it is difficult to determine whether missingness is a function of an omitted variable
+    - Including more predictors in a model helps to reduce such concerns
+- MNAR is more problematic and may limit inferential potential
+    
+# Missing data
+## Addressing missingness
+- Three approaches
+    1. Delete missing cases
+    2. \textit{Simple} imputation
+    3. \textit{Multiple} imputation
+    
+# Missing data
+## Deleting missing data
+- \textbf{Complete-case analysis / listwise deletion}
+    - Delete all rows where $y$, $x$, or $z$ are missing
+- Implications
+    - If not MCAR, results could be biased
+    - Sample size can reduce substantially
+
+# Missing data
+## Deleting missing data
+- \textbf{Available-case analysis / pairwise deletion}
+    - Make comparisons where data are available
+- In the previous example, one might use the following model to get an estimate of the effect of $z$ on $y$
+    
+    $$\hat{y} = \hat{\beta_0} + \hat{\beta_1}z_i + \hat{u_i}$$
+    
+    
+- The $x$ not entered into the equation to avoid dropping observations missing $x$.
+    - One might also estimate the model including $x$ and compare the results.
+- Implications
+    - Bias can occur if systematic differences between missing and non-missing cases.
+
+# Missing data
+## Simple imputation: Guessing the mean
+- Instead of removing data, we can try to "guess" the missing values.
+- A good guess is the mean of the observed data, \textbf{mean imputation}. 
+- Implications
+    - But this can distort the distribution and underestimate the variance.
+
+# Missing data
+## Simple imputation
+```{r guess, echo =TRUE, mysize=TRUE, size='\\footnotesize'}
+X <- rnorm(N)
+print(mean(X))
+print(sd(X))
+X.m <- ifelse(rbinom(N, 1, 1-0.2), X, NA)
+X.g <- ifelse(!is.na(X.m), X, mean(X.m[!is.na(X.m)]))
+print(mean(X.g))
+print(sd(X.g))
+```
+
+# Missing data
+## Simple imputation
+```{r guess-plot, echo =FALSE, mysize=TRUE, size='\\footnotesize'}
+d <- cbind(X, X.m, X.g)
+colnames(d) <- c("Complete", "Missing", "Mean Imp.")
+d2 <- melt(d)
+colnames(d2) <- c("ID", "X", "x")
+    
+ggplot(d2, aes(x = x, group = X, fill = X)) +  geom_density(alpha = 0.5) + scale_fill_viridis_d(option = "cividis") + theme_classic()
+```
+
+# Missing data
+## Simple imputation: Random imputation
+- We can address some of the limitations of mean imputation by using the full distribution of the observed variable. This is known as \textbf{random imputation}
+- However, the imputed values will not necessarily reflect the underlying association between variables and we do not make use of other information.
+
+# Missing data
+## Simple imputation: Random imputation
+```{r guess-random, echo =TRUE, mysize=TRUE, size='\\footnotesize'}
+missing <- is.na(X.m)
+X.g2 <- X.m
+X.g2[missing] <- sample(X.m[!is.na(X.m)], 
+                        length(X.m[missing]), 
+                        replace = TRUE)
+```
+
+
+# Missing data
+## Simple imputation: Random imputation
+```{r guess-plot2, echo =FALSE, mysize=TRUE, size='\\footnotesize'}
+d <- cbind(X, X.m, X.g2)
+colnames(d) <- c("Complete", "Missing", "Random Imp.")
+d2 <- melt(d)
+colnames(d2) <- c("ID", "X", "x")
+    
+ggplot(d2, aes(x = x, group = X, fill = X)) +  geom_density(alpha = 0.5) + scale_fill_viridis_d(option = "cividis") + theme_classic()
+```
+
+
+# Missing data
+## Simple imputation: Prediction with regression
+- We can improve our imputation model by making use of additional information in other variables.
+    - For example, we could estimate a model to predict $x$ using other covariates and then use these predictions in place of missing values
+    
+# Missing data
+## Simple imputation: Prediction with regression
+```{r impute-model, echo =TRUE, mysize=TRUE, size='\\footnotesize'}
+N <- 1000
+v <- rnorm(N)
+w <- rnorm(N)
+x <- 0.5*v + 0.5*w + rnorm(N)
+y <- x - 2*w + rnorm(N)
+
+x.m <- ifelse(rbinom(N, 1, 0.4), x, NA) # MCAR
+
+imp.model <- lm(x.m ~ v + w)
+```
+
+
+# Missing data
+## Simple imputation: Prediction with regression
+```{r impute-model2, echo =TRUE, mysize=TRUE, size='\\footnotesize'}
+preds <- predict(imp.model, 
+                 newdata = as.data.frame(cbind(v, w)))
+
+x.imp <- x.m
+for (i in 1:length(x.m)) {
+    if (is.na(x.m[i])) {
+        x.imp[i] <- preds[i]
+    }
+}
+```
+
+
+# Missing data
+## Simple imputation: Prediction with regression
+```{r impute-model-results, echo =FALSE, mysize=TRUE, size='\\footnotesize'}
+missing <- is.na(x.m)
+x.mean <- x.m
+x.mean[missing] <- mean(x.m[!is.na(x.m)])
+x.r <- x.m
+x.r[missing] <- sample(x.m[!is.na(x.m)], length(x.r[missing]), replace = TRUE)
+d1 <- as.data.frame(cbind(y,x,w))
+m1 <- lm(y ~ x + w, data = d1)
+d2 <- as.data.frame(cbind(y,x.m,w)) %>% rename(x = x.m)
+mm <- lm(y ~ x + w, data = d2)
+d3 <- as.data.frame(cbind(y,x.mean,w)) %>% rename(x = x.mean)
+m2 <- lm(y ~ x + w, data = d3)
+d4 <- as.data.frame(cbind(y,x.r,w)) %>% rename(x = x.r)
+m3 <- lm(y ~ x + w, data = d4)
+d5 <- as.data.frame(cbind(y,x.imp, w)) %>% rename(x = x.imp)
+m4 <- lm(y ~ x + w, data = d5)
+
+modelsummary(list("Complete" = m1, "Listwise" = mm, "Mean" = m2, "Random" = m3, "Predicted"=  m4),
+             star = TRUE, gof_omit = "Log|AIC|BIC|F", stars = FALSE, output = "latex", fmt = 2)
+```
+
+# Missing data
+## Simple imputation
+- Limitations
+    - Each process becomes cumbersome if we have multiple variables with missing data and observations with more than one variable missing.
+        - e.g. How do we predict $x$ if we are missing other variables?
+    - These approaches are *deterministic*, failing to take into account the uncertainty in the imputations.
+
+# Missing data
+## Multiple imputation
+- \textbf{Multiple imputation (MI)} methods address both issues:
+    - MI models use observed data to predict missing values.
+    - Multiple missing variable can be imputed simultaneously.
+    - Uncertainty associated with the imputation process can be incorporated into the estimates.
+    
+# Missing data
+```{r lall, out.width="70%",out.height="70%", fig.align="center"}
+include_graphics('../../img/lall_missing.png')
+```
+\tiny \centering Lall 2016.    
+
+
+# Missing data
+## Multiple imputation: Algorithms
+- Multiple imputation algorithms work by using existing data to predict missing values across the entire dataset
+- Generally, these algorithms use iterative procedures, predicting a subset of the missing values at a time
+- These algorithms converge when the distributions of the predicted datasets look like the distributions in the original data
+- Often these algorithms use Bayesian techniques such as MCMC sampling\footnote{\tiny See the \href{https://stats.oarc.ucla.edu/stata/seminars/mi_in_stata_pt1_new/}{mi command in Stata} for example.}
+
+# Missing data
+## Multiple imputation: MI in R
+- There are several different MI packages available in R
+- Two commonly used packages are
+    - `mice` (Multivariate Imputation via Chained Equations)
+    - `Amelia`
+        - Particularly useful for panel data
+    
+# Missing data
+## Multiple imputation: Pooling
+- MI algorithms generate $M$ imputed datasets. 
+    - In each case, we can compute an estimate, $\hat{\beta_1}_m$ and a standard error $\hat{SE}_m$.
+- The overall estimate is an average over the $M$ datasets, known as a \textbf{pooled} estimate:\footnote{\tiny See GHV p. 326 for the formula for the standard error of the pooled estimate.}
+
+
+$$\hat{\beta} = \frac{1}{M} \sum_{m=1}^M \hat{\beta_1}_m$$
+
+<!--
+- The standard error needs to account for the variance within and between imputations:
+
+$$SE_\beta = \sqrt{W + (1 +\frac{1}{M})B}$$
+
+where within variance $W = \frac{1}{M} \sum_{m=1}^M SE_m^2$ and between variance $B = \frac{1}{M-1} \sum_{m=1}^M (\hat{\beta}_m -\hat{\beta})^2$.\footnote{\tiny See GHV p. 326.}
+-->
+
+
+# Missing data
+## Multiple imputation with MICE
+```{r mice, echo =TRUE, mysize=TRUE, size='\\footnotesize'}
+library(mice)
+x <- x.m
+data <- cbind(y, v, w, x)
+
+M <- mice(data, m=10, method = "pmm",
+          seed=08901, 
+          printFlag = FALSE)
+```
+
+# Missing data
+## Multiple imputation with MICE
+```{r mice2, echo =TRUE, mysize=TRUE, size='\\footnotesize'}
+# Impute using m=1
+simple.imp <- complete(M,1)
+mi.s <- lm(y ~ x + w, data = simple.imp)
+
+# Pool over all M
+fits <- with(M, lm(y ~ x + w))
+mi.M <- pool(fits)
+```
+
+# Missing data
+## Multiple imputation with MICE
+```{r mice3, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+modelsummary(list("Complete" = m1, "Predicted"=  m4,
+                  "MI m" = mi.s, "MI M" = mi.M),
+                  gof_omit = "Log|AIC|BIC|F", stars = FALSE, output = "latex", fmt = 2)
+```
+<!-- Note: The MI algorithm fits poorly unless y is included.-->
+
+# Missing data
+## Overview
+- Data can be missing for several different reasons
+- Important to try to diagnose reason for missingness
+- Listwise deletion and simple imputation sometimes reasonable but can introduce bias, but multiple imputation preferred when several variables are missing
+- Recommended to report multiple estimates to assess sensitivity to how missingness is handled
+
+# Model checking
+## Diagnostics
+- We have already covered several different diagnostics for checking how well models fit the data
+    - Residuals and standard error of the residuals
+    - Predicted values
+    - $R^2$ and adjusted $R^2$
+    - Standard errors on coefficients and p-values
+    - F-statistic
+    
+# Model checking
+## Outliers
+- Outliers are extreme data points that deviate from the distribution of other values
+    - Scatterplots of raw data and residual can be helpful for identifying these
+- An outlier has \textbf{leverage} if the addition of the observation results in a change in the slope of the regression line
+- Such cases are considered *influential* if they result in substantial changes to the regression results
+    - e.g. Differences in statistical sigificance, sign, magnitude
+    
+# Model checking
+## Outliers: Cook's D
+- \textbf{Cook's D}istance measures the influence of each point on the predictions.
+- A value about 1 suggests an observation has high influence.
+
+$$D_i = \frac{ \sum_{j=1}^n (\hat y_j\ - \hat y_{j(-i)})^2 }{k \ \mathrm{MSE}},$$
+where $\hat y_{j(-i)}$ is the predicted value for the $j^{th}$ observation when observation $i$ is removed, $k$ is the number of parameters, and $\mathrm{MSE}$ is the mean squared error.
+
+# Model checking
+## Outliers
+```{r outlier1, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+N <- 100
+X <- rnorm(N)
+Y <- 0.5*X + rnorm(N)
+```
+
+
+# Model checking
+## Outliers
+```{r outlier2, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+d <- as.data.frame(cbind(X,Y))
+ggplot(data = d, aes(x=X, y=Y)) + geom_point() + geom_smooth(method = "lm", se = F) + theme_classic()
+```
+
+# Model checking
+## Outliers
+```{r outlier2-cd, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+d <- as.data.frame(cbind(X,Y))
+cooksd <- cooks.distance(lm(Y ~ X, data=d))
+hist(cooksd, main = "Distribution of Cook's D", xlab = "Cook's D")
+```
+
+# Model checking
+## Outliers: Outlier with low leverage
+```{r outlier3, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+X[N+1] <- 5
+Y[N+1] <- 0.5*X[N+1]
+d <- as.data.frame(cbind(X,Y))
+
+ggplot(data = d, aes(x=X, y=Y)) + geom_point(color = dplyr::case_when(X >=4 ~ "red", X < 4 ~ "black")) + geom_smooth(method = "lm", se = F) + theme_classic()
+```
+# Model checking
+## Outliers
+```{r outlier3-cd, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+d <- as.data.frame(cbind(X,Y))
+cooksd <- cooks.distance(lm(Y ~ X, data=d))
+hist(cooksd, main = "Distribution of Cook's D", xlab = "Cook's D")
+```
+
+# Model checking
+## Outliers: Outlier with high leverage
+```{r outlier4, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+X[N+1] <- 5
+Y[N+1] <- -3
+data <- as.data.frame(cbind(X,Y))
+
+ggplot(data = data, aes(x=X, y=Y)) + geom_point(color = dplyr::case_when(X >=5 ~ "red", X < 5 ~ "black")) + geom_smooth(method = "lm", se = F) + theme_classic()
+```
+
+# Model checking
+## Outliers
+```{r outlier4-cd, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+d <- as.data.frame(cbind(X,Y))
+cooksd <- cooks.distance(lm(Y ~ X, data=d))
+hist(cooksd, main = "Distribution of Cook's D", xlab = "Cook's D")
+```
+
+
+# Model checking
+## Outliers
+- Sometimes outliers may be due to data coding or quality issues, but they are often valid observations
+- Summary statistics and plots can help identify outliers
+- It is defensible to drop outlier cases, but this should be clearly reported in the manuscript
+    - Recommended to also conduct sensitivity checks to see how results change
+    
+# Model checking
+## Multicollinearity
+- Recall that multicollinearity occurs when predictors are highly correlated and results in increased variance.
+- High pairwise correlations might indicate *potential* collinearity, but the issue can only be diagnosed after controlling for all relevant predictors.
+
+# Model checking
+## Multicollinearity: VIF
+- The \textbf{Variance Inflation Factor (VIF)} can be used to diagnose highly collinear predictors.
+- Consider the population model $y = \beta_0 + \beta_ix_i + \beta_jx_j + ... + \beta_kx_k + u$
+- A score is calculated for each *independent variable* using the following approach:
+    - For $x_i$ in $x_{i=1},...,x_k$, regress $x_i = \alpha_0 + \alpha_1x_{j} + ... + \alpha_2x_{k} + u$
+    - Use $R^2$ from the model to calculate $VIF(\hat{\beta_i}) = \frac{1}{1 - R^2_i}$
+- VIF scores greater than $\approx 5-10$ indicate that a predict is highly collinear with one or more of the other predictors.
+
+
+# Model checking
+## Multicollinearity: VIF
+```{r vif, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+N <- 1000
+x <- rnorm(N)
+x2 <- rnorm(N)
+x3 <- 3*x + rnorm(N)
+y <- x + 2*x2 + 0.5*x3 + rnorm(N)
+m <- lm(y ~ x + x2 + x3)
+
+library(car)
+vif(m) %>% round(2)
+```
+
+# Model checking
+## Prediction and explanation
+- In sociology, we typically estimate explanatory models where the primary goal is to estimate one or more $\hat{\beta}$'s and prediction is typically used to explore relationships between variables.
+- Predictive modeling focuses on \textbf{generalization error}, or how well a model predicts new data.
+- This can be a useful heuristic for comparing and selecting different models, particularly when we do not have strong theory to guide model specification.\footnote{\tiny See Watts, Duncan J. 2014. “Common Sense and Sociological Explanations.” American Journal of Sociology 120 (2): 313–51. https://doi.org/10.1086/678271 for further elaboration of this idea and Mullainathan, Sendhil, and Jann Spiess. 2017. “Machine Learning: An Applied Econometric Approach.” Journal of Economic Perspectives 31 (2): 87–106. https://doi.org/10.1257/jep.31.2.87 for some discussion of the limitations of predictive modeling.
+}
+
+# Model checking
+## Underfitting
+- A model is \textbf{underfit} if it does not sufficiently explain the variance in the outcome.
+- Consider the following population model:
+
+$$y = \beta_0 + \beta_1x + \beta_2x^2 + u$$
+
+- The following model underfits because it does not account for the quadratic relationship:
+
+$$\hat{y} = \hat{\beta_0} + \hat{\beta_1}x + u$$
+
+- In short, we fail to observe the *signal* in the data.
+
+# Model checking
+## Overfitting
+- A model is \textbf{overfit} if it also explains *noise* in addition to the signal in the data.
+- Using the previous population, consider we estimate the following model:
+
+$$\hat{y} = \hat{\beta_0} + \hat{\beta_1}x + \hat{\beta_2}x^2  + \hat{\beta_3}z + \hat{\beta_4}z^2  + u$$
+
+- The additional parameters $\hat{\beta_3}$ and $\hat{\beta_4}$ do not correspond to any of the population parameters, but may still explain some of the random variance in the outcome.
+
+# Model checking
+## Underfitting, overfitting, and generalization error
+- Models suffering from under and overfitting will fail to generalize.
+    - Underfit models do not sufficiently explain variation in the outcome in the sample or population.
+    - Overfit models explain patterns in the sample that do not generalize to the population.
+
+# Model checking
+## Cross-validation
+- \textbf{Cross-validation} is an approach used in machine-learning to assess the extent to which a predictive model can generalize to unseen data.
+- The technique allows us to measure generalization error:
+    1. Estimate an model using a sample $X$.
+    2. Use the fitted model to predict the outcome for a new dataset $X'$.
+    3. Compare the predictive accuracy (e.g. mean squared error) across the two datasets:
+        - Model generalizes well if $MSE(\hat{y}=f(X)) \approx MSE(\hat{y}=f(X'))$ and both are low
+        - Model overfits if $MSE(\hat{y}=f(X)) << MSE(\hat{y}=f(X'))$
+        - Model underfit if both MSE scores are high
+
+# Model checking
+## Cross-validation
+- Different kinds of cross-validation procedures are often used to evaluate generalization error:
+    - \textbf{k-fold cross-validation}: data are split into $k$ subsets. Models are estimated using $k-1$ subsets and predictions made for held-out set. Prediction error is averaged over $k$ held-out sets.
+    - \textbf{Leave-one-out cross-validation}: same procedure where each subset is a single datapoint. Requires estimation of $N$ models.
+    
+# Model checking
+## Cross-validation: `loo`
+- The `rstanarm` package includes a function `loo`, which computes an approximation of leave-one-out cross-validation, avoiding the need to fit N models.
+- Models can be compared using the *expected log pointwise predictive density* (ELPD), a quantity that captures the predictive accuracy of the model (McElreath 7.2-4, GHV 11.8). 
+- The function can also be used to compute a k-fold CV score and information theoretic measures of model fit.\footnote{\tiny See the \href{http://mc-stan.org/rstanarm/reference/loo.stanreg.html}{documentation} and \href{https://mc-stan.org/rstanarm/articles/rstanarm.html}{vignette} for further details on implementation.}
+
+    
+# Model checking
+## Cross-validation: LOO-CV
+```{r loo, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+x <- rnorm(N)
+z <- rnorm(N)
+y <- 0.1*x + 2*(x^2) + rnorm(N)
+df <- as.data.frame(y,x,z)
+
+m <- stan_glm(y ~ x + I(x^2),  data = df, 
+                family = "gaussian", chains =1 , refresh = 0)
+m.u <- stan_glm(y ~ x,  data = df, 
+                family = "gaussian", chains =1 , refresh = 0)
+m.o <- stan_glm(y ~ x + I(x^2) + z + I(z^2),  data = df, 
+                family = "gaussian", chains =1 , refresh = 0)
+```
+
+
+# Model checking
+## Cross-validation: LOO-CV
+<!--TODO: Discuss ElPD-->
+The `loo` function provides an approximation of the LOO-CV for an estimated model
+```{r loo3, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+print(loo(m))
+```
+
+# Model checking
+## Cross-validation: LOO-CV
+Individual points are scored using Pareto-Smoothed Importance Sampling (PSIS). High *pareto k* values ($k > .7$) indicate observations with high leverage.
+```{r loo4, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
+plot(loo(m.u))
+```
+
+# Model checking
+## Cross-validation: LOO-CV
+- `loo_compare` can be used to compare different models. The results rank the models from best to worst.
+```{r loo5, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+loo_compare(loo(m), loo(m.u), loo(m.o))
+```
+
+
+# Model checking
+## Posterior predictive checks
+- We can also evaluate Bayesian models by examining the posterior predictive distribution.
+- Recall that Bayesian models are *generative*:
+    - We can use the posterior distribution to make predictions, creating new, hypothetical datasets.
+- These predictions can be used to evaluate how well the models fit the data, including key statistics.
+
+# Model checking
+## Posterior predictive checks
+```{r ppc, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+pp_check(m) + theme_classic()
+```
+
+# Model checking
+## Posterior predictive checks
+```{r ppc2, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+pp_check(m, plotfun = "stat_2d", stat = c("mean", "sd")) + theme_classic()
+```
+
+# Model checking
+## Posterior predictive checks
+```{r ppc3, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+pp_check(m.u) + theme_classic()
+```
+
+# Model checking
+## Posterior predictive checks
+```{r ppc4, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
+pp_check(m.u, plotfun = "stat_2d", stat = c("mean", "sd")) + theme_classic()
+```
+
+# Model checking
+## Additional Bayesian diagnostics
+- There are several other diagnostics specific to Bayesian inference and help to determine whether the MCMC algorithms have worked.\footnote{\tiny See the \href{https://mc-stan.org/misc/warnings}{Stan documentation} for discussion of these issues and how to address them.}
+    - \textbf{R-hat values} indicate whether a model has converged. 
+        - Values should be 1.01 or less.
+    - \textbf{Divergent transitions} indicate problems with the MCMC estimation and model specification.
+        - The sampler is making large "jumps" rather than smoothly exploring the posterior distribution. You will receive a warning in the output.
+    - \textbf{Trace plots} are useful for assessing MCMC chains.
+        - Ideally, chains should be moving randomly, without strong autocorrelation.
+
+# Model robustness
+## Defining robustness
+- \textbf{Model robustness} refers to how *robust* the results of a given model are to alternative specifications.
+    - The concern is that a result (such as $p < 0.05$) is sensitive to a particular, arbitrary specification.
+- We typically try to mitigate such concerns by estimating several specifications of a model.
+
+# Model robustness
+## How robust are our results?
+- Recent work calls for greater attention to specification issues as a way to address robustness concerns (Young and Holsteen 2017, Muñoz and Young 2018).
+    - Critique: Reporting a handful of ad hoc specifications is insufficient to ensure robustness.
+    - Solution: Estimate models with *every possible combination of independent variables* and assess the distribution of coefficients.
+    - The goal is to explore the entire *model space* and to construct a distribution of estimates.
+    
+# Model robustness
+## How robust are our results?
+```{r hy, out.width="70%",out.height="70%", fig.align="center"}
+include_graphics('../../img/young_holsteen.png')
+```
+\tiny \centering Young and Holsteen 2017.
+
+# Model robustness
+## How robust are our results?
+```{r my, out.width="70%",out.height="70%", fig.align="center"}
+include_graphics('../../img/young_munoz.png')
+```
+\tiny \centering Muñoz and Young 2018.
+    
+# Model robustness
+## Bayesian Model Averaging
+- Bayesian statisticians have proposed a similar idea known as \textbf{Bayesian Model Averaging (BMA)}
+    - Estimate several models and construct an average across the models, weighted by the model fit, i.e. higher weights to better models.
+- There has been some debate about whether this approach is preferable to the Young-Holsteen-Muñoz technique.
+    - Proponents of BMA contend that we should not weight all models equally, some are better than others.
+    - Young and colleagues argue that it is problematic to weight different models if we do not know which is better a priori and that weighting requires more assumptions.\footnote{\tiny See Slez' 2017 comment on Young and Holsteen and the rejoinder by the latter and Bruce Western's 2018 \href{https://doi.org/10.1177/0081175018799095}{comment} on Muñoz and Young}
+
+# Model robustness 
+## Multiverse analysis
+
+
+"We suggest that instead of performing only one analysis, researchers could perform a multiverse analysis, which involves performing all analyses across the whole set of alternatively processed data sets corresponding to a large set of *reasonable scenarios* ... A multiverse analysis offers an idea of how much the conclusions change because of *arbitrary choices* in data construction and gives pointers as to which choices are most consequential in the fragility of the result."\footnote{Steegen et al. 2016}
+
+# Model robustness 
+## Multiverse analysis
+- There are often multiple ways we can transform variables in our analysis, e.g.
+    - Collapsing or binarizing categorical data
+    - Log transforming linear data
+- We also make other decisions like what to do with missing data
+- We typically make *reasonable* but *arbitrary* choices
+- Solution:
+    - Run a multiverse analysis where we consider all combinations of these choices
+
+# Model robustness 
+## Multiverse analysis
+```{r st1, out.width="70%",out.height="70%", fig.align="center"}
+include_graphics('../../img/steegen_weak.png')
+```
+\tiny \centering Steegen et al 2016.
+
+# Model robustness 
+## Multiverse analysis
+```{r st2, out.width="70%",out.height="70%", fig.align="center"}
+include_graphics('../../img/steegen_robust.png')
+```
+\tiny \centering Steegen et al 2016.
+
+# Model robustness 
+## Multiverse analysis
+```{r st3, out.width="70%",out.height="70%", fig.align="center"}
+include_graphics('../../img/steegen_combinations.png')
+```
+\tiny \centering Steegen et al 2016.
+
+# Model robustness 
+## Multiverse analysis
+```{r pe1, out.width="70%",out.height="70%", fig.align="center"}
+include_graphics('../../img/multiverse_mobility_1.png')
+```
+\tiny \centering Engzell, Per, and Carina Mood. 2023. “Understanding Patterns and Trends in Income Mobility through Multiverse Analysis.” *American Sociological Review* 88 (4): 600–626.
+
+# Model robustness 
+## Multiverse analysis
+```{r pe2, out.width="70%",out.height="70%", fig.align="center"}
+include_graphics('../../img/multiverse_mobility_2.png')
+```
+\tiny \centering Engzell, Per, and Carina Mood. 2023. “Understanding Patterns and Trends in Income Mobility through Multiverse Analysis.” *American Sociological Review* 88 (4): 600–626.
+
+
+# Model robustness 
+## Multiverse analysis
+"We demonstrated how this tool can be used not only to gauge robustness, but also—with an abductive logic of inference to shift our theoretical understanding of the phenomenon studied. Selecting a given specification to test a prediction such as "mobility is declining," we would have been likely to confirm it. *By contrast, examining the full model space we can begin to address questions not only of if but why.* In our case, the striking conclusion is that rising gender equality, not inequality, is the main driver of declining income mobility in Sweden today." \tiny - Engzell and Mood 2023, p.618
+
+
+# Conclusions
+- Missing data
+    - Carefully examine any patterns of missing data
+    - Choose an appropriate strategy to address the problem
+- Model checking
+    - Use diagnostic checks to identify and address potential issues with models including outliers, multicollinearity, and fit issues
+- Model robustness
+    - Estimate multiple specifications to ensure results are robust
+    - Robustness simulations, BMA, and multiverse analyses provide systematic approaches to evaluate robustness and learn more from data
+
+# Next week
+- Spring break!
+- After spring break
+    - Generalized linear models
+    
+# Lab
+- Missing data, imputation, and model checking
