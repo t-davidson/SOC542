@@ -339,10 +339,7 @@ Just like with log likelihood, we want to maximize McFadden's pseudo-$R^2$.
 Let's finish by replicating two of our previous analyses using `stan_glm()`. The first is the linear probability model and the second is the logistic model. You'll note that they display the exact same except for the line that tell `rstanarm` what "family" of distributions to pull from. The "identity" family tells it not to conduct any transformation, while the "logit" family tells it to perform the logit transformation on the dependent variable. 
 
 ```{r bayes}
-bmodlinpro <- stan_glm(legal_grass ~ conservatism + age + educ + race4 + sex,
-                       data = gss, weights = weight,
-                       family = gaussian(link = "identity"),
-                       seed = seed, chains = 1, refresh = 0)
+
 bmodlogit <- stan_glm(legal_grass ~ conservatism + age + educ + race4 + sex,
                       data = gss, weights = weight,
                       family = binomial(link = "logit"),
@@ -352,10 +349,10 @@ bmodlogit <- stan_glm(legal_grass ~ conservatism + age + educ + race4 + sex,
 Now, let's build a table with all six models together. 
 ```{r comp-table}
 lastmods <- list("LPM via OLS" = linprob1,
-                 "LPM via Bayes GLM" = bmodlinpro,
                  "Base Logit" = logit_base,
                  "Full Logit" = logit_full,
                  "Bayes Logit" = bmodlogit)
+
 coefnames <- c("conservatism" = "Conservatism \n(7 pt scale)", # The "\n" will come in handy in a second
                "age" = "Age (Yrs)",
                "educ" = "Education (Yrs)",
