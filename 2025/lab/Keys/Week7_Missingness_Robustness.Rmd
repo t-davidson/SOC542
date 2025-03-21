@@ -14,12 +14,14 @@ options(scipen = 999)
 
 library(tidyverse)
 library(haven)
+library(mice)
 
 library(modelsummary)
 library(broom.mixed)
   options(modelsummary_get = "broom") 
 
 set.seed(1234) # Optional, for reproducibility
+seed <- 1234
 ```
 
 # Data Loading and Management
@@ -31,7 +33,7 @@ gss2022 <- read_dta("../DATASETS/GSS/GSS2022.dta")
 gss <- gss2022 %>% 
   select(conrinc, unemp,                 # DV: Inflation-adjusted personal income 
          hrs1, wrkslf, prestg10, degree,  
-         # IVs: career variables (number of hours worked last week, r self-emp or works for somebody,
+         # IVs: career variables (number of hours worked last week, self-emp or works for somebody,
          # r's occupational prestige score, r's highest degree )
          sex, race, hispanic, age, educ, partyid, # IVs: some demographic information
          region, # a level-2 variable for multi-level modeling 
@@ -273,7 +275,12 @@ If you're curious, more detail on the steps that make these equations chained ca
 Below, we use the `mice` command to create five new, imputed datasets. (If we only wanted one dataset, a la normal regression imputation, we set `m = 1`.) The `maxit` option tells it how many iterations it should do before giving up. The default is 5. 
 
 ```{r mice1}
-imp <- mice(gss, m = 5, maxit = 2, seed = seed)
+install.packages("mice")
+
+library(mice)
+seed <- 1234
+
+imp <- mice(gss, m = 5, maxit = 5, seed = seed)
 ```
 
 The output tells us which variables were imputed and that there are several "logged events." There are several reasons this can occur. The biggest ones are due to collinearity. Let's take a look and see.
@@ -287,7 +294,7 @@ The column `meth` tells us that collinearity is to blame for our problem variabl
 ```{r mice2}
 newimp <- gss %>% 
   select(-wrkslf, -workexp, -income, -imp_loginc, -imp_income, -sex) %>% 
-  mice(., m= 5, maxit = 2,
+  mice(., m= 5, maxit = 5,
        seed = seed, printFlag=F)
 newimp$loggedEvents
 
@@ -351,7 +358,7 @@ mod6 <- lm(imp_loginc ~ prestige + self_employed + race + female,
 lastmods <- list("Avail. Case" = mod3,
                  "Comp. Case" = mod2,
                  "Mean Imp" = mod6,
-                 "Reg Imp (M=5)" = impmod_pool,)
+                 "Reg Imp (M=5)" = impmod_pool)
 
 modelsummary(lastmods, stars = T,
              title = "Comparison of Methods of Handling Missing Data",
@@ -463,9 +470,13 @@ Predictive performance can be calculated using cross-validation. These approache
 One form of cross validation is Leave-One-Out, where we leave out one data point and see how good the model does. **NOTE**: While this can be done on OLS models, the `rstanarm::loo()` function only works on `stan_glm` objects (not `lm`). Because of this, let's create two Bayesian models and see how they do. (Also, you sadly can't use data weights with `loo()`, so we'll create unweighted models.)
 
 ```{r bayesmod-create}
+library(tidybayes)
+library(rstanarm)
+
 bayes_mod1 <- stan_glm(logincome ~ prestige + self_employed + race + female,
                        data = gss_comp,  seed = seed,
                        chains = 1, refresh = 0)
+
 bayes_mod2 <- stan_glm(logincome ~ prestige + self_employed + race + female * (workexp + workexp^2),
                        data = gss_comp,  seed = seed,
                        chains = 1, refresh = 0)
