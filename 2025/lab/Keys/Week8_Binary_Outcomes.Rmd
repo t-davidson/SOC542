@@ -1,0 +1,406 @@
+---
+title: "Week 8 -  Regression with Binary Outcomes"
+author: "Brent Hoagland, Lab TA"
+date: "3/24/2025"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen = 10)
+
+library(tidyverse)
+library(rstanarm)
+library(modelsummary)
+library(broom.mixed)
+options(modelsummary_get = "broom") 
+library(flextable)
+library(naniar)
+
+seed <- 1234
+```
+
+# Data Loading and Management
+
+Let's use the GSS again. This week, we'll be investigating factors associated with whether a person supports marijuana legalization. 
+
+```{r gss-loading}
+# You may need to write the code or change your working directory to properly load the GSS2022.dta file and assign it to the object gss2022
+gss2022 <- read_dta("../DATASETS/GSS/GSS2022.dta")
+
+gss2022$ballot
+
+gss <- gss2022 %>% 
+  select(grassnv,                           # Target: Whether marijuana should be legal (1 = yes, 2 = no)  
+                                          # https://gssdataexplorer.norc.org/variables/285/vshow
+         polviews,                        # Political Vars 
+         sex, race, hispanic, age, educ,  # Other Demos
+         wtssnrps, ballot                    # Weight & Ballot
+         ) %>% 
+  haven::zap_labels() %>% 
+  mutate( 
+    
+    legal_grass = case_when(
+      grassnv == 1 ~ 1,
+      grassnv == 2 ~ 0
+    ),
+    conservatism = polviews, # Rennaming to be more descriptive 
+
+    age = case_when(
+      age > 88 ~ NaN,
+      TRUE ~ age
+      ),
+    sex = factor(sex, levels = c(1,2),
+                 labels = c("Male", "Female")
+                 ),
+    race = case_when(
+      hispanic != 1 ~ "Hispanic",
+      race == 1 & hispanic == 1 ~ "White",
+      race == 2 & hispanic == 1 ~ "Black",
+      race == 3 & hispanic == 1 ~ "Other",
+      ),
+    race4 = factor(race, levels = c("White", "Black", "Hispanic", "Other")),
+    weight =  wtssnrps 
+    )  %>%   
+  filter(ballot != 1) %>% 
+  select(-wtssnrps , -hispanic, -race, -polviews, -grassnv, -ballot)
+
+
+```
+
+Let's take a look at our two new variables. 1) `legal_grass`, which asks whether marijuana should be legalized; 2) `conservatism`, which is a 1 to 7 scale of ideology, with 1 as extremely liberal and 7 as extremely conservative. Let's double check the coding below. 
+
+## Missingness Analysis
+
+```{r miss-upset}
+gg_miss_upset(gss)
+```
+While we can (and probably should) do any of the methods from last time to impute missing values, we're just going to use listwise deletion to keep it simple. 
+
+```{r}
+gss <- gss %>% drop_na()
+```
+
+
+## Descriptives
+As always, let's look at our descriptive statistics. 
+
+```{r desc-tables}
+datasummary_skim(gss, type = "numeric",
+                 title = "Sample Descriptive Statistics: Continuous Variables",
+                 notes = "Data: 2022 General Social Survey")
+
+datasummary_skim(gss, type = "categorical",
+                 title = "Sample Descriptive Statistics: Categorical Variables",
+                 notes = "Data: 2022 General Social Survey")
+
+```
+
+We can also create a "balance table" to compares demographics on each side of the issue.
+
+The format is `datasummary_balance(~VAR, data = DATA, ... )`, where `VAR` is the variable we want to analyze the sample by. Note the function only provides differences and standard errors of those differences for continuous variables and only when we split by two groups.  
+
+```{r baltable}
+datasummary_balance(~legal_grass, data = gss,
+                    title = "Balance Table: Demographics by Views on Marijuana Legalization",
+                    notes = "Data: 2022 General Social Survey (Unweighted)")
+```
+
+Looking at the column "Diff. in Means," we can see that people who favor marijuana legalization tend to be younger by about 8 years, are more liberal by close to one step, and have about one-half more years of education. We also see that people who support legalization are more likely to be Democrats and male. 
+
+\newpage 
+
+# Linear Probability Model
+
+Let's start off by creating a linear probability model for the likelihood somebody favors marijuana legalization. 
+
+```{r lin-prob}
+linprob1 <- lm(legal_grass ~ conservatism + age + educ + race4 + sex,
+               data = gss, weights = weight)
+modelsummary(linprob1, estimate = "{estimate} ({std.error})", 
+             statistic = NULL, 
+             gof_omit = "F|RMSE|Log|IC",
+             output = "huxtable")
+```
+
+
+## Interpretation
+
+We can interpret this model as the effect of various factors on the probability a person is in favor of legalizing marijuana. So each additional step of conservatism decreases this probability by .098 and each additional year of age decreases it by .005. 
+
+This is why it is called a "linear probability model:" we're modeling the probabilities using linear regression. 
+
+They're great at certain things, but the biggest downside is that a person could have a predicted probability that is less than zero or greater than one. 
+
+Below, I create a new dataset for values of conservatism (ranging from 1 to 7) and age (ranging from 18 to 88 by 10's). The function `tidyr::expand_grid()` creates a "grid" of all possible combinations of these variables. I also set `educ` to its mean, `race4` to Black, and `sex` to Male. 
+
+I then use the `predict()` function to predict values `legal_grass` for each of these combinations. In essence, this is calculating the predicted value for legal_grass for a Black Male with mean education, as age and levels of conservatism vary. 
+
+Using the `range()` function, we can see that our predicted values range from .27 to 1.22. 
+
+```{r lin-pred}
+linpreddata <- expand_grid(conservatism = seq(1, 7),
+                           age = seq(18, 88, 10),
+                           educ = mean(gss$educ),
+                           race4 = "Black",
+                           sex = "Male")
+
+linpreddata$pred_grass <- predict(linprob1, newdata = linpreddata, type = "response")
+
+head(linpreddata)
+range(linpreddata$pred_grass)
+```
+
+We can also plot our predicted values with a heatmap to see how they change across age and political ideology. 
+
+```{r lin-pred-graph}
+ggplot(linpreddata, aes(x = conservatism, y = age, fill = pred_grass)) +
+  geom_tile() + scale_fill_viridis_c() +  theme_minimal() +
+  geom_text(aes(label = round(pred_grass, 2)), 
+            color = "white", size = 4) +
+  scale_x_continuous(breaks = seq(0,8,1)) +
+  scale_y_continuous(breaks = seq(18,88,10)) +
+  labs(title = "Linear Probability Model",
+       y = "Age", x = "Conservativsm", fill = "Probability",
+       subtitle = "Predicted Probability of Favoring Marijuana Legalization for Black Males with Average Education")
+```
+
+# Logistic regression
+
+Now, let's estimate an alternative model using logistic regression. (This is also called a "logit" model.) 
+
+The set up is very similar to how we create a linear regression model. There are two key differences: 
+1. We use the `glm()` function instead of `lm()`.
+2. We include the argument `family = "binomial"` to specify the link function.
+
+Let's go ahead and run three models. First, let's recreate our previous linear probability model, but this time using `glm()` and `family = gaussian(link = "identity")`. Second, let's run a logistic regression model using `glm()` and `family = "binomial"`. And lastly, we'll add a model "`logit_base`" that uses only conservatism as a predictor. 
+
+
+```{r logit-mod}
+lin_glm1 <- glm(legal_grass ~ conservatism + age + educ + race4 + sex,
+                family = gaussian(link = "identity"),
+                data = gss)
+
+logit_full <- glm(legal_grass ~ conservatism + age + educ + race4 + sex,
+                  family = "binomial",
+                  data = gss)
+
+logit_base <- glm(legal_grass ~ conservatism,
+                  family = "binomial", data = gss)
+
+compmods <- list("LPM via OLS" = linprob1,
+                 "LPM via GLM" = lin_glm1,
+                 "Base Logit" = logit_base,
+                 "Full Logit" = logit_full)
+modelsummary(compmods,
+             estimate = "{estimate} ({std.error})",
+             statistic = NULL, gof_omit = "F|RMSE",
+             output = "huxtable")
+```
+
+One of the first things we notice is that the standard errors of the coefficients have exploded in size in the logit model and the coefficients are very different.
+
+You'll also notice that we get different model diagnostics when we use `lm()` and `glm()`. We don't get an $R^2$ for the GLM's. But we also see a significant shrinkage in the model AIC and BIC when using the GLM. 
+
+Let's plot the coefficients and standard errors to see how they compare. 
+
+```{r mod-comp-graph}
+modelplot(compmods, coef_omit = 'Interc') +
+  geom_vline(aes(xintercept = 0), 
+             linetype = "dotted", linewidth = 1, alpha = .5) +
+  theme(legend.position = "bottom")
+```
+
+We see here just how big the confidence intervals are in our logit model. We also see that the linear probability model coefficient estimates are typically covered by the logit model's confidence intervals. Interestingly, we also see big differences in the coefficients for conservatism. 
+
+This plot highlights the differences between the models, but it is critical to note that these coefficients have different interpretations, so should not be directly compared on the same scale. 
+
+## Interpretation
+
+Let's reproduce the output for just the full logit model so we can interpret it.
+
+```{r logit-table}
+modelsummary(logit_full, estimate = "{estimate} ({std.error}) {stars}",
+             statistic = NULL, gof_omit = "F|RMSE|IC|Log",
+             output = "huxtable")
+```
+
+
+When interpreting our "full" logit model, we're working with log odds. So we say that a person moving one step more conservative decreases the log odds of them favoring marijuana legalization by 0.635 and each additional year of age decreases them by 0.027.
+
+We can also interpret the categorical variables in a similar way. Being Black does not significantly affect the log odds of opinions on marijuana legalization, but being Hispanic is associated with significantly lower log odds of favoring legalization. 
+
+## Predict
+
+Just like we did earlier with the linear probability model, we can predict a person's likelihood of supporting legalization. 
+
+```{r log-pred}
+logitpreddata <- expand_grid(conservatism = seq(1, 7),
+                             age = seq(18, 88, 10),
+                             educ = mean(gss$educ),
+                             race4 = "Black",
+                             sex = "Male")
+
+logitpreddata$pred_grass <- predict(logit_full, newdata = logitpreddata, type = "response")
+
+head(logitpreddata)
+```
+
+For one, we can see our predicted values are all between zero and one. 
+
+```{r log-pred-range}
+range(logitpreddata$pred_grass)
+```
+
+
+We can also plot our predicted values with a heatmap. 
+
+```{r log-pred-graph}
+ggplot(logitpreddata, aes(x = conservatism, y = age, fill = pred_grass)) +
+  geom_tile() + scale_fill_viridis_c() +  theme_minimal() +
+  geom_text(aes(label = round(pred_grass, 2)), 
+            color = "white", size = 4) +
+  scale_x_continuous(breaks = seq(0,8,1)) +
+  scale_y_continuous(breaks = seq(18,88,10)) +
+  labs(title = "Logit Model",
+        y = "Age", x = "Conservativsm", fill = "Probability",
+       subtitle = "Predicted Probability of Favoring Marijuana Legalization for Black Males with Average Education")
+```
+# Odds Ratios
+
+Log odds are not ease to interpret (but I do find them useful for looking at direction of the relationship), so another way of presenting your output is with odds ratios.
+
+Getting the exponentiated coefficients is easy. Just use `exp()` on the coefficients of your model. Below, I compare the log odds and the odds ratios of our logit model. 
+
+```{r odds-ratio}
+cbind(LogOdds=round(coef(logit_full),3),
+      OddsRatio=round(exp(coef(logit_full)),3)) 
+```
+
+So here, we would say that being Hispanic decreases the odds of favoring marijuana legalization. 
+
+$$ \frac{Hispanic}{White}=\frac{.391}{1}$$
+
+To find the percent difference from the odds ratio, we take the difference from one: $ .391-1=-.609 $, so we would say that being Hispanic decreases the odds of favoring legalization by around 60.9%. 
+
+For continuous variables, such as education, we say that each additional year of education decreases the odds of favoring marijuana legalization by 8.2%: $1-0.918=.082$. 
+
+**If the OR is greater than 1, it is an increase in the odds. If it is less than 1, it is a decrease.**
+
+Because of this easy(ish) interpretation, odds ratios are more common to present. On the other hand, I know others prefer log odds because the simple positive-negative heuristic works for them. (0.25 and -0.25 are the same distance from zero, which is easier to understand than 0.25 and 4 being the same distance from 1. )
+
+While exponentiating the coefficients is easy, getting standard errors is a little more difficult. 
+
+Fortunately, `modelsummary` makes it easy: just include `exponentiate = T` to get odds ratis and associated standard errors.
+
+```{r OR-table}
+modelsummary(logit_full, exponentiate = T,
+             estimate = "{estimate} ({std.error}) {stars}",
+             statistic = NULL, gof_omit = "F|RMSE|IC|Log")
+```
+
+
+If you want to include both the log odds and odds ratios, just include the same model twice and then set `exponentiate = c(T,F)` or `c(F,T)` in your function. 
+
+```{r OR-logodds-table}
+modelsummary(list("Log Odds" = logit_full, "Odds Ratio" = logit_full),
+             exponentiate = c(F,T),
+             estimate = "{estimate} ({std.error}) {stars}",
+             statistic = NULL, gof_omit = "F|RMSE|Log")
+```
+
+# Model Evaluation 
+
+## Log Likelihood
+
+Just like before, we can use the log-likelihood for the model. 
+
+```{r loglike}
+logLik(logit_full) 
+logLik(logit_base) 
+logLik(lin_glm1)
+```
+
+In the models above, we see that the base logit model, which only included conservatism as a predictor for legalization, had the lowest log-likelihood, showing it was worst-performing of the three. The full logit model, with all predictors included, performed best. 
+
+## Pseudo R-Squared
+
+The most standard method of model evaluation is the $R^2$. However, we cannot calculate it in logistic regression. Instead, we can approximate it with a "pseudo" $R^2$. A common way of doing this is McFadden's $R^2$, calculated as: 
+
+$$R^2_{McFadden} = \frac{1 - LL_{mod}}{ LL_0}$$
+Where $LL_{mod}$ is the log-likelihood for the model, and $LL_0$ is the Log Likelihood for the "null model" which only includes the intercept as the predictor.
+
+We can calculate it using the `DescTools` package. (**Note** that I use `package::function()` form below, since `DescTools` overwrites some important functions in `modelsummary`.) We can also ask it to give us the log-likelihood. 
+
+```{r}
+DescTools::PseudoR2(logit_full, which = c("McFadden","McFaddenAdj", "logLik"))
+DescTools::PseudoR2(logit_base, which = c("McFadden","McFaddenAdj", "logLik"))
+DescTools::PseudoR2(lin_glm1, which = c("McFadden","McFaddenAdj", "logLik")) 
+```
+
+Just like with log likelihood, we want to maximize McFadden's pseudo-$R^2$. 
+
+# Bayesian Modeling 
+Let's finish by replicating two of our previous analyses using `stan_glm()`. The first is the linear probability model and the second is the logistic model. You'll note that they display the exact same except for the line that tell `rstanarm` what "family" of distributions to pull from. The "identity" family tells it not to conduct any transformation, while the "logit" family tells it to perform the logit transformation on the dependent variable. 
+
+```{r bayes}
+bmodlinpro <- stan_glm(legal_grass ~ conservatism + age + educ + race4 + sex,
+                       data = gss, weights = weight,
+                       family = gaussian(link = "identity"),
+                       seed = seed, chains = 1, refresh = 0)
+bmodlogit <- stan_glm(legal_grass ~ conservatism + age + educ + race4 + sex,
+                      data = gss, weights = weight,
+                      family = binomial(link = "logit"),
+                      seed = seed, chains = 1, refresh = 0)
+```
+
+Now, let's build a table with all six models together. 
+```{r comp-table}
+lastmods <- list("LPM via OLS" = linprob1,
+                 "LPM via GLM" = lin_glm1,
+                 "LPM via Bayes GLM" = bmodlinpro,
+                 "Base Logit" = logit_base,
+                 "Full Logit" = logit_full,
+                 "Bayes Logit" = bmodlogit)
+coefnames <- c("conservatism" = "Conservatism \n(7 pt scale)", # The "\n" will come in handy in a second
+               "age" = "Age (Yrs)",
+               "educ" = "Education (Yrs)",
+               "sexFemale" = "Female",
+               "race4Black" = "Race: Black",
+               "race4Hispanic" = "Race: Hispanic",
+               "race4Other" = "Race: Other",
+               "(Intercept)" = "Constant")
+
+modelsummary(lastmods,
+             coef_map = coefnames, gof_omit = "pss|alg|RMSE",
+             title = "Model Comparison: Predicing Support for Marijuana Legalization",
+             notes = c("Reference Categories: Male, White.",
+                       "Data: 2018 General Social Survey"),
+             output = "huxtable")
+```
+
+And lastly, let's plot them all together. Remember that special code I used earlier on the conservatism variable's name? This makes it so now, in the plot, the description will be on a new line. 
+
+```{r comp-plot}
+modelplot(lastmods, coef_omit = 'Interc',
+          coef_map = rev(coefnames)) +  # Reversing order to match order in table
+  geom_vline(aes(xintercept = 0), linetype = "dotted", linewidth = 1, alpha = .5) +
+  theme(legend.position = "bottom")
+```
+
+# Posterior Predictive Check
+
+With all of this, it's important to remember why we even want to use a logistic model when the LPM "can" work. 
+
+The structure of your data and dependent variable dictate which model to use. The rest of the semester, we'll work with different types of dependent variables, and these will dictate our models. 
+
+To illustrate this, below I perform a posterior predictive check (`pp_check`) on our two Bayesian models. I set the limits to be identical so we'll see them on the same scale. Notice how the LPM wants to throw the mass of the predictions in the middle, while the logit model puts it neatly into the categories of our dependent variable. 
+
+```{r}
+ppc_lpm <- pp_check(bmodlinpro) + ggtitle("LPM") + lims(x = c(-1.75, 3))
+ppc_log <- pp_check(bmodlogit) + ggtitle("Logit") + lims(x = c(-1.75, 3))
+ggpubr::ggarrange(ppc_lpm, ppc_log, nrow = 2)
+```
+
