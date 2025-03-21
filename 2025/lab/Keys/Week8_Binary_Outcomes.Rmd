@@ -16,7 +16,6 @@ library(rstanarm)
 library(modelsummary)
 library(broom.mixed)
 options(modelsummary_get = "broom") 
-library(flextable)
 library(naniar)
 
 seed <- 1234
@@ -27,8 +26,8 @@ seed <- 1234
 Let's use the GSS again. This week, we'll be investigating factors associated with whether a person supports marijuana legalization. 
 
 ```{r gss-loading}
-# You may need to write the code or change your working directory to properly load the GSS2022.dta file and assign it to the object gss2022
-gss2022 <- read_dta("../DATASETS/GSS/GSS2022.dta")
+
+gss2022 <- read_dta("DATASETS/GSS/GSS2022.dta")
 
 gss2022$ballot
 
@@ -179,9 +178,6 @@ Let's go ahead and run three models. First, let's recreate our previous linear p
 
 
 ```{r logit-mod}
-lin_glm1 <- glm(legal_grass ~ conservatism + age + educ + race4 + sex,
-                family = gaussian(link = "identity"),
-                data = gss)
 
 logit_full <- glm(legal_grass ~ conservatism + age + educ + race4 + sex,
                   family = "binomial",
@@ -191,7 +187,6 @@ logit_base <- glm(legal_grass ~ conservatism,
                   family = "binomial", data = gss)
 
 compmods <- list("LPM via OLS" = linprob1,
-                 "LPM via GLM" = lin_glm1,
                  "Base Logit" = logit_base,
                  "Full Logit" = logit_full)
 modelsummary(compmods,
@@ -320,7 +315,6 @@ Just like before, we can use the log-likelihood for the model.
 ```{r loglike}
 logLik(logit_full) 
 logLik(logit_base) 
-logLik(lin_glm1)
 ```
 
 In the models above, we see that the base logit model, which only included conservatism as a predictor for legalization, had the lowest log-likelihood, showing it was worst-performing of the three. The full logit model, with all predictors included, performed best. 
@@ -337,7 +331,6 @@ We can calculate it using the `DescTools` package. (**Note** that I use `package
 ```{r}
 DescTools::PseudoR2(logit_full, which = c("McFadden","McFaddenAdj", "logLik"))
 DescTools::PseudoR2(logit_base, which = c("McFadden","McFaddenAdj", "logLik"))
-DescTools::PseudoR2(lin_glm1, which = c("McFadden","McFaddenAdj", "logLik")) 
 ```
 
 Just like with log likelihood, we want to maximize McFadden's pseudo-$R^2$. 
@@ -359,7 +352,6 @@ bmodlogit <- stan_glm(legal_grass ~ conservatism + age + educ + race4 + sex,
 Now, let's build a table with all six models together. 
 ```{r comp-table}
 lastmods <- list("LPM via OLS" = linprob1,
-                 "LPM via GLM" = lin_glm1,
                  "LPM via Bayes GLM" = bmodlinpro,
                  "Base Logit" = logit_base,
                  "Full Logit" = logit_full,
