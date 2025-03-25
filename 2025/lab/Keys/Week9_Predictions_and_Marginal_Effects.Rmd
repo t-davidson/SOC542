@@ -1,0 +1,324 @@
+---
+title: "Week 9 - Predictions and Marginal Effects"
+author: "Brent Hoagland, Lab TA"
+date: "3/31/2025"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE)
+options(scipen = 10)
+
+library(tidyverse)
+library(haven)
+library(modelsummary)
+library(ggplot2)
+  
+# marginaleffects: Predictions, Comparisons, Slopes, Marginal Means, and Hypothesis Tests
+# https://marginaleffects.com/
+if(!require(marginaleffects)) install.packages("marginaleffects")
+library(marginaleffects)
+
+set.seed(1234) # Optional, for reproducibility
+```
+
+# Data Preparation
+
+Let's use the GSS again. This week, we'll be looking again at factors that influence a person's income and factors that predict whether that person has been unemployed in the past ten years.
+
+```{r}
+# Write the code or change your working directory to properly load the GSS2022.dta file and assign it to the object gss2022
+gss2022 <- read_dta("../DATASETS/GSS/GSS2022.dta")
+
+# Select and recode essential variables
+gss <- gss2022 %>% 
+  transmute(
+    income = as.numeric(conrinc),
+    age = ifelse(age < 0, NA, age),
+    educ = ifelse(educ < 0, NA, educ),
+    sex = factor(sex, levels = 1:2, labels = c("Male", "Female")),
+    race = factor(race, levels = 1:3, labels = c("White", "Black", "Other")),
+    self_employed = ifelse(wrkslf == 1, 1, 0),
+    unemp = ifelse(unemp == 1, 1, 0)
+  ) %>% drop_na()
+
+```
+
+## Descriptives
+
+As always, let's look at our descriptive statistics.
+
+```{r}
+datasummary_skim(gss,
+                 type = "numeric",
+                 fmt = 2, # Show 2 decimal places 
+                 histogram = T,
+                 title = "Sample Descriptive Statistics: Continuous Variables",
+                 notes = "Data: 2022 General Social Survey")
+
+datasummary_skim(gss, 
+                 type = "categorical",
+                 title = "Sample Descriptive Statistics: Categorical Variables",
+                 notes = "Data: 2022 General Social Survey",
+                 output = "huxtable")
+
+```
+
+# 1. Simple Linear Model
+First, create a simple linear model predicting income using education:
+```{r}
+mod_simple <- lm(income ~ educ, data = gss)
+
+modelsummary(mod_simple,
+             estimate = "{estimate}{stars} \n ({std.error}) ",
+             statistic = NULL,
+             gof_omit = "pss|alg|RMSE|AIC|BIC|F",
+             output = "huxtable")
+
+```
+
+**Exercise:** Interpret the results of this model. Specifically, describe what the coefficient for education tells us about the relationship between education and income.
+
+**Response:** Each additional year of education is associated with a $5,040 increase in income.
+
+### Using Predictions
+We can use `predictions()` to estimate specific data points by manually setting conditions:
+```{r}
+specific_pred <- predictions(mod_simple, newdata = datagrid(educ = c(12, 16, 20)))
+specific_pred
+```
+
+Use the `predictions()` function to examine predicted income across all actual observations:
+```{r}
+pred_all <- predictions(mod_simple, newdata = gss)
+head(pred_all)
+```
+
+#### Visualizing Predictions
+The below plot will be our basic starting point. Visualize predicted income alongside the actual observations:
+```{r}
+ggplot(gss, aes(x = educ, y = income)) +
+  geom_point(alpha = 0.6) +
+  geom_line(data = pred_all, aes(x = educ, y = estimate), color = "blue", size = 1.2) +
+  labs(title = "Actual and Predicted Income by Education",
+       x = "Education (years)",
+       y = "Income") +
+  theme_minimal()
+
+```
+
+The `plot_predictions` function comes from `marginaleffects` package and simplifies visualizing predictions. 
+```{r}
+plot_predictions(mod_simple, condition = "educ") +
+  labs(title = "Predicted Income by Education",
+       x = "Education (years)",
+       y = "Predicted Income")
+
+```
+Key take away: with each step along the x-axis we move at a constant rate up the y-axis.
+
+#### Seque: Predictions are necessary for calculating and assessing residuals
+We can also use predictions to calculate residuals, which show us how far off each observation's predicted value is from its actual value:
+```{r}
+# Add predictions and residuals to the dataset
+gss <- gss %>% 
+  mutate(predicted_income = pred_all %>% pull(estimate),
+         residuals = income - predicted_income)
+
+# View the first few residuals
+head(gss %>% select(income, predicted_income, residuals))
+```
+
+Visualize residuals to assess model assumptions (normality and homoscedasticity):
+```{r}
+# Residuals vs Predicted Values
+p1 <- ggplot(gss, aes(x = predicted_income, y = residuals)) +
+  geom_point(alpha = 0.6) +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  labs(title = "Residuals vs Predicted Values",
+       x = "Predicted Income",
+       y = "Residuals") +
+  theme_minimal()
+
+# Histogram of Residuals
+p2 <- ggplot(gss, aes(x = residuals)) +
+  geom_histogram(bins = 30, fill = "grey", color = "black") +
+  labs(title = "Distribution of Residuals",
+       x = "Residuals",
+       y = "Frequency") +
+  theme_minimal()
+
+# QQ-plot of Residuals
+p3 <- ggplot(gss, aes(sample = residuals)) +
+  stat_qq() +
+  stat_qq_line() +
+  labs(title = "QQ-Plot of Residuals") +
+  theme_minimal()
+
+# Display plots
+p1
+p2
+p3
+```
+
+
+# 2. Predictions with Multiple Categorical Variables
+```{r}
+mod_cat <- lm(income ~ educ + sex + race, data = gss)
+
+modelsummary(mod_cat,
+             estimate = "{estimate}{stars} \n ({std.error}) ",
+             statistic = NULL,
+             gof_omit = "pss|alg|RMSE|AIC|BIC|F",
+             output = "huxtable")
+```
+**Exercise:** Interpret the results, specifically describing how sex and race are associated with income.
+
+**Response:** Females earn significantly less than males, and Black respondents earn significantly less compared to White respondents, controlling for education.
+
+
+As a visualization:
+```{r}
+plot_predictions(mod_cat, condition = c("sex", "race")) +
+  labs(title = "Predicted Income by Sex and Race")
+```
+**Key Takeaway:** Significant differences in income exist between males and females at average education levels, with males earning substantially higher predicted incomes than females. Additionally, the visualization highlights disparities by race, showing that Black individuals have notably lower predicted incomes compared to White and Other racial categories, within each gender group.
+
+# 3. Interaction Effects
+```{r}
+mod_interaction <- lm(income ~ educ * sex, data = gss)
+
+modelsummary(mod_interaction,
+             estimate = "{estimate}{stars} \n ({std.error}) ",
+             statistic = NULL,
+             gof_omit = "pss|alg|RMSE|AIC|BIC|F",
+             output = "huxtable")
+```
+**Exercise:** Describe the interaction between education and sex on predicted income.
+
+**Response:** The regression results indicate a positive relationship between education and income, with each additional year of education associated with an average increase of approximately $5,526 for males. For females, however, this benefit is reduced by about $516 per year of education (interaction term: educ × sexFemale = -516.54). Although the interaction itself is not statistically significant, it suggests that the income gain from education is slightly smaller for females compared to males. 
+
+As a visualization:
+```{r}
+plot_predictions(mod_interaction, condition = c("educ", "sex")) +
+  labs(title = "Interaction of Education and Sex on Income")
+```
+**Key Takeaway:** The return on education differs by sex, with males seeing a steeper increase in income for each additional year of education compared to females.
+
+# 4. Nonlinear Effects
+Let's model a curvilinear relationship using age:
+```{r}
+mod_nonlin <- lm(income ~ age + I(age^2), data = gss)
+modelsummary(mod_nonlin,
+             estimate = "{estimate}{stars} \n ({std.error}) ",
+             statistic = NULL,
+             gof_omit = "pss|alg|RMSE|AIC|BIC|F",
+             output = "huxtable")
+```
+**Exercise:** Interpret the curvilinear relationship between age and income.
+
+**Response:** Income increases with age up to a certain point and then declines, forming a parabola-shaped relationship.
+
+As a visualization:
+```{r}
+plot_predictions(mod_nonlin, condition = "age") +
+  labs(title = "Curvilinear Effect of Age on Income")
+```
+
+Getting more specific: You could report predicted values at specific points
+```{r}
+# Marginal Effects
+slopes(mod_nonlin, newdata = datagrid(age = c(25, 45, 65)))
+
+```
+
+Illustrative Point: Marginal Effects as Tangent Lines
+```{r}
+# Calculate slope and intercept for tangent lines
+marg_effects <- slopes(mod_nonlin, newdata = datagrid(age = c(25, 45, 65)))
+pred_points <- predictions(mod_nonlin, newdata = datagrid(age = c(25, 45, 65)))
+
+# Plot predictions with tangent lines
+plot_predictions(mod_nonlin, condition = "age") +
+  geom_abline(slope = marg_effects$estimate[1], intercept = pred_points$estimate[1] - marg_effects$estimate[1]*25, color = "red") +
+  geom_abline(slope = marg_effects$estimate[2], intercept = pred_points$estimate[2] - marg_effects$estimate[2]*45, color = "red") +
+  geom_abline(slope = marg_effects$estimate[3], intercept = pred_points$estimate[3] - marg_effects$estimate[3]*65, color = "red") +
+  geom_point(data = pred_points, aes(x = age, y = estimate), color = "red", size = 2) +
+  labs(title = "Marginal Effects of Age on Income")
+
+```
+
+# 5. Logistic (Binomial) Model
+
+Modeling unemployment:
+```{r}
+logit_model <- glm(unemp ~ age + I(age^2) + educ + sex + race, data = gss, family = binomial)
+modelsummary(list("log(odds)" = logit_model, "odds ratios" = logit_model),
+             exponentiate = c(F,T),
+             estimate = "{estimate}{stars} \n ({std.error}) ",
+             statistic = NULL,
+             gof_omit = "pss|alg|RMSE|AIC|BIC|F",
+             output = "huxtable")
+```
+**Exercise:** Interpret how education, age, sex, and race predict unemployment.
+
+**Response:** Higher education reduces unemployment likelihood; the relationship with age is nonlinear. Females and certain racial groups have differing unemployment probabilities.
+
+
+### Predictions
+
+```{r}
+plot_predictions(logit_model, condition = c("educ", "sex")) +
+  labs(title = "Predicted Probability of Unemployment by Education and Sex",
+       x = "Education (Years)",
+       y = "Predicted Probability")
+```
+
+### Marginal Effects
+Logistic regression coefficients are typically expressed in log-odds, which can be difficult to interpret intuitively. Marginal effects provide a clear and practical interpretation by directly showing how a one-unit change in predictors affects the predicted probability of the outcome.
+
+- **Average Marginal Effects:**
+One way to summarize this information is to calculate the average of the marginal effects. We can get the marginal effects and then take the average of that across different levels.
+```{r}
+slopes(logit_model) %>% 
+  group_by(term) %>% 
+  summarize(AME = mean(estimate), 
+            StdError = mean(std.error),
+            z = AME / StdError,
+            p = 2 * pnorm(-abs(z)),
+            conf.low = AME - 1.96 * StdError,
+            conf.high = AME + 1.96 * StdError)
+
+```
+**Key Takeaway:** Marginal effects calculated using the `slopes()` function from the `marginaleffects` package represent the average change in the probability of the outcome (unemployment, in this case) associated with a one-unit change in each predictor.
+
+Thus, the estimate (AME) are interpreted directly as changes in predicted probabilities:
+
+- A positive AME means the predictor increases the probability of unemployment.
+
+- A negative AME means the predictor decreases the probability of unemployment.
+
+- **Marginal Effects at the Mean:**
+Rather than taking the average of the unit marginal effects, we can also calculate marginal effects while holding other predictors at their means. This is called the marginal effect at the mean (MEM). For each variable, it calculates the marginal effect when all other variables are held at their means. Categorical variables are set at their modal values. This makes it both useful and easy useful to interpret. 
+```{r}
+slopes(logit_model, newdata = datagrid())
+```
+**Key Takeaway:** Holding all other variables at their means, each additional year of education reduces the probability of unemployment by about 2 percentage points.
+
+For categorical variables, we use the contrast column to specify the effect. So being female increases the probability of being unemployed by .0474, compared to men, and being Black increases them by 0.0232 compared to white. 
+
+- **Conditional Marginal Effects:**
+Conditional marginal effects allow us to investigate how the influence of one predictor changes under specific conditions set by other variables. For instance, the effect of education on unemployment might vary substantially depending on age.
+```{r}
+slopes(logit_model, newdata = datagrid(educ = c(12, 16), age = c(30, 50)))
+```
+
+### Visualizing Conditional Marginal Effects
+```{r}
+plot_slopes(logit_model, variables = "educ", condition = "age") +
+  labs(title = "Marginal Effect of Education on Probability of Unemployment at Different Ages",
+       x = "Age",
+       y = "Marginal Effect of Education on Probability")
+```
+**Key Takeaway:** The protective effect of education against unemployment is strongest for younger individuals and diminishes gradually with age. In other words, investing in additional education has a greater impact on reducing unemployment probabilities among younger adults compared to older adults.
