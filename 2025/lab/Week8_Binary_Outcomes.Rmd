@@ -17,6 +17,7 @@ library(modelsummary)
 library(broom.mixed)
 options(modelsummary_get = "broom") 
 library(naniar)
+library(haven)
 
 seed <- 1234
 ```
@@ -193,6 +194,7 @@ modelsummary(compmods,
              estimate = "{estimate} ({std.error})",
              statistic = NULL, gof_omit = "F|RMSE",
              output = "huxtable")
+
 ```
 
 One of the first things we notice is that the standard errors of the coefficients have exploded in size in the logit model and the coefficients are very different.
@@ -202,10 +204,12 @@ You'll also notice that we get different model diagnostics when we use `lm()` an
 Let's plot the coefficients and standard errors to see how they compare. 
 
 ```{r mod-comp-graph}
+
 modelplot(compmods, coef_omit = 'Interc') +
   geom_vline(aes(xintercept = 0), 
              linetype = "dotted", linewidth = 1, alpha = .5) +
   theme(legend.position = "bottom")
+
 ```
 
 We see here just how big the confidence intervals are in our logit model. We also see that the linear probability model coefficient estimates are typically covered by the logit model's confidence intervals. Interestingly, we also see big differences in the coefficients for conservatism. 
@@ -217,9 +221,11 @@ This plot highlights the differences between the models, but it is critical to n
 Let's reproduce the output for just the full logit model so we can interpret it.
 
 ```{r logit-table}
+
 modelsummary(logit_full, estimate = "{estimate} ({std.error}) {stars}",
              statistic = NULL, gof_omit = "F|RMSE|IC|Log",
              output = "huxtable")
+
 ```
 
 
@@ -232,6 +238,7 @@ We can also interpret the categorical variables in a similar way. Being Black do
 Just like we did earlier with the linear probability model, we can predict a person's likelihood of supporting legalization. 
 
 ```{r log-pred}
+
 logitpreddata <- expand_grid(conservatism = seq(1, 7),
                              age = seq(18, 88, 10),
                              educ = mean(gss$educ),
@@ -241,6 +248,7 @@ logitpreddata <- expand_grid(conservatism = seq(1, 7),
 logitpreddata$pred_grass <- predict(logit_full, newdata = logitpreddata, type = "response")
 
 head(logitpreddata)
+
 ```
 
 For one, we can see our predicted values are all between zero and one. 
@@ -328,7 +336,11 @@ Where $LL_{mod}$ is the log-likelihood for the model, and $LL_0$ is the Log Like
 
 We can calculate it using the `DescTools` package. (**Note** that I use `package::function()` form below, since `DescTools` overwrites some important functions in `modelsummary`.) We can also ask it to give us the log-likelihood. 
 
+
 ```{r}
+
+install.packages("DescTools")
+
 DescTools::PseudoR2(logit_full, which = c("McFadden","McFaddenAdj", "logLik"))
 DescTools::PseudoR2(logit_base, which = c("McFadden","McFaddenAdj", "logLik"))
 ```
@@ -388,8 +400,7 @@ The structure of your data and dependent variable dictate which model to use. Th
 To illustrate this, below I perform a posterior predictive check (`pp_check`) on our two Bayesian models. I set the limits to be identical so we'll see them on the same scale. Notice how the LPM wants to throw the mass of the predictions in the middle, while the logit model puts it neatly into the categories of our dependent variable. 
 
 ```{r}
-ppc_lpm <- pp_check(bmodlinpro) + ggtitle("LPM") + lims(x = c(-1.75, 3))
 ppc_log <- pp_check(bmodlogit) + ggtitle("Logit") + lims(x = c(-1.75, 3))
-ggpubr::ggarrange(ppc_lpm, ppc_log, nrow = 2)
+ggpubr::ggarrange(ppc_log, nrow = 2)
 ```
 
