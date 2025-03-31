@@ -118,7 +118,7 @@ plot_predictions(mod_simple, condition = "educ") +
 ```
 Key take away: with each step along the x-axis we move at a constant rate up the y-axis.
 
-#### Seque: Predictions are necessary for calculating and assessing residuals
+#### Segue: Predictions are necessary for calculating and assessing residuals
 We can also use predictions to calculate residuals, which show us how far off each observation's predicted value is from its actual value:
 ```{r}
 # Add predictions and residuals to the dataset
@@ -281,14 +281,8 @@ Logistic regression coefficients are typically expressed in log-odds, which can 
 - **Average Marginal Effects:**
 One way to summarize this information is to calculate the average of the marginal effects. We can get the marginal effects and then take the average of that across different levels.
 ```{r}
-slopes(logit_model) %>% 
-  group_by(term) %>% 
-  summarize(AME = mean(estimate), 
-            StdError = mean(std.error),
-            z = AME / StdError,
-            p = 2 * pnorm(-abs(z)),
-            conf.low = AME - 1.96 * StdError,
-            conf.high = AME + 1.96 * StdError)
+
+avg_slopes(logit_model)
 
 ```
 **Key Takeaway:** Marginal effects calculated using the `slopes()` function from the `marginaleffects` package represent the average change in the probability of the outcome (unemployment, in this case) associated with a one-unit change in each predictor.
