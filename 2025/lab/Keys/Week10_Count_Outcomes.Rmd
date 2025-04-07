@@ -380,7 +380,7 @@ For Bayesian modeling, as usual, the `stan_glm()` command works out similar to t
     earlier.
 2.  Zero-inflated Bayesian models are not currently supported in
     `rstanarm` but can be implemented in `brms`. However, it poses some
-    complications;as such, we'll use the count model (Poisson) to
+    complications. As such, we'll use the count model (Poisson) to
     demonstrate.
 
 If you want to know more, you can follow this link to Aki Vehtari's page, where he shows how to do this modeling:
@@ -391,7 +391,7 @@ partner_stan_poisson <- stan_glm(partners ~ marital + educ + sex + age + I(age^2
                                  data = gss, family = "poisson",
                                  seed = seed, chains = 1, refresh = 0)
 
-modelsummary(list("Parnters" = partner_stan_poisson),
+modelsummary(list("Partners" = partner_stan_poisson),
   estimate = "{estimate}{stars} ({std.error})",
   exponentiate = TRUE,
   statistic = NULL,
