@@ -254,7 +254,7 @@ modelsummary(list("OLS FE (Log)" = ols.fe.log, "Poisson" = pois), stars = c("*" 
 ## Interpretation
 - The intercept $\beta_0$ is the *logged* average value of the outcome when all other predictors are equal to zero.
 - Each coefficient $\beta_i$ indicates the effect of a unit change of $x_i$ on the *logarithm* of the outcome.
-    - e.g., $\beta_{seats\%} = 0.013$ implies that the expected log number of tweets increases by 0.02 in response to a 1-unit, or 1% increase in parliamentary seats held by a party.
+    - e.g., $\beta_{seats\%}$ implies that the expected log number of tweets increases by 0.013 in response to a 1-unit, or 1% increase in parliamentary seats held by a party.
 - Coefficients can be interpreted as *multiplicative* changes after exponentiation
     - e.g., $e^{\beta_{seats\%}} = e^{0.013} \approx 1.013$. This implies that a ~1.3% increase in tweets.
     - These coefficients are sometimes referred to as \textbf{incident rate ratios (IRRs)}.
@@ -496,7 +496,7 @@ modelsummary(list("NB" = nb.rt, "NB (Offset)" = nb.rt.o), stars = c("*" = 0.05, 
 $$y_i = ZIPoisson(p, \lambda)$$
 $$logit(p) = \gamma_{0} + \gamma_{1}z$$
 
-$$log(\lambda)  = \beta_{0} + \beta_{1}x$$
+$$log(\lambda)   \beta_{0} + \beta_{1}x$$
 
 - Each model has its own set of regression parameters. These can be specified differently to model each process.
 
@@ -506,15 +506,15 @@ $$log(\lambda)  = \beta_{0} + \beta_{1}x$$
     - If so, how many?
 
 # Zero-inflated models
-## Example: Books borrowed from the library
+## Simulating library usage (binary)
 ```{r library, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
 N <- 1000 # N
 
-z <- rnorm(N, 0.5, 1) # Random variable determines library usage=
+z <- rnorm(N, 0.5, 1) # Random variable determines library usage
 p_lib <- 1/(1 + (exp(1)^-(z))) # Convert to probability 
 
 lib <- rep(0,N) # Generate binary library variable
-for (i in 1:N) {
+for (i in 1:N) { 
     lib[i] <- rbinom(1, 1, p_lib[i])
 }
 
@@ -522,7 +522,7 @@ sum(lib)/N
 ```
 
 # Zero-inflated models
-## Example: Books borrowed from the library
+## Simulating borrowing (count)
 ```{r library-books, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
 x <- rnorm(N) # Random variable for books borrowed
 
@@ -530,7 +530,7 @@ books <- c() # Store number of books borrowed for each student
 for (i in 1:N) {
     if (lib[i] == 1) { # Borrow books if library visitor
         books[i] <- rpois(1, lambda = exp(0.5 + x[i]))
-    } else {books[i] <- 0} # Otherwise zero
+    } else {books[i] <- 0} # Otherwise zero books borrowed
 }
 mean(books)
 max(books)
@@ -587,13 +587,14 @@ zip <- brm(bf(books ~ x,
               data = book.data,
               family = zero_inflated_poisson(link = "log",
                                             link_zi = "logit"),
-              seed = 08901, refresh = 0, chains = 1, backend = "cmdstanr")
+              seed = 08901, refresh = 0, chains = 1, 
+              backend = "cmdstanr")
 ```
 
 # Zero-inflated models
 ```{r zinb-sum, echo = FALSE,  mysize=TRUE, size='\\footnotesize'}
-modelsummary(list("Poisson" = pois.m, "ZI Poisson" = zip), statistic = "conf.int", gof_omit = "Log.Lik.|R2|WAIC|RMSE|LOOIC",
-             output = "latex")
+modelsummary(list("Poisson (exp.)" = pois.m, "ZI Poisson (exp.)" = zip), statistic = "conf.int", gof_omit = "Log.Lik.|R2|WAIC|RMSE|LOOIC|Num.Obs.",
+             output = "latex", exponentiate = T)
 ```
 
 # Posterior predictive checks
@@ -629,3 +630,6 @@ loo_compare(loo(zip), loo(pois.m))
 # Next week
 - Categorical outcomes
     - Multinomial and ordered logistic regression
+    
+# Lab
+- Estimating and interpreting count models in R
