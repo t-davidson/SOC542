@@ -329,7 +329,7 @@ nb <- glm.nb(tweet_count ~ seats_per + left_right + country,
 
 # Comparing Poisson and negative binomial regression
 ```{r negbin-table, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
-modelsummary(list("Poisson" = pois, "Negative binomial" = nb), stars = c("*" = 0.05, "**" = 0.01, "***" = 0.001), gof_omit = "AIC|BIC|RMSE", output = "latex", coef_omit = "country*", note = "Country FE omitted. Exponentiated coefficients.", exponentiate = F, coef_map = c("seats_per" = "Seats %","left_right" = "Ideology [0-10]", "(Intercept)" = "Intercept"))
+modelsummary(list("Poisson" = pois, "Negative binomial" = nb), stars = c("*" = 0.05, "**" = 0.01, "***" = 0.001), gof_omit = "RMSE", output = "latex", coef_omit = "country*", note = "Country FE omitted. Exponentiated coefficients.", exponentiate = F, coef_map = c("seats_per" = "Seats %","left_right" = "Ideology [0-10]", "(Intercept)" = "Intercept"))
 ```
 
 # Negative binomial regression
@@ -474,7 +474,7 @@ nb.rt.o <- glm.nb(retweet_total ~ offset(log(tweet_count)) +
 
 # Offsets
 ```{r retweet, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
-modelsummary(list("NB" = nb.rt, "NB (Offset)" = nb.rt.o), stars = c("*" = 0.05, "**" = 0.01, "***" = 0.001), gof_omit = "AIC|BIC|RMSE", output = "latex", exponentiate = T, coef_omit = c("country*"), coef_map = c("seats_per" = "Seats %","left_right" = "Ideology [0-10]", "(Intercept)" = "Intercept"))
+modelsummary(list("NB" = nb.rt, "NB (Offset)" = nb.rt.o), stars = c("*" = 0.05, "**" = 0.01, "***" = 0.001), gof_omit = "RMSE", output = "latex", exponentiate = T, coef_omit = c("country*"), coef_map = c("seats_per" = "Seats %","left_right" = "Ideology [0-10]", "(Intercept)" = "Intercept"))
 ```
 
 # Offsets
