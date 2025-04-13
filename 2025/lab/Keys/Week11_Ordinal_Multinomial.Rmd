@@ -1,0 +1,540 @@
+---
+title: "Week 11 - Ordered and Multinomial Outcomes"
+author: "Brent Hoagland, Lab TA"
+date: "4/14/2025"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(modelsummary)
+library(naniar)
+library(performance)
+
+# library(MASS) # For Ordinal Models, comment this out for not so `dyplr::select` works
+library(nnet) # For Multinomial Models
+ 
+seed <- 12345
+```
+
+We're going to switch it up this week. In March 2020, to mark the 100th Anniversary of the 19th Amendment (which gave (white) women the right to vote in the USA), the Pew Research Center fielded a survey about Americans' perceptions of women's equality. For more on the survey, see the topline report in the lab-data folder or the [full report on their website](https://www.pewresearch.org/social-trends/2020/07/07/a-century-after-women-gained-the-right-to-vote-majority-of-americans-see-work-to-do-on-gender-equality/).
+
+> "Pew Research Center is a nonpartisan fact tank that informs the public about the issues, attitudes and trends shaping the world. We conduct public opinion polling, demographic research, content analysis and other data-driven social science research. We do not take policy positions." 
+
+All throughout the year, they field surveys on a wide variety of issues, including social and demographic trends, religion, politics, journalism, science, and global affairs. These survey datasets are typically released to the public after an embargo period of one to three years. 
+
+Their survey reports typically only use bivariate analysis, meaning there is a LOT of analysis that is available for secondary researchers. 
+
+This week, we have two research questions: How do members of the public think about the progress in women's rights? And what do they think has been the most important factor in this? We'll be looking at two outcomes:
+
+ - EQRIGHTS2: "When it comes to giving women equal rights with men, do you think our country ... 
+      1. has gone too far,
+      2. has not gone far enough,
+      3. or has been about right?"
+      
+ - ADVANCE3: "In your opinion, which of the following milestones has been the most important in advancing the position of women in our country? 
+      1. Women gaining the right to vote
+      2. The availability of the birth control pill
+      3. Passage of the Equal Pay Act
+      4. Passage of the Family and Medical Leave Act "
+
+
+# Data Loading and Management
+
+The dataset is in the lab data folder. Let's load it up and do some data management. 
+
+```{r gss-loading}
+pewraw <- haven::read_sav("../DATASETS/Mar20_19th_Amendment_cleaned dataset.sav")
+
+pewamend <- pewraw %>% 
+  dplyr::select(
+    
+    # Target Vars
+    EQRIGHTS2, ADVANCE3,
+    
+    # IV's
+    age = ppage, 
+    educ = ppeducat,
+    race = ppethm,
+    gender = ppgender,
+    marital = ppmarit,
+    employ = ppwork,
+    party = PARTY,
+    ideo = IDEO,
+    weight, 
+    ) %>% 
+  mutate(
+    
+    # OUTCOME VARIABLES
+    rightsprog = ordered(EQRIGHTS2,
+                        levels = c(1, 3, 2),
+                        labels = c("Too Far", "About Right","Not Far Enough")),
+    milestone = factor(ADVANCE3,
+                       levels = c(1:4),
+                       labels = c("Voting", "BC_Pill", "EQ_Pay", "FMLA")),
+    # PREDICTORS
+    gender = ifelse(gender==1, "Male", "Female"),
+    race = case_when(
+      race == 1 ~ "White",
+      race == 2 ~ "Black", 
+      race == 3 ~ "Other", 
+      race == 4 ~ "Hispanic",
+      race == 5 ~ "Mixed"
+      ),
+    educ = factor(educ, levels = c(1:4),
+                  labels = c("<HS", "High School", "Some College", "College+")),
+    marital = factor(marital, 1:6,
+                     labels = c("Married", "Cohabiting","Divorced",
+                                "Separated","Widowed","Never Married")),
+    employ = case_when(
+      employ == 1  ~ "Working",
+      employ ==  2 ~ "Self-Employed",
+      employ %in% c(3,4) ~ "Unemployed", # Looking for  work or temporary layoff
+      employ %in% c(5,6,7) ~ "Not Working"   # Retired, disabled,  other
+      ),
+    party = case_when(
+      party == 1 ~ "Republican",
+      party == 2 ~ "Democrat",
+      party == 3 ~ "Independent",
+      party == 4 ~ "Something Else"
+      ),
+    ideo = factor(ideo, levels = c(1:5),
+                  labels = c("Very Conservative", "Conservative", "Moderate", "Liberal", "Very Liberal")),
+    weight = as.numeric(weight)
+  ) %>% 
+  dplyr::select(-EQRIGHTS2, -ADVANCE3)
+
+```
+
+If you're curious, the code to view the questions and response orders is "lab_data/checking_atp_coding.R". It uses the `foreign::read.spss` function to maintain variable "attributes." This allows for maintaining data information but makes recoding variables slightly harder. Instructions for how to do this are also in the file "lab-data/atp_codebook.pdf".
+
+## Missingness Analysis
+
+Since we're working with new data, let's see if there are any patterns of missingness among the variables. 
+```{r miss-upset}
+gg_miss_upset(pewamend)
+```
+Let's take this at face-value and say there is no particular pattern. If this were a more formal analysis for a research paper, this would need more serious considerations. But in the interest of time, let's employ listwise deletion.
+
+```{r list-delete}
+pewamend <- pewamend %>% drop_na()
+pewamend %>% count
+```
+
+## Descriptives
+As always, let's look at our descriptive statistics. Since we have only one numeric variables (age), we can simply create a table with means and standard deviations for those, and count and percent for our categorical variables. 
+```{r desc-tables, message=FALSE, warning=FALSE}
+datasummary_balance( ~ 1, data = pewamend,
+                     fmt = 2, # Show 2 decimal places 
+                     title = "Sample Descriptive Statistics",
+                     notes = "Data: March 2020 Pew Research Center Poll",
+                     output = "huxtable")
+```
+
+# Ordinal Outcomes: Ordinal Logistic Regression
+
+Our first variable today is whether people think women's rights have gone too far, not far enough, or about right. Because this has an order to it, we call this ordinal. 
+
+### Using what we already know: A series of logit or OLS models
+
+A common way of doing this is to create a logit model. Say we're trying to predict just people who say it hasn't gone far enough or just people who say it's gone too far, we could create dummies for these and run a series of logit models. 
+
+Another way of doing this is to create a numeric version of it, such that "not far enough" is 3, "about right" is 2, and "too far" is 1, and then doing an OLS regression 
+
+```{r bad-ordinal}
+pewamend <- pewamend %>% 
+  fastDummies::dummy_cols("rightsprog") %>% 
+  mutate(progress_numeric = case_when(
+    rightsprog == "Too Far" ~ 1,
+    rightsprog == "About Right" ~ 2,
+    rightsprog == "Not Far Enough" ~ 3
+  ))
+
+pewamend %>% select(starts_with("rights")) %>% names()
+table(pewamend$rightsprog, pewamend$progress_numeric)
+
+rightslog1 <- glm(`rightsprog_Too Far` ~ gender + race + age, 
+                  data = pewamend, weights = weight, family = "binomial")
+rightslog2 <- glm(`rightsprog_About Right` ~ gender + race + age, 
+                  data = pewamend, weights = weight, family = "binomial")
+rightslog3 <- glm(`rightsprog_Not Far Enough` ~ gender + race + age, 
+                  data = pewamend, weights = weight, family = "binomial")
+
+rightsols <- lm(progress_numeric ~ gender + race + age, 
+                data = pewamend, weights = weight)
+
+modelsummary(list("Too Far" = rightslog1, "About Right" = rightslog2, 
+                  "Not Far Enough" = rightslog3, "OLS" = rightsols),
+             estimate = "{estimate} ({std.error}) {stars}",
+             fmt = 2, statistic = NULL, output = "huxtable", gof_omit = "F|IC|RM")
+```
+
+While overall there is a similar pattern among those who've said "not far enough" and our OLS model, the coefficients are different.
+
+More importantly, we're working with an ordinal variable, and we should treat it as such! 
+
+Thinking back to Stats I, we know an ordinal variable is one that has a defined order to it, but there is no similar intervals between the levels. How do we know that the difference between saying "Too Far" and saying "About Right" is the exact same as the difference between saying "About Right" and saying "Not Far Enough?" We don't! 
+
+
+
+## Ordinal Logistic Regression
+Let's assume there is some latent continuous dimension onto which we can project the categories: A scale from 0 to 100. We know that the lower values will say "Too Far" and the higher values will say "Not Far Enough," but we don't know where those groups end and the "About Right" group begins. 
+
+This is the value of ordinal logistic regression. Just like binary logistic regression, we're looking for the value(s) that move a person from the base category (Too Far) to the next (About Right), and at the same time, from that category to the next (Not far enough). 
+
+To do this, we use the `MASS::polr()` function. (Yes, the same `MASS` that conflicts with `dplyr`, hence the `package::function()` notation.)
+
+```{r ordinal1}
+order1 <- MASS::polr(rightsprog ~ gender + race + age,
+                     data = pewamend, weights = weight)
+summary(order1)
+
+```
+
+The output looks pretty familiar: a call to say what our formula is, some coefficients and their standard errors. We even get an AIC. 
+
+The bottom part is where things get distinctly ordinal. Remember our jumps from one level to another? This is saying the "intercepts" where those jumps occur. The jump from "Too Far" to "About Right" occurs at -2.9, and the jump from "About Right" to "Not Far Enough" occurs at -0.9. In other programs, you might see this referred to as the "cutpoints." While important to include in the model output, just like other intercepts, we rarely interpret them. (We also don't get a p value or associated stars, but we can look at the t-values instead.)
+
+### Hessian?
+
+You might've noticed we got a message that it was "Re-fitting to get Hessian." Looking at the function documentation (`?polr`), we see that the "Hessian" is akin to an output matrix. Essentially, we should say `Hess = T` if we want to look at the values afterwards. Nothing happens if we don't, but we should include it to quiet the warning. 
+
+```{r hessian}
+order1 <- MASS::polr(rightsprog ~ gender + race + age,
+                     Hess = T,
+                     data = pewamend, weights = weight)
+summary(order1)
+```
+
+
+## Interpretation
+
+Let's now add in some variables and see if/how anything changed. Because `polr`'s output doesn't provide p values, `modelsummary()` can't extract significance or display stars for `polr` objects. Instead, we need to run the below command to specify a new method for it that will give us stars. 
+
+```{r ordinal-table}
+order2 <- MASS::polr(rightsprog ~ gender + race + age + marital + employ + ideo,
+                     Hess = T, data = pewamend, weights = weight)
+
+modelsummary(list(order1, order2), output = "huxtable", 
+             title = "Model Output: Status of Women's Progress",
+             estimate = "{estimate} ({std.error}) {stars} ", statistic = NULL)
+
+```
+
+So here we see that men have lower log odds of saying there is more progress to be done, as do whites, a finding that holds consistent across both models. In model 2, we see that liberal political ideology increases the log odds of supporting women's progress, and this addition also bolsters the effect of age, such that each additional year of age increases the log odds of supporting progress by .013.
+
+### Odds Ratios
+
+Let's convert log odds (the default output) into odds ratios. 
+
+```{r order-oddsratio}
+modelsummary(list("Log Odds" = order2, "Odds Ratio" = order2), 
+             output = "huxtable", exponentiate = c(F,T),
+             estimate = "{estimate} ({std.error}) {stars} ", statistic = NULL)
+
+```
+
+Above, we see that being male decreases the log odds of favoring continued progress on women's rights by about 42% ($1-.578=.422$). Additionally, somebody who is very liberal is more than 14 times more likely to say progress has not gone far enough ($15.6-1=14.6$).
+
+\newpage 
+
+
+# Categorical Outcomes: Multinomial Logistic Regression
+
+Our second variable we'll be looking at is which item people think was most important in advancing women's rights. There are four possible responses: Women gaining the right to vote, The availability of the birth control pill, Passage of the Equal Pay Act, and Passage of the Family and Medical Leave Act. 
+
+These were included in the same question, and respondents were asked to pick ONE of these. 
+
+### Using what we already know: A series of logit models
+
+One way people will try to analyze these questions is with a series of logistic regression models. Below, I use `fastDummies::dummy_cols()` to create a set of binary indicators for whether a person chose each item. 
+
+I then create a series of logit models to analyze the probability of a person picking this based on their gender, race, and age. 
+```{r bad-multi}
+pewamend <- pewamend %>% 
+  fastDummies::dummy_cols("milestone")
+pewamend %>% select(starts_with("miles")) %>% names()
+
+milelog1 <- glm(milestone_Voting ~ gender + race + age, 
+                data = pewamend, weights = weight, family = "quasibinomial")
+milelog2 <- glm(`milestone_BC_Pill` ~ gender + race + age, 
+                data = pewamend, weights = weight, family = "quasibinomial")
+milelog3 <- glm(`milestone_EQ_Pay` ~ gender + race + age, 
+                data = pewamend, weights = weight, family = "quasibinomial")
+milelog4 <- glm(`milestone_FMLA` ~ gender + race + age, 
+                data = pewamend, weights = weight, family = "quasibinomial")
+
+modelsummary(list("Voting" = milelog1, "BC Pill" = milelog2,
+                  "Equal Pay" = milelog3, "Fam Med Leave" = milelog4),
+             estimate = "{estimate} ({std.error}) {stars}",
+             fmt = 3, statistic = NULL, output = "huxtable", gof_omit = "F|IC|Log|RM")
+
+```
+
+The problem with this is that we are analyzing them separately, but they are all related. 
+
+What we need instead is a model to analyze them TOGETHER. 
+
+## Multinomial Logistic Regression
+
+Enter the multinomial logistic regression model! This allows us to analyze the probability of all choices at once. 
+
+The command is `nnet::multinom`. Below, I create a multinomial regression model of our milestone dependent variable using gender, race, and age as our independent variables. Just like the `Hess  = T` option from above, we should specify `model = T` so that R maintains information about the model, which  we'll use to calculate $R^2$.
+
+```{r multi1}
+multi1 <- multinom(milestone ~ gender + race + age,
+                  model = T, data = pewamend, weights = weight)
+
+modelsummary(
+  list("Multi1" = multi1),
+  estimate = "{estimate} ({std.error}) {stars}",
+  exponentiate = F,
+  statistic = NULL,
+  gof_omit = "F|IC|Log|RM",
+  shape = model + term ~ response,
+  output = "huxtable",
+  notes = "Reference: Women Gaining the Right to Vote"
+)
+
+```
+
+Turning to the output, you'll see that there are only three columns. This is because it used the first category of the variable (the right to vote) as the reference category. Multinomial regression essentially creates a series of models predicting the likelihood of each of the others, compared to choosing the reference category. What we get, then, is the likelihood that somebody said the birth control pill, compared to them saying the right to vote; next to it, the likelihood that somebody said equal pay, compared to them saying the right to vote; and lastly, the likelihood they said paid family leave, compared to the right to vote. 
+
+Looking now at our output, we can see a few trends. (NOTE: We interpret this as log odds, just like with logit. We can also exponentiate the coefficients to get odds ratios instead.) First, let's look at age. Older people were less likely to say the birth control pill was the most significant milestone in advancing women's rights, compared to gaining the right to vote, but were more likely to say paid family and medical leave, also compared to the right to vote. We can do this also with race, where we see whites, compared to Blacks, were less likely to say that either the Equal Pay or Family and Medical Leave Acts were the most important, compared to women's suffrage. 
+
+Additionally, we can see that men were less likely to say all three options were the most important, signifying that men are more likely to think the right to vote was the most important.
+
+Now, let's add in some more variables and see how things change. We can hypothesize that married people would find FMLA more important and employed people would find equal pay more important. 
+
+```{r multi2}
+multi2 <- multinom(milestone ~ gender + race + age + marital + employ + ideo, 
+                  model = T, data = pewamend, weights = weight, trace = F)
+
+modelsummary(
+  list("Multi2" = multi2),
+  estimate = "{estimate} ({std.error}) {stars}",
+  exponentiate = F,
+  statistic = NULL,
+  gof_omit = "F|IC|Log|RM",
+  shape = model + term ~ response,
+  output = "huxtable",
+  notes = "Reference: Women Gaining the Right to Vote"
+)
+```
+
+Well, it turns out employment didn't work as expected, but we do see that unemployed people are less likely to find the FMLA to be most important. Interesting too, liberalism is associated with increased odds of thinking the birth control pill is most important and decreased odds of saying equal pay was most important, compared to the right to vote. 
+
+While not included in the table, we can also examine model fit via `performance::compare_performance()`. Below, we see that the new model with more parameters didn't shrink the AIC much and actually increased the BIC, suggesting we inflated the model with too many variables. 
+```{r}
+compare_performance(multi1, multi2)
+```
+
+
+## Comparing Multinomial Models in Modelsummary
+
+Here are three ways to do this. 
+
+```{r model comparisons}
+
+# Model 2 below Model 1: good for when model2 uses different variables and side-by-side comparison isn't needed
+modelsummary(
+  list("Base Model" = multi1, "Extended Model" = multi2),
+  stars = TRUE,
+  output = "huxtable",
+  shape = model + term ~ response,
+  title = "Model Comparison: shape = model + term ~ response (stacked)"
+)
+
+# Model 2 next to Model 1: All around good, but requires going back and forth to compare M1's BC coefficient with M2's
+modelsummary(
+  list("Base Model" = multi1, "Extended Model" = multi2),
+  stars = TRUE,
+  output = "huxtable",
+  shape = term + response ~ model,
+  title = "Model Comparison: shape = term + response ~ model"
+)
+
+# Similar to above, but columns are interspersed: Good at showing change in outcome with new variables, but hard to compare within same model
+modelsummary(
+  list("Base Model" = multi1, "Extended Model" = multi2),
+  stars = TRUE,
+  output = "huxtable",
+  shape = term + model ~ response,
+  title = "Model Comparison: shape = term + model ~ response"
+)
+
+```
+
+There is no right way to  display your outputs, so feel free to play around with these permutations (and others) when making an output table. Of course, there are also edits to be made to include the display within each cell, such as placing standard error next to the coefficient (`estimate = "{estimate} ({std.error}) {stars}"`).
+
+
+\newpage 
+
+# Baysian Modeling
+
+## Ordinal Models with `rstanarm::stan_polr()`
+
+We can use `rstanarm::stan_polr()` to create Bayesian ordinal models. The big change here is that we have to specify a prior for the $r^2$. Using our models above as estimates, I plugged in .15.
+
+```{r bordinal-create}
+library(rstanarm)
+bordinal1 <- stan_polr(rightsprog ~ gender + race + age + marital + ideo,
+                      data = pewamend,
+                      method = "logistic",
+                      prior = R2(location = .15),
+                      seed = seed, chains = 1, refresh = 0)
+
+```
+
+```{r bordinal-view}
+print(bordinal1)
+prior_summary(bordinal1)
+```
+
+We can then use `modelsummary()` just like normal to display our output. 
+```{r bordinal-table}
+
+modelsummary(list("Log Odds" = bordinal1, 
+                  "Odds Ratios" = bordinal1),
+             estimate = "{estimate}  [{conf.low}, {conf.high}]", 
+             exponentiate = c(F,T),
+             statistic = NULL,
+             title = "Bayesian Model Output: Status of Women's Progress",
+             gof_omit = c("pss|alg"),
+             output = "huxtable")
+
+
+
+```
+
+We can also use our regular `rstanarm::loo` to create model diagnostics. 
+```{r bordinal-loo}
+(loo_ord <- loo(bordinal1))
+plot(loo_ord)
+```
+
+Lastly, we can do a posterior predictive check to see how well our model fits to the actual outcomes.
+
+```{r}
+library(bayesplot)
+
+# Convert observed ordinal outcome to numeric codes
+y <- as.integer(pewamend$rightsprog)
+
+# Simulate posterior predictions (100 draws, returns numeric matrix)
+yrep <- posterior_predict(bordinal1, draws = 100)
+
+# Convert factor predictions to numeric in one line
+yrep_num <- apply(yrep, c(1,2), function(x) as.integer(factor(x, 
+  levels = levels(pewamend$rightsprog))))
+
+# Plot posterior predictive check using bar distributions
+ppc_bars(y = y, yrep = yrep_num) +
+  scale_x_continuous(breaks = 1:3, 
+                     labels = c("Too Far", "About Right", "Not Far Enough")) +
+  coord_cartesian(xlim = c(0.5, 3.5)) +
+  labs(x = "Public Opinion on Women's Rights", 
+       y = "Proportion", 
+       title = "Posterior Predictive Check using `ppc_bars()`",
+       caption = "Outcome categories truncated to ordinal range (1–3)")
+```
+
+So here we can see that our model overestimated people who think women's rights have not gone far enough (=3) and vastly underestimated the proportion of people who think it's gone too far or is about right. 
+
+## Multinomial Models with `brms::brm`
+
+`rstanarm` doesn't (yet!) have a method to create multinomial models, however. We can use "the other" Bayesian package, BRMS, to do this. This process sometimes takes a long time, so I've bookended it with a series of `Sys.time()` functions to calculate the runtime. (Not at all necessary, but sometimes helpful in knowing what's going on.)
+
+```{r bmult}
+library(brms)
+
+bmultstart <- Sys.time()
+
+bmult1 <- brm(
+  milestone ~ gender + race + age,
+  data = pewamend,
+  family = categorical(link = "logit"),
+  seed = seed,
+  chains = 2,          # Increase if time permits
+  iter = 2000,
+  warmup = 1000,
+  refresh = 250
+)
+
+bmult_end <- Sys.time()
+```
+
+Let's view it now.
+
+```{r bmult-view}
+bmult_end - bmultstart
+print(bmult1)
+```
+
+Here is best efforts as displaying the table:
+```{r}
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(modelsummary)
+library(broom.mixed)
+
+# Tidy and parse response/predictor from term
+tidy_bmult_clean <- tidy(bmult1, conf.int = TRUE) %>%
+  filter(effect == "fixed") %>%
+  separate(term, into = c("response", "predictor"), sep = "_", extra = "merge") %>%
+  mutate(response = str_remove(response, "^mu"))  # Remove "mu" prefix
+
+datasummary_df(
+  tidy_bmult_clean,
+  estimate = "{estimate} [{conf.low}, {conf.high}]",
+  statistic = NULL,
+  title = "Bayesian Multinomial Model: Posterior Estimates",
+  output = "huxtable"
+)
+
+```
+
+
+Additionally, we can view the `loo` outputs for the model to see if there are any outliers.
+
+```{r bmult-loo}
+(loo_mult <- loo(bmult1))
+plot(loo_mult)
+```
+
+Lastly, we can do a posterior predictive check to see how well the model predicts each outcome. 
+
+```{r bmult-ppcheck}
+pp_check(bmult1) + theme_light()
+
+# Step 1: Convert observed outcome to numeric (1 = Voting, ..., 4 = FMLA)
+y <- as.integer(pewamend$milestone)
+
+# Step 2: Posterior predicted category outcomes
+yrep <- posterior_predict(bmult1, draws = 100)
+
+# Step 3: Convert factor predictions to numeric (if needed)
+# Get all unique levels across all predictions
+predicted_levels <- sort(unique(as.character(yrep)))
+
+# Coerce all posterior predictions to numeric using those levels
+yrep_num <- apply(yrep, c(1,2), function(x) match(x, predicted_levels))
+
+
+# Step 4: Posterior predictive bar plot
+ppc_bars(y = y, yrep = yrep_num) +
+  scale_x_continuous(breaks = 1:4, 
+                     labels = c("Voting", "BC Pill", "Equal Pay", "FMLA")) +
+  coord_cartesian(xlim = c(0.5, 4.5)) +
+  labs(x = "Perceived Most Important Advance for Women",
+       y = "Proportion",
+       title = "Posterior Predictive Check using `ppc_bars()`",
+       caption = "100 posterior draws of outcome category predictions")
+
+
+```
+
+Wow! That's exceedingly good. 
