@@ -116,15 +116,15 @@ Since we're working with new data, let's see if there are any patterns of missin
 ```{r miss-upset}
 gg_miss_upset(pewamend)
 ```
+Let's take this at face-value and say there is no particular pattern. If this were a more formal analysis for a research paper, this would need more serious considerations. But in the interest of time, let's employ listwise deletion.
 
-Seeing no particular pattern, let's employ listwise deletion. 
 ```{r list-delete}
 pewamend <- pewamend %>% drop_na()
 pewamend %>% count
 ```
 
 ## Descriptives
-As always, let's look at our descriptive statistics. Since we have only two numeric variables (weight and age), we can simply create a table with means and standard deviations for those, and count and percent for our categorical variables. 
+As always, let's look at our descriptive statistics. Since we have only one numeric variables (age), we can simply create a table with means and standard deviations for those, and count and percent for our categorical variables. 
 ```{r desc-tables, message=FALSE, warning=FALSE}
 datasummary_balance( ~ 1, data = pewamend,
                      fmt = 2, # Show 2 decimal places 
@@ -137,7 +137,7 @@ datasummary_balance( ~ 1, data = pewamend,
 
 Our first variable today is whether people think women's rights have gone too far, not far enough, or about right. Because this has an order to it, we call this ordinal. 
 
-### Incorrect: A series of logit or OLS models
+### Using what we already know: A series of logit or OLS models
 
 A common way of doing this is to create a logit model. Say we're trying to predict just people who say it hasn't gone far enough or just people who say it's gone too far, we could create dummies for these and run a series of logit models. 
 
@@ -180,7 +180,7 @@ Thinking back to Stats I, we know an ordinal variable is one that has a defined 
 
 
 ## Ordinal Logistic Regression
-Let's say there's something underlying this: A scale from 0 to 100. We know that the lower values will say "Too Far" and the higher values will say "Not Far Enough," but we don't know where those groups end and the "About Right" group begins. 
+Let's assume there is some latent continuous dimension onto which we can project the categories: A scale from 0 to 100. We know that the lower values will say "Too Far" and the higher values will say "Not Far Enough," but we don't know where those groups end and the "About Right" group begins. 
 
 This is the value of ordinal logistic regression. Just like binary logistic regression, we're looking for the value(s) that move a person from the base category (Too Far) to the next (About Right), and at the same time, from that category to the next (Not far enough). 
 
@@ -227,7 +227,7 @@ So here we see that men have lower log odds of saying there is more progress to 
 
 ### Odds Ratios
 
-Lastly, since this is a  GLM, we  can convert log odds (the default output) into odds ratios. 
+Let's convert log odds (the default output) into odds ratios. 
 
 ```{r order-oddsratio}
 modelsummary(list("Log Odds" = order2, "Odds Ratio" = order2), 
@@ -247,7 +247,7 @@ Our second variable we'll be looking at is which item people think was most impo
 
 These were included in the same question, and respondents were asked to pick ONE of these. 
 
-### Incorrect: A series of logit models
+### Using what we already know: A series of logit models
 
 One way people will try to analyze these questions is with a series of logistic regression models. Below, I use `fastDummies::dummy_cols()` to create a set of binary indicators for whether a person chose each item. 
 
@@ -418,7 +418,27 @@ plot(loo_ord)
 Lastly, we can do a posterior predictive check to see how well our model fits to the actual outcomes.
 
 ```{r}
-pp_check(bordinal1)
+library(bayesplot)
+
+# Convert observed ordinal outcome to numeric codes
+y <- as.integer(pewamend$rightsprog)
+
+# Simulate posterior predictions (100 draws, returns numeric matrix)
+yrep <- posterior_predict(bordinal1, draws = 100)
+
+# Convert factor predictions to numeric in one line
+yrep_num <- apply(yrep, c(1,2), function(x) as.integer(factor(x, 
+  levels = levels(pewamend$rightsprog))))
+
+# Plot posterior predictive check using bar distributions
+ppc_bars(y = y, yrep = yrep_num) +
+  scale_x_continuous(breaks = 1:3, 
+                     labels = c("Too Far", "About Right", "Not Far Enough")) +
+  coord_cartesian(xlim = c(0.5, 3.5)) +
+  labs(x = "Public Opinion on Women's Rights", 
+       y = "Proportion", 
+       title = "Posterior Predictive Check using `ppc_bars()`",
+       caption = "Outcome categories truncated to ordinal range (1–3)")
 ```
 
 So here we can see that our model overestimated people who think women's rights have not gone far enough (=3) and vastly underestimated the proportion of people who think it's gone too far or is about right. 
@@ -489,6 +509,32 @@ Lastly, we can do a posterior predictive check to see how well the model predict
 
 ```{r bmult-ppcheck}
 pp_check(bmult1) + theme_light()
+
+# Step 1: Convert observed outcome to numeric (1 = Voting, ..., 4 = FMLA)
+y <- as.integer(pewamend$milestone)
+
+# Step 2: Posterior predicted category outcomes
+yrep <- posterior_predict(bmult1, draws = 100)
+
+# Step 3: Convert factor predictions to numeric (if needed)
+# Get all unique levels across all predictions
+predicted_levels <- sort(unique(as.character(yrep)))
+
+# Coerce all posterior predictions to numeric using those levels
+yrep_num <- apply(yrep, c(1,2), function(x) match(x, predicted_levels))
+
+
+# Step 4: Posterior predictive bar plot
+ppc_bars(y = y, yrep = yrep_num) +
+  scale_x_continuous(breaks = 1:4, 
+                     labels = c("Voting", "BC Pill", "Equal Pay", "FMLA")) +
+  coord_cartesian(xlim = c(0.5, 4.5)) +
+  labs(x = "Perceived Most Important Advance for Women",
+       y = "Proportion",
+       title = "Posterior Predictive Check using `ppc_bars()`",
+       caption = "100 posterior draws of outcome category predictions")
+
+
 ```
 
 Wow! That's exceedingly good. 
