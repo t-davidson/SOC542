@@ -73,7 +73,7 @@ options("modelsummary_format_numeric_latex" = "plain")
 # Course updates
 - Homework 4 due Friday, 4/18 at 5pm
 - Project preliminary results due next Friday, 4/25 at 5pm
-- Presentations in class on 5/1
+- Presentations in class on 5/5
 
 # Course updates
 - Labs
