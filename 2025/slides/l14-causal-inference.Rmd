@@ -1,0 +1,559 @@
+---
+title: "SOC542 Statistical Methods in Sociology II" 
+subtitle: "Causal inference"
+author: Thomas Davidson
+institute: Rutgers University
+date: April 28, 2025
+urlcolor: blue
+output:
+    beamer_presentation:
+      theme: "Szeged"
+      colortheme: "beaver"
+      fonttheme: "structurebold"
+      toc: FALSE
+      incremental: FALSE
+      fig_width: 3.5
+      fig_height: 2.5
+header-includes:
+  - \usepackage{hyperref}
+  - \usepackage{multicol}
+  - \usepackage{caption}
+  - \usepackage{booktabs}
+  - \usepackage{siunitx}
+  - \newcolumntype{d}{S[input-symbols = ()]}
+  - \captionsetup[figure]{font=scriptsize}
+  - \captionsetup[figure]{labelformat=empty}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(dev = 'pdf')
+library("knitr")
+library("formatR")
+library(ggplot2)
+library(tidyverse)
+library(latex2exp)
+library(kableExtra)
+library(modelsummary)
+library(viridis)
+library(cowplot)
+library(mice)
+library(reshape2)
+library(haven)
+library(dagitty)
+library(ggdag)
+
+opts_chunk$set(tidy.opts=list(width.cutoff=80),tidy=TRUE)
+opts_chunk$set(tidy = FALSE)
+
+knitr::knit_hooks$set(mysize = function(before, options, envir) {
+  if (before) 
+    return(options$size)
+})
+
+knitr::opts_chunk$set(
+ fig.width = 4,
+ fig.asp = 0.8,
+ out.width = "70%",
+ fig.align = "center"
+)
+
+kable <- function(data) {
+  knitr::kable(data, digits = 3) %>% 
+    kable_styling(position = "center")
+}
+
+set.seed(14850)
+
+options("modelsummary_format_numeric_latex" = "plain")
+```
+
+# Course updates
+- Presentations on 5/5
+    - 10 minutes to present project
+        - Introduction
+        - Data 
+        - Methodology
+        - Main results
+        - Robustness checks
+        - Conclusions
+    - 5 minutes for Q&A
+    
+# Course updates
+- Presentations on 5/5
+    - Make your slides in Google Slides
+    - Copy and paste into main deck when finished (link will be shared via email)
+
+# Plan
+- Introduction to causal inference
+- Methods
+    - Matching and weighting using propensity scores\*
+    - Instrumental variables\*
+    - Regression discontinuity
+    - Difference-in-differences
+    
+# Causal inference and regression
+- Causal inference entails making causal claims about relationships between variables
+    - $X$ causes $Y$
+- So far, we have generally refrained from making causal claims
+    - We have focused on estimating relationships between variables
+    - Correlations, associations
+    
+# Causal inference and regression
+## Causal inference in the social sciences
+- Causal inference is a central goal of much social science research, but varying emphasis across disciplines
+    - Primary goal in much economic research
+    - Preferred in quantitative political science
+    - Growing interest in sociology, harder to publish descriptive work
+    - Psychology primarily an experimental science already
+
+# Causal inference and regression
+## Potential outcomes
+- $D_i$ is a binary variable denoting whether a unit is treated.
+- For each unit, we have two \textbf{potential outcomes}:
+    - Outcome if $D_i = 1$ (treated): $Y_i^1$
+    - Outcome if $D_i = 0$ (untreated): $Y_i^0$ 
+- The outcome for a given unit can be expressed as:
+    - $Y_i =Y_i^1 D_i+Y_i^0\left(1-D_i\right)$
+
+# Causal inference and regression
+## The fundamental problem of causal inference
+- Only one treatment status and outcome is observed for each unit.
+    - The difference in potential outcomes for a unit, $Y_i^1 - Y_i^0$, is unobservable
+    - The hypothetical outcome if treatment status differed is known as a \textbf{counterfactual}.
+
+# Causal inference and regression
+## When regression is causal
+- In an experiment, we can randomly assign subjects to treatment and control conditions and compare the outcomes across subjects.
+- Assuming a binary treatment, $D$ we could estimate the following regression:
+
+$$y_i = \hat{\beta_0} + \hat{\beta_1}D_i + u_i$$
+
+- Here $\hat{\beta_1}$ will provide an estimate of the average treatment effect (ATE).
+
+# Causal inference and regression
+## Observational data
+- Many social science questions cannot be tested via experiments.
+- But we can conduct pseudo-experiments where observed variables are considered as treatments.
+    - e.g. What is effect of college degree on earnings?
+- Assignment to treatment is not controlled by researcher or randomized.
+    - \textbf{Selection bias}: Subjects may select into treatment.
+    
+# Causal inference and regression
+## Selection on observables   
+- We can account for selection process and make a causal estimate using observational data if the selection process is observable.
+- \textbf{Ignorability}
+    - The treatment assignment is independent of the potential outcomes, conditional on observed covariates.
+    - All possible confounders are observed.
+- After conditioning on $X$, the treatment assignment is as good as random.
+    
+# Causal inference and regression
+## Selection on observables 
+```{r, echo=FALSE, out.width = "60%"}
+D3 <- dagify(Y ~ D,
+    D ~ X,
+    Y ~ X,
+  exposure = "D",
+  outcome = "Y",
+  coords = list(
+  x = c(D = 0, X = 1, Y = 2),
+  y = c(D = 0, X = 0.5, Y = 0)
+)
+)
+ggdag_status(D3, layout = "circle") +
+  theme_dag() + theme(legend.position = "none")
+```
+    
+# Causal inference and regression
+## Selection on observables     
+- Confounding (omitted variables bias) is nearly always a risk
+    - Few cases where we can expect to measure *all* unobserved confounders
+- Causal inference techniques can be used to make causal claims by enabling us to approximate randomized experiments
+    - But each approach entails many assumptions and there is no silver bullet when working with observational data
+
+# Causal inference and regression
+## Causal inferences from observational data
+- There are several approaches to making causal inference using observational data that extend regression methods
+- This class will focus on four common ones:
+    - Propensity score matching and weighting
+    - Instrumental variables
+    - Regression discontinuity
+    - Difference-in-difference
+
+# Propensity score matching and weighting
+- Intuition: 
+    - Find treated and untreated units with similar covariates then compare outcomes.
+- Addresses selection by comparing similar observations
+    - Assumes selection on observables
+        
+# Propensity score matching and weighting
+## Matching approches 
+- Exact matching
+    - Ideal case, but limited value in practice as requires extreme subsampling
+- Partial or fuzzy matching
+    - Match on a subset of covariates
+    - Use a distance metric to find similar units
+- Propensity score matching
+    - Estimate a model to predict treatment, $\hat{p_i} = P(D_i = 1|X_i)$
+    - Use $\hat{p_i}$ to match units with similar scores
+- Causal estimate obtained by comparing outcomes of matched units
+
+# Propensity score matching and weighting
+## Estimating propensity scores
+- Estimate the probability of treatment conditional on covariates, typically using logistic regression
+    - Goal is to explain as much variance as possible to try to achieve balance
+    - A large number of predictors and transformations recommended (Morgan and Todd 2008)
+- Key assumptions:
+    - Ignorability: Treatment assignment is independent of potential outcomes, conditional on $X$
+    - Overlap: Each unit has a nonzero probability of receiving treatment and control
+
+
+# Simulating propensity scores
+```{r, fig.align='center', out.width = "90%"}
+include_graphics('../../img/pscore.png')
+```
+\tiny See `matching_sim.R` for code.
+
+# Matches within propensity score strata
+```{r, fig.align='center', out.width = "90%"}
+include_graphics('../../img/matched.png')
+```
+
+# Propensity score matching and weighting
+## Propensity score weighting
+- Reweight observations to create a synthetic sample
+    - Adjust regression estimates to account for propensity to select into treatment
+- Check *balance* after weighting to ensure covariates are similar across treatment groups
+
+# Propensity score matching and weighting
+## Propensity score weighting
+- Reweighting to measure the Average Treatment Effect on the Treated (ATT)
+    - Treatment group is unchanged. The goal is to "turn the control group into a representative sample of the population-level treatment group" (Morgan and Todd 2008: 244).
+
+$$
+d_i = 1: w_{i,ATT} = 1
+$$
+$$
+d_i = 0: w_{i,ATT} = \frac{\hat{p_i}}{1-\hat{p_i}}
+$$
+
+# Propensity score matching and weighting
+## Morgan and Todd (2008) procedure
+```{r, fig.align='center', out.width = "90%"}
+include_graphics('../../img/morgan_todd.png')
+```
+
+ 
+# Propensity score matching and weighting
+## Example: Organizational participation and network expansion (Davidson and Sanyal 2017)
+- Do women who participate in self-help groups (SHGs) have larger networks?
+- Causal mechanism: SHGs provide social capital and resources
+- Selection problem
+    - Women who join SHGs may be systematically different from those who do not
+- Solution
+    - Propensity scores to estimate SHG participation
+    - Use ATT weighting and matching estimators
+    
+# Unadjusted regression results
+```{r, fig.align='center', out.width = "90%"}
+include_graphics('../../img/ds_raw.png')
+```
+
+# Balance table
+```{r, fig.align='center', out.width = "60%"}
+include_graphics('../../img/ds_balance.png')
+```
+
+# Weighted and matched results
+```{r, fig.align='center', out.width = "90%"}
+include_graphics('../../img/ds_matched.png')
+```
+
+# Propensity score matching and weighting
+## Critiques of propensity score matching
+- King and Nielsen's (2019) critique:
+    - PSM approximates a completely randomized experiment, not an efficient blocked randomized experiment
+    - Matching on propensity scores can increase imbalance relative to matching directly on covariates
+        - We lose information by reducing the comparison to a single score
+- PSM can introduce *bias*, *inefficiency*, and *model dependence*
+- Solution: Directly match on covariates (e.g., Mahalanobis distance matching, coarsened exact matching)
+
+# Propensity score matching and weighting
+## Practical advice
+- Estimating propensity scores is a useful approach for weighting
+- For matching, it is better to match directly on covariates
+- Always:
+    - Check covariate balance after matching or weighting
+    - Note that neither approach can correct for unobserved confounders
+
+# Instrumental variables
+- Find an exogenous regressor to explain random variation in a treatment
+    - Relaxes selection on observables assumption
+- Random variation in the treatment can be isolated and treated as a causal effect
+- A good IV has a "certain ridiculousness" (Cunningham) with respect to the outcome
+
+# Instrumental variables
+## Rainfall and protest
+- We want to infer effect of protest (treatment) on policy change (outcome)
+- But protest is not randomly assigned; unmeasured confounders
+- Rainfall is an \textbf{instrument} insofar as it effects protest and indirectly effects policy change *only through* its effect on protest
+
+# Instrumental variables
+## Rainfall and protest
+```{r, echo=FALSE, out.width = "60%"}
+D3 <- dagify(Policy ~ Protest,
+    Protest ~ Rainfall,
+    Protest ~ U,
+    Policy ~ U,
+  exposure = "Protest",
+  outcome = "Policy",
+  coords = list(
+  x = c(Rainfall = 0, Protest = 1, U = 1, Policy = 2),
+  y = c(Rainfall = 0, Protest = 0, U = 0.5, Policy = 0)
+)
+)
+ggdag_status(D3, layout = "circle") +
+  theme_dag() + theme(legend.position = "none")
+```
+
+# Instrumental variables in sociology
+```{r, fig.align='center', out.width = "80%"}
+include_graphics('../../img/stewart_felton_1.png')
+```
+\tiny \centering Stewart and Felton 2024.
+
+# Instrumental variables
+## Estimation
+- IV is estimated using two-stage least squares (2SLS)
+- Where $Y$ is the outcome, $D$ is the treatment, and $Z$ is the instrument:
+    - First stage: $\hat{D_i} = \hat{\gamma_0} + \hat{\gamma_1}Z_i + \epsilon_i$
+    - Second stage: $\hat{Y_i} = \hat{\beta_0} + \hat{\beta_1}(\hat{D_i}) + u_i$
+- Additional controls can be included in both stages.
+
+# Instrumental variables
+## Estimation
+- Estimates
+    - First stage isolates unconfounded variation in treatment
+    - Second stage estimates for the causal effect of instrumented treatment on outcome
+
+# Instrumental variables
+## Assumptions
+- IV relies on *strong assumptions* for valid causal inference:
+    - *Relevance:* Instrument must causally affect the treatment
+    - *Unconfoundedness:* Instrument is independent of unobserved confounders
+    - *Exclusion restriction:* Instrument affects the outcome only through the treatment
+    - *Monotonicity:* Instrument does not push some units toward treatment and others away
+    - *SUTVA and positivity:* No interference, and all units must have a chance to receive either value of the instrument
+
+# Instrumental variables
+## Relevance
+- The most basic requirement is that the instrument must causally affect treatment uptake
+- Measured by the first-stage regression:
+    - Strong instrument: Large first-stage coefficient $\hat{\gamma_1}Z_i$, high F-statistic
+        - Multiple instruments can be used, so t-statistics are not sufficient to assess strength
+    - Weak instrument: Small first-stage coefficient, low F-statistic
+- Important to report first-stage F-statistics
+    - Heuristic: F > 10 implies a strong instrument, but maybe bigger is needed (20+)
+
+# Instrumental variables
+## Unconfounded instrument
+- Instrument must be *as good as randomly assigned*
+- No unmeasured common causes with treatment or outcome
+    
+# Instrumental variables
+## Confounded instrument?
+```{r, fig.align='center', out.width = "90%"}
+include_graphics('../../img/stewart_felton_unconfoundedness.png')
+```
+
+# Instrumental variables
+## Confounded instrument?
+```{r, fig.align='center', out.width = "50%"}
+include_graphics('../../img/smelter_locations.png')
+```
+
+# Instrumental variables
+## Example: COVID-19 and right-wing populism (Lall, Davidson, and Hagemeister)
+- Did COVID-19 increase support for right-wing populism?
+- Confounding: COVID-19 infections not randomly assigned
+- Solution: Super-spreader events as instrument
+
+# Locations of super-spreader events
+```{r, fig.align='center', out.width = "90%"}
+include_graphics('../../img/lall_map.png')
+```
+
+# Checking balance
+```{r, fig.align='center', out.width = "90%"}
+include_graphics('../../img/lall_balance.png')
+```
+
+# 2SLS estimates: Social media engagement
+```{r, fig.align='center', out.width = "90%"}
+include_graphics('../../img/lall_twitter.png')
+```
+
+# 2SLS estimates: Electoral support
+```{r, fig.align='center', out.width = "90%"}
+include_graphics('../../img/lall_election.png')
+```
+
+# Instrumental variables
+## Exclusion restriction
+- Instrument affects the outcome *only through treatment*
+- Violations can arise:
+    - If instrument affects outcome through other causal pathways
+    - If treatments are coarsely measured
+- Violations are hard to rule out and can severely bias results
+
+# Instrumental variables
+## Exclusion restriction
+```{r, fig.align='center', out.width = "90%"}
+include_graphics('../../img/stewart_felton_exclusion.png')
+```
+
+# Instrumental variables
+## Example: Weather instruments
+- Mellon (2024) surveys weather-IV studies
+    - Extensive evidence of many relationships between weather and social outcomes
+    - Hard to maintain exclusion assumption
+
+# Potential exclusion violations for rainfall
+```{r, fig.align='center', out.width = "90%"}
+include_graphics('../../img/weather_instrument.png')
+```
+\tiny Mellon 2024.
+
+# Instrumental variables
+## Exclusion restriction violations
+- Similar problems apply to many common instruments:
+    - Historical shocks (e.g. recession, war, colonialism)
+    - Geographic variation (e.g. altitude, distance)
+    - Policy changes
+
+# Instrumental variables
+## Sensitivity to violations
+- Many IV estimates vulnerable to small biases
+    - Tiny relationships between exclusion variables and outcomes can nullify findings
+    - Sensitivity analysis essential for credible IV claims
+
+<!--
+# Instrumental variables
+## Monotonicity
+- Instrument must *encourage treatment for some*, but *never discourage* others
+- No "defiers": units for whom the instrument has the opposite effect
+- Often assumed, rarely tested
+
+# Causal inference and regression
+## Other assumptions: SUTVA and positivity
+- *SUTVA (Stable Unit Treatment Value Assumption):*
+    - No interference between units
+    - No hidden versions of the instrument or treatment
+- *Positivity:*
+    - Every covariate profile must have a nonzero probability of receiving each instrument value
+-->
+
+# Instrumental variables
+## IV is powerful but fragile
+- IV can identify causal effects when unmeasured confounding exists
+- But IV is *highly sensitive* to assumption violations
+    - Small violations (especially with weak instruments) can cause large bias
+    - Requires careful assessment, diagnostics, and transparency
+
+# Regression discontinuity designs (RDD)
+- Treatment is assigned based on a cutoff in a continuous, "running" variable
+- Provides a way to estimate causal effects near the cutoff
+
+# Regression discontinuity designs
+## Example: Test scores and college enrollment
+```{r, fig.align='center', out.width = "80%"}
+include_graphics('../../img/rdd_hoekstra1.jpg')
+```
+\tiny Hoekstra (2009), from Cunningham 2021.
+
+# Regression discontinuity designs
+## Assumptions
+- Continuity: No unobserved confounders at the cutoff
+- No manipulation: No one can manipulate the running variable to gain treatment
+- Local randomization: Units just above and below the cutoff are similar
+- Treatment effect is local: The estimated effect is valid only for units near the cutoff
+
+# Regression discontinuity designs
+## Sharp vs. fuzzy designs
+- Sharp RDD: Treatment status perfectly determined at the cutoff
+- Fuzzy RDD: Probability of treatment changes at the cutoff
+- Both can be used for causal inference if assumptions hold
+
+# Regression discontinuity designs
+## Sharp vs. fuzzy RDD
+```{r, fig.align='center', out.width = "80%"}
+include_graphics('../../img/sharp_fuzzy.png')
+```
+\tiny Cunningham 2021.
+
+
+# Difference-in-differences
+- Compare changes over time between treated and control groups
+- Basic idea: Subtract differences to account for trends
+    - Removes any bias due to fixed unobservables
+
+# Difference-in-differences
+## Basic DiD estimator
+- Where $T$ denotes treatment and $C$ denotes control, and $0$ is before and $1$ is after:
+
+$$
+\hat{\text{DiD}} = (\overline{Y}_{T,1} - \overline{Y}_{T,0}) - (\overline{Y}_{C,1} - \overline{Y}_{C,0})
+$$
+
+- First difference: Change over time in treated group
+- Second difference: Change over time in control group
+- DiD compares these changes to estimate treatment effect
+
+# Difference-in-differences
+## Example: Police officer deaths and excessive force
+```{r, fig.align='center', out.width = "90%"}
+include_graphics('../../img/office_killings.jpg')
+```
+\tiny Zhao, L., & Papachristos, A. V. 2024. Threats to Blue Networks: The Effect of Partner Injuries on Police Misconduct. *American Sociological Review*, 89(1), 159-195.
+
+# Difference-in-differences
+## Key assumption
+- Parallel trends
+    - In the absence of treatment, treated and control groups would have moved in parallel (allowing common shocks)
+    - No time-varying unobservable confounders
+
+# Difference-in-differences
+## Extensions and considerations
+- Multiple periods allow testing for pre-treatment trends
+- Event study designs can show treatment dynamics over time
+- Staggered adoption of treatment complicates standard DiD
+
+# Causal inference and regression
+## Causation and description
+- Descriptive claims are valuable and descriptive regression models can provide rich insights into social processes
+- Causal thinking is important for model specification and inference techniques can be used to make stronger causal claims
+- But causal inference often requires that we focus on a very narrowly defined problem, losing some of the richness of description
+
+# Causal inference and regression
+## Using causal inference techniques
+- Causal inference is difficult in observational settings due to selection bias and typically requires strong assumptions
+- Triangulation across multiple methodologies is often necessary
+- Complex methodological literature associated with each methodology
+    - Diagnostic tests and bias analyses important
+    - Robustness checks using alternative estimators and specifications
+
+# Causal inference and regression
+## Four designs, one goal  
+
+- \textbf{PSM/weighting}: assume selection on observables; make treated & control alike
+- \textbf{IV}: let $Z$ create exogenous variation in $D$ (relevance + exclusion)
+- \textbf{RDD}: near cutoff, units are as-if random
+- \textbf{DiD}: differencing removes *time-invariant* unobservables; needs parallel trends
+
+
+# Summary
+- Causal inference is difficult in observational settings due to selection bias
+- Various regression-based techniques can be used to infer causality
+- All techniques entail strong assumptions and require careful evaluation to make valid inferences
