@@ -92,6 +92,8 @@ BLANK
 
 Download wage1 dataset from Github into your working directory then import wage1.dta using the `read_dta` function from the haven package. Name the object `wage_org`.
 
+Note that the data file is located inside the `DATASETS` folder inside your working directory.
+
 ```{r}
 wage_org <- read_dta("DATASETS/wage1.dta")
 ```
