@@ -50,6 +50,18 @@ a <- sample(1:100, size = 10, replace = T)
 
 Here are some basic functions for measures of central tendency.
 
+Median:
+```{r}
+# Delete this and place your answer here
+```
+
+Mean:
+```{r}
+
+```
+
+R does not provide a built-in function for mode--the most frequent value of a variable. Instead, you can create a custom function as follows. No need to memorize any of this! Note that any functions you will be using in R are structured like this under the hood.
+
 Mode:
 ```{r}
 getmode <- function(v) {
@@ -59,33 +71,21 @@ getmode <- function(v) {
 getmode(a)
 ```
 
-Median:
-```{r}
-BLANK
-```
-
-Mean:
-```{r}
-BLANK
-```
-
 Here are some basic functions for measures of variability.
 
 Range:
 ```{r}
-BLANK
+
 ```
 
 Inter-quartile range
 ```{r}
-BLANK
+
 ```
 
 Variance and standard deviation
 ```{r}
-BLANK
 
-BLANK
 ```
 
 ## Let's load the data
@@ -101,8 +101,10 @@ wage_org <- read_dta("DATASETS/wage1.dta")
 Info about dataset: http://fmwww.bc.edu/ec-p/data/wooldridge/datasets.list.html
 Codebook: http://fmwww.bc.edu/ec-p/data/wooldridge/wage1.des
 
+Let's begin by creating a copy of the original dataset. As you will make many changes to the dataset, creating an intermediate object (i.e., wage1) and keeping the original dataset helps revert any changes you made.
+
 ```{r}
-# Copy wage_org to a working dataset called wage1. Best practices to not override original dataset. 
+# Copy wage_org to an intermediate dataset called wage1.
 wage1 <- wage_org
 ```
 
@@ -113,26 +115,26 @@ wage1 <- wage_org
 Inspect data in R viewer using `View` function.
 
 ```{r}
-BLANK
+
 ```
 
 *Question*: What do the columns and rows represent?
 
-Response*:* BLANK
+Response:
 
 *Question*: Using code, how many rows and columns are there?
 
 ```{r}
-BLANK
+
 ```
 
 *Question*: How big is the sample size? (n = ?)
 
-Response: BLANK
+Response:
 
 *Question*: Find participant 35 in the View(wage1), how many years of education did they report?
 
-Response: BLANK
+Response:
 
 *Question*: Instead of manually looking up the row and column, what code works to answer this?
 
@@ -145,17 +147,23 @@ wage1[BLANK]
 Use the `str` function to understand the structure of the dataset.
 
 ```{r}
-BLANK
+
+```
+
+You can use the `glimpse` function to get a similar result to `str`.
+
+```{r}
+
 ```
 
 *Question*: Are there any factor variables?
 
-Response: BLANK
+Response: 
 
-Question 5: Determine the number of missing values in each variable.
+Question 5: Determine the number of missing values in each variable using the `colSums` and `is.na` functions.
 
 ```{r}
-colSums(BLANK)
+
 ```
 
 #### Exercise
@@ -163,14 +171,14 @@ colSums(BLANK)
 -   Use the `head` function to display the first few rows of the dataset. This gives a glimpse of the actual data values.
 
 ```{r}
-BLANK
+
 ```
 
 ### Data Recoding & Wrangling
 
 #### Exercise
 
--   Create a new factor variable called `gender` based on the `female` variable. This variable should have two levels: "Male" and "Female", where `female == 1` is "Female".
+-   Create a new factor variable called `gender` based on the `female` variable. This variable should have two levels: "Male" and "Female", where `female == 1` is "Female". Fill in the BLANKs.
 
 ```{r}
 wage1 <- wage1 %>%
@@ -279,60 +287,65 @@ region_table
 
 Use `datasummary_skim` to provide a descriptive table of wage2
 ```{r}
-BLANK
+
 ```
 
 *Question 6*: What is the most common education level in the dataset?
 
-Response: BLANK
+Response:
 
 *Question 7*: What is the average number of years of experience (`exper`) among the participants?
 
 ```{r}
-BLANK
-# Response: BLANK
+
 ```
+
+Response:
 
 *Question 8*: Which education level has the highest average hourly earnings?
 
 ```{r}
 wage2 %>%
   group_by(BLANK) %>%
-  summarise(
+  summarize(
     Mean = BLANK(BLANK, na.rm = TRUE)
   )
-# Response: BLANK
 ```
+
+Response:
 
 *Question 9*: What is the standard deviation of the education level with the second highest average hourly earnings?
 
 ```{r}
 wage2 %>%
   group_by(BLANK) %>%
-  summarise(
+  summarize(
     Mean = BLANK(BLANK, na.rm = TRUE),
     SD = BLANK(BLANK,na.rm = TRUE)
   )
-# Response: BLANK
 ```
+
+Response:
 
 *Question 10*: Based on the descriptive statistics obtained, what kind of statistical analysis would you perform to make a more formal inference about the relationship between education level and wages? Why would you choose this method?
 
-Response: BLANK
+Response:
 
 ### Data Visualizations
 
 #### Exercise
 
+Let's use `ggplot2` package for visualization. The main `ggplot` function is the heavy lifter. It takes in a dataset and a few variables inside the `aes` function to draw axes (e.g., x and y axes). Then, you can add whatever geometries using the `geom_...` function family, connected by `+`.
+
 Fill in the blanks in the below code for a box-and-whiskers plot.
 
 ```{r}
-ggplot(BLANK, aes(x = BLANK, y = BLANK)) +
+ggplot(BLANK, aes(x = BLANK, y = BLANK)) + # provide a dataset and variables for axes
   geom_boxplot() +
   labs(title = "Figure 1. Average Hourly Earnings by Education Level",
        x = "Education Level",
        y = "Hourly Earnings",
-       caption = "Notes: n=BLANK; Wooldridge Data Set") +
+       caption = "Notes: Wooldridge Data Set") +
   theme_minimal()
 ```
 
@@ -343,19 +356,19 @@ Calculate the mean wage for each education level.
 ```{r}
 mean_wages <- wage2 %>%
   group_by(BLANK) %>%
-  summarise(Mean = BLANK(BLANK, na.rm = TRUE))
+  summarize(Mean = BLANK(BLANK, na.rm = TRUE))
 ```
 
-Create the histogram with density plots and mean lines.
+Create the histogram with density plots and mean lines. Find appropriate geom_... functions.
 ```{r}
 ggplot(BLANK, aes(x = BLANK, fill = BLANK)) +
-  geom_density(alpha = 0.7) +
-  geom_vline(data = mean_wages, aes(xintercept = Mean, color = educ_level), linetype = "dashed") +
+  geom_...(alpha = 0.7) + # replace ... with proper function
+  geom_...(data = mean_wages, aes(xintercept = Mean, color = educ_level), linetype = "dashed") +
   scale_fill_brewer(palette = "Set1") +
   labs(title = "Figure 2. Average Hourly Earnings by Education Level",
        x = "Hourly Earnings",
        y = "Density",
-       caption = "Notes: n=BLANK; Wooldridge Data Set") +
+       caption = "Notes: Wooldridge Data Set") +
   theme_minimal()
 ```
 
