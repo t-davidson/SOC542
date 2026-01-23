@@ -1,0 +1,375 @@
+---
+title: 'Week1: Review of Basics'
+author: "YJ Chae"
+date: "2026-01-26"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE) # FALSE hides the code but shows the output (if any)
+knitr::opts_chunk$set(message = FALSE) # FALSE suppresses messages in the output document.
+knitr::opts_chunk$set(warning = FALSE) # FALSE suppresses warnings in the output document.
+
+options(scipen=999)  # Set to display small numbers in decimal form
+set.seed(1234) # Optional, for reproducibility
+
+# Check and load required libraries
+# tidyverse: A collection of packages for data manipulation and visualization
+if(!require(tidyverse)) install.packages("tidyverse")
+library(tidyverse)
+
+# ggplot2: A system for creating graphics
+if(!require(ggplot2)) install.packages("ggplot2")
+library(ggplot2)
+
+# haven: for reading in stata (.dta) files
+if(!require(haven)) install.packages("haven")
+library(haven) 
+
+# modelsummary: Summarizes and presents regression models and data frames in tables
+if(!require(modelsummary)) install.packages("modelsummary")
+library(modelsummary)
+
+```
+
+#### Let's refresh our memory of the RStudio Environment
+
+```{r}
+getwd() # Show the working directory
+
+# Use setwd() if you need to change the file path or point-and-click in the file pane to the right
+```
+
+## R Basics Review
+Let's start by creating a vector of whole random numbers called `a`.
+```{r}
+a <- sample(1:100, size = 10, replace = T)
+```
+
+Here are some basic functions for measures of central tendency.
+
+Median:
+```{r}
+# Delete this and place your answer here
+```
+
+Mean:
+```{r}
+
+```
+
+R does not provide a built-in function for mode--the most frequent value of a variable. Instead, you can create a custom function as follows. No need to memorize any of this! Note that any functions you will be using in R are structured like this under the hood.
+
+Mode:
+```{r}
+getmode <- function(v) {
+  as.numeric(names(which.max(table(v))))
+}
+
+getmode(a)
+```
+
+Here are some basic functions for measures of variability.
+
+Range:
+```{r}
+
+```
+
+Inter-quartile range
+```{r}
+
+```
+
+Variance and standard deviation
+```{r}
+
+```
+
+## Let's load the data
+
+Download wage1 dataset from Github into your working directory then import wage1.dta using the `read_dta` function from the haven package. Name the object `wage_org`.
+
+Note that the data file is located inside the `DATASETS` folder inside your working directory.
+
+```{r}
+wage_org <- read_dta("DATASETS/wage1.dta")
+```
+
+Info about dataset: http://fmwww.bc.edu/ec-p/data/wooldridge/datasets.list.html
+Codebook: http://fmwww.bc.edu/ec-p/data/wooldridge/wage1.des
+
+Let's begin by creating a copy of the original dataset. As you will make many changes to the dataset, creating an intermediate object (i.e., wage1) and keeping the original dataset helps revert any changes you made.
+
+```{r}
+# Copy wage_org to an intermediate dataset called wage1.
+wage1 <- wage_org
+```
+
+### Basic Data Overview
+
+#### Exercise
+
+Inspect data in R viewer using `View` function.
+
+```{r}
+
+```
+
+*Question*: What do the columns and rows represent?
+
+Response:
+
+*Question*: Using code, how many rows and columns are there?
+
+```{r}
+
+```
+
+*Question*: How big is the sample size? (n = ?)
+
+Response:
+
+*Question*: Find participant 35 in the View(wage1), how many years of education did they report?
+
+Response:
+
+*Question*: Instead of manually looking up the row and column, what code works to answer this?
+
+```{r}
+wage1[BLANK]
+```
+
+#### Exercise
+
+Use the `str` function to understand the structure of the dataset.
+
+```{r}
+
+```
+
+You can use the `glimpse` function to get a similar result to `str`.
+
+```{r}
+
+```
+
+*Question*: Are there any factor variables?
+
+Response: 
+
+Question 5: Determine the number of missing values in each variable using the `colSums` and `is.na` functions.
+
+```{r}
+
+```
+
+#### Exercise
+
+-   Use the `head` function to display the first few rows of the dataset. This gives a glimpse of the actual data values.
+
+```{r}
+
+```
+
+### Data Recoding & Wrangling
+
+#### Exercise
+
+-   Create a new factor variable called `gender` based on the `female` variable. This variable should have two levels: "Male" and "Female", where `female == 1` is "Female". Fill in the BLANKs.
+
+```{r}
+wage1 <- wage1 %>%
+  mutate(gender = factor(ifelse(female == BLANK, "BLANK", "BLANK"), 
+                         levels = c("Male", "Female")))
+```
+
+#### Exercise
+
+Recode the `educ` variable into a new categorical variable `educ_level` as a factor variable with the following levels:
+    - "Less than High School" (less than 12 years)
+    - "High School Graduate" (12 years)
+    - "Some College" (13 to 15 years)
+    - "College Graduate and above" (16 or more years)
+
+```{r}
+wage1 <- wage1 %>%
+  mutate(educ_level = factor(case_when(
+    educ BLANK 12 ~ "Less than High School",
+    educ BLANK 12 ~ "High School Graduate",
+    educ BLANK 12 & educ < 16 ~ "Some College",
+    educ BLANK 16 ~ "College Graduate and above"
+  ), levels = c("Less than High School", "High School Graduate", "Some College", "College Graduate and above")))
+
+```
+
+#### Exercise
+
+Create a new factor variable `region` based on `northcen`, `south`, and `west`. The regions should be labeled as 'North', 'South', 'West'. If a participant does not fall into any of these categories, label them as `Other`.
+
+```{r}
+wage1 <- wage1 %>%
+  mutate(region = case_when(
+    BLANK == 1 ~ "North Central",
+    BLANK == 1 ~ "South",
+    BLANK == 1 ~ "West",
+    TRUE ~ "Other"  # default case
+  )) %>%
+  mutate(region = factor(region))
+```
+
+*Follow-up*: Did you check if there are any participants who were categorized in more than one region? If there are, how will you handle these cases?
+
+```{r}
+wage1 %>%
+  filter(BLANK) %>%
+  nrow()
+```
+
+#### Exercise
+
+Select a subset of columns for further analysis (`wage`, `educ_level`, `exper`, `tenure`, `gender`, `regio`) from the `wage1` dataset and name the new data frame `wage2`.
+
+```{r}
+wage2 <- BLANK  
+```
+
+### Descriptive Statistics
+
+#### Exercise
+
+Calculate the mean, median, and standard deviation for `wage`,`exper`, and `tenure`.
+
+```{r}
+mean(BLANK, na.rm = TRUE)
+median(BLANK, na.rm = TRUE)
+sd(BLANK, na.rm = TRUE)
+
+mean(BLANK, na.rm = TRUE)
+median(BLANK, na.rm = TRUE)
+sd(BLANK, na.rm = TRUE)
+
+mean(BLANK, na.rm = TRUE)
+median(BLANK, na.rm = TRUE)
+sd(BLANK, na.rm = TRUE)
+```
+
+#### Exercise
+
+Calculate frequency tables with counts and percentages for the categorical variables `educ_level`, `gender`, and `region`. Combine the results for each variable into a single table.
+
+Education level:
+```{r}
+educ_freq <- table(BLANK)
+educ_percent <- prop.table(educ_freq) * 100
+educ_table <- cbind(Count = educ_freq, Percentage = round(educ_percent,2))
+educ_table
+```
+
+Gender:
+```{r}
+gender_freq <- table(BLANK)
+gender_percent <- prop.table(gender_freq) * 100
+gender_table <- cbind(Count = gender_freq, Percentage = round(gender_percent, 2))
+gender_table
+```
+
+Region:
+
+```{r}
+region_freq <- table(BLANK)
+region_percent <- prop.table(region_freq) * 100
+region_table <- cbind(Count = region_freq, Percentage = round(region_percent, 2))
+region_table
+```
+
+Use `datasummary_skim` to provide a descriptive table of wage2
+```{r}
+
+```
+
+*Question 6*: What is the most common education level in the dataset?
+
+Response:
+
+*Question 7*: What is the average number of years of experience (`exper`) among the participants?
+
+```{r}
+
+```
+
+Response:
+
+*Question 8*: Which education level has the highest average hourly earnings?
+
+```{r}
+wage2 %>%
+  group_by(BLANK) %>%
+  summarize(
+    Mean = BLANK(BLANK, na.rm = TRUE)
+  )
+```
+
+Response:
+
+*Question 9*: What is the standard deviation of the education level with the second highest average hourly earnings?
+
+```{r}
+wage2 %>%
+  group_by(BLANK) %>%
+  summarize(
+    Mean = BLANK(BLANK, na.rm = TRUE),
+    SD = BLANK(BLANK,na.rm = TRUE)
+  )
+```
+
+Response:
+
+*Question 10*: Based on the descriptive statistics obtained, what kind of statistical analysis would you perform to make a more formal inference about the relationship between education level and wages? Why would you choose this method?
+
+Response:
+
+### Data Visualizations
+
+#### Exercise
+
+Let's use `ggplot2` package for visualization. The main `ggplot` function is the heavy lifter. It takes in a dataset and a few variables inside the `aes` function to draw axes (e.g., x and y axes). Then, you can add whatever geometries using the `geom_...` function family, connected by `+`.
+
+Fill in the blanks in the below code for a box-and-whiskers plot.
+
+```{r}
+ggplot(BLANK, aes(x = BLANK, y = BLANK)) + # provide a dataset and variables for axes
+  geom_boxplot() +
+  labs(title = "Figure 1. Average Hourly Earnings by Education Level",
+       x = "Education Level",
+       y = "Hourly Earnings",
+       caption = "Notes: Wooldridge Data Set") +
+  theme_minimal()
+```
+
+#### Exercise
+Fill in the blanks in the below code for a histogram of average wages grouped by education level.
+
+Calculate the mean wage for each education level.
+```{r}
+mean_wages <- wage2 %>%
+  group_by(BLANK) %>%
+  summarize(Mean = BLANK(BLANK, na.rm = TRUE))
+```
+
+Create the histogram with density plots and mean lines. Find appropriate geom_... functions.
+```{r}
+ggplot(BLANK, aes(x = BLANK, fill = BLANK)) +
+  geom_...(alpha = 0.7) + # replace ... with proper function
+  geom_...(data = mean_wages, aes(xintercept = Mean, color = educ_level), linetype = "dashed") +
+  scale_fill_brewer(palette = "Set1") +
+  labs(title = "Figure 2. Average Hourly Earnings by Education Level",
+       x = "Hourly Earnings",
+       y = "Density",
+       caption = "Notes: Wooldridge Data Set") +
+  theme_minimal()
+```
+
+Nice work :) End of Week 1 Lab
