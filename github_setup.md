@@ -42,17 +42,17 @@ usethis::create_github_token()
 
 This will take you to Github with some recommended settings pre-selected. Give your token a descriptive name (e.g., "personal-laptop" or "SOC542-class"). Change the expiration period to 90 days so your token does not expire mid-semester. Click "Generate token" and copy the token immediately (you won't be able to see it again).
 
-Back in R, run the following command and paste your token when prompted:
+Back in R, run the following command and paste your token when prompted. It will likely not show anything on your screen. Hit Enter to input it:
 
 ```
 gitcreds::gitcreds_set()
 ```
 
-Note: Github tokens expire by default after 30 days. If you suddenly cannot push or pull, your token may have expired. Re-generate it at [github.com/settings/tokens](https://github.com/settings/tokens) and run `gitcreds::gitcreds_set()` again.
+Note: Github tokens expire after the allotted time. If you suddenly cannot push or pull, your token may have expired. Re-generate it at [github.com/settings/tokens](https://github.com/settings/tokens) and run `gitcreds::gitcreds_set()` again.
 
 For more details, see the [happygitwithr guide](https://happygitwithr.com/https-pat).
 
-Restart RStudio before proceeding to the next step.
+*Restart RStudio before proceeding to the next step.*
 
 5. Finally, you can use Github to get the latest version of all the course files (including this one!) on your computer.
 
