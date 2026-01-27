@@ -27,7 +27,7 @@ library(ggplot2) # For visualizations
 
 ```
 
-Most Stata datasets contain informative variables labels that you can view using R functions. We'll learn how to view them and store them into an R object.
+Most Stata datasets contain informative variable labels that you can view using R functions. We'll learn how to view them and store them into an R object.
 
 To take advantage of these labels, download a dataset in Stata format if available and load it using `read_dta` function in the `haven` package.
 
@@ -135,7 +135,7 @@ ggplot(BLANK, aes(x = BLANK)) +
        y = "Frequency")
 ```
 
-Create a histogram of the violent crime rate in 2001 with bin increments of 25
+Create a histogram of the violent crime rate in 2001 **with bin increments of 25**.
 
 ```{r}
 ggplot(BLANK, aes(x = BLANK)) +
@@ -180,8 +180,10 @@ mean_vcr <- mean(crime$vcr2001, na.rm = TRUE)
 crime %>%
   ggplot(aes(x = poverty_rate, y = vcr2001)) +
   geom_point(color="black") +
+  
   # Add horizontal line representing the overall mean
   geom_hline(yintercept = mean_vcr, linetype = "dashed", color = "blue") +
+  
   # Add vertical lines representing distance from each point to the mean
   geom_segment(aes(xend = poverty_rate, yend = mean_vcr), 
                color = "red", alpha = 0.5) +
@@ -211,18 +213,18 @@ crime %>%
   labs(y="VCR (per 1,000)", x="% Poverty", caption="Notes: Washington D.C. census tracts, 2000") 
 ```
 
-#### Exploring the relationship between `homeownership_rate` and `vcr2001`
+#### Exploring the relationship between `homeownership_rate` and `vcr2001`.
 
 #### Exercise: 
 
-Create a Scatter Plot of `vcr2001` and `homeownership_rate` with line of best fit and averages
+Create a Scatter Plot of `vcr2001` and `homeownership_rate` with line of best fit.
 
 ```{r}
 crime %>%
   ggplot(aes(x = BLANK, y = BLANK))+
   geom_point(color="black") +
   geom_smooth(method="BLANK", color="red", fill=NA)+
-  ggtitle("Scatter Plot of Violent Crime Rate vs. % Homeownership with Averages") +
+  ggtitle("Scatter Plot of Violent Crime Rate vs. % Homeownership") +
   labs(y="Violent Crime Rate (per 1,000)", x="% Homeownership", caption="Notes: Washington D.C. census tracts, 2000") 
 ```
 
@@ -243,7 +245,7 @@ Displaying the summary of the linear model
 
 #### Exercise: 
 
-Debug the code below
+Debug the code below! What function do you use to get a summarized model result?
 
 ```{r}
 sum(lm_model)
