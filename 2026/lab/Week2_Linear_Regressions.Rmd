@@ -86,33 +86,6 @@ attr(crime[["per_tanf"]], "label")
 
 ```
 
-Instead of loading the label one by one, here is a `for` loop that goes through each variable to extract and store its label.
-
-```{r}
-for(var in var_names) {
-  var_labels[which(var_names == var)] <- attr(crime[[var]], "label")
-}
-
-```
-
-Create a data frame with variable names and labels
-
-```{r}
-variables_df <- data.frame(
-  Variable = var_names,
-  Label = var_labels,
-  stringsAsFactors = FALSE  # to keep the text as characters
-)
-
-```
-
-View the definition of the available variables in the dataset
-
-```{r}
-view(variables_df)
-
-```
-
 Generating some quick descriptive statistics of the `crime` dataset
 
 ```{r}
