@@ -72,7 +72,7 @@ print(var_names)
 
 #### Exercise: 
 
-Let's take a look at the label for the `per_tanf` variable. Note how to use 
+Let's take a look at the label for the `per_tanf` variable. Note how to use the `attr` function for a Stata dataset imported by `haven`.
 
 ```{r}
 attr(crime[["per_tanf"]], "label")
