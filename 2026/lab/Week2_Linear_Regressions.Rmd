@@ -72,14 +72,7 @@ print(var_names)
 
 #### Exercise: 
 
-Initialize an empty vector to store variable names and labels.
-
-```{r}
-var_labels <- c()
-
-```
-
-Let's take a look at the label for the `per_tanf` variable.
+Let's take a look at the label for the `per_tanf` variable. Note how to use 
 
 ```{r}
 attr(crime[["per_tanf"]], "label")
