@@ -110,8 +110,7 @@ modelsummary(list("OLS" = model_ols),
              notes = "Notes: *** p < 0.001, ** p < 0.01, * p < 0.05")
 ```
 
-Familiar, right?
-But...
+The `modelsummary` function helps create a regression table that shows coefficient estimates, uncertainty measures (i.e., confidence interval), and statistical significance with star symbols. Specifically, it shows the result from the OLS regression, but it is not without limitations:
 
 ## Limitations of OLS
 
@@ -182,7 +181,7 @@ Recall that in a normal distribution:\
 - **95%** of values fall within **±2 standard deviations**.\
 - **99.7%** of values fall within **±3 standard deviations**.
 
-Thus, this weak prior allows for moderate deviations from 0, effectively assuming "no effect" with 95% confidence.
+Thus, this weakly informative prior allows for moderate deviations from 0, effectively assuming "no effect" with 95% confidence.
 
 ```{r weak-prior}
 bayes_weak_prior <- stan_glm(
@@ -197,16 +196,56 @@ print(bayes_weak_prior)
 ```
 
 ```{r weak-compare-ols}
-modelsummary(list("OLS" = model_ols, "Bayes Weak" = bayes_weak_prior),
+modelsummary(list("OLS" = model_ols, "Bayes Flat" = bayes_uniform, "Bayes Weak" = bayes_weak_prior),
              estimate = "{estimate}{stars} [{conf.low}, {conf.high}]",
              statistic = NULL,
              stars = c("***" = 0.001, "**" = 0.01, "*" = 0.05),
              notes = "Notes: *** p < 0.001, ** p < 0.01, * p < 0.05")
 ```
 
-## Interlude: Posterior predictive checks
+*Interlude: Prior Predictive Simulation*
 
-One way to evaluate the performance of our Bayes model is simulate data from the posterior distribution and compare it to the original data.
+One way to evaluate the role of priors in Bayesian models is to generate data purely from the **prior distribution**, without incorporating observed data.
+This is called a *prior predictive simulation* and allows us to visualize the model's assumptions before any learning occurs.
+
+We can do this by setting `prior_PD = TRUE`, which tells `stan_glm` to simulate data based only on the prior.
+
+```{r prior-predictive}
+
+## Prior predictive simulation with uniform prior
+bayes_uniform_pp <- stan_glm(
+  kid_score ~ mom_iq, data = kidiq,
+  prior = NULL, # Note we are not providing any priors
+  prior_PD = TRUE,
+  refresh = 0
+)
+print(bayes_uniform_pp)
+
+pp_check(bayes_uniform_pp) +
+  theme_tidybayes()
+
+## prior predictive simulation with a weakly informative prior
+bayes_weak_pp <- stan_glm(
+  kid_score ~ mom_iq, data = kidiq,
+  prior = normal(location = 0,
+                 scale = 1), # We now provide a standard normal distribution as a prior
+  prior_PD = TRUE,
+  refresh = 0
+)
+print(bayes_weak_pp)
+
+pp_check(bayes_weak_pp) +
+  theme_tidybayes()
+
+```
+
+Without seeing any real data, the prior predictive simulation with the uniform prior did not generate any meaningful estimates. This is because we are basically telling the model that *any* values are possible candidates. In contrast, the model with the weakly informative prior generates at least some estimates close to the actual IQ scores, but still they are very noisy.
+
+Then what would happen if we provide data so the model can update their priors?
+
+## Posterior predictive checks
+
+We can evaluate the performance of our Bayes model by simulating data from the posterior distribution and compare it to the original data.
 This is called *posterior predictive* check.
 
 ```{r posterior-check-weak}
@@ -228,27 +267,6 @@ In this case:\
 
 **Reflection: What would happen if we never used observed data to build a model?**
 
-*Prior Predictive Simulation*
-
-One way to evaluate the role of priors in Bayesian models is to generate data purely from the **prior distribution**, without incorporating observed data.
-This is called a *prior predictive simulation* and allows us to visualize the model's assumptions before any learning occurs.
-
-We can do this by setting `prior_PD = TRUE`, which tells `stan_glm` to simulate data based only on the prior.
-
-```{r prior-predictive}
-bayes_weak_pp <- stan_glm(
-  kid_score ~ mom_iq, data = kidiq,
-  prior = normal(location = 0,
-                 scale = 1),
-  prior_PD = TRUE,
-  refresh = 0
-)
-print(bayes_weak_pp)
-
-pp_check(bayes_weak_pp) +
-  theme_tidybayes()
-
-```
 
 **Comparing Prior and Posterior Predictions**
 
@@ -267,7 +285,7 @@ ggpubr::ggarrange(pp_prior, pp_posterior, ncol = 2)
 -   The **posterior predictive check is significantly more accurate** because it has been updated using the likelihood from the observed data.
 -   This comparison highlights how the posterior distribution **refines predictions**, making our model more data-driven.
 
-## 3. Strong Prior
+## 3. Strong Prior (i.e., you have a strong theory)
 
 A strong prior encodes a firm belief about the relationship between `mom_iq` and `kid_score`, shifting our estimates toward an assumed effect.
 Here, we set a normal(10,1) prior, implying that before seeing any data, we expect a **1-point increase in `mom_iq` to increase `kid_score` by 10 points on average**.
@@ -360,7 +378,7 @@ This highlights the fundamental difference:
 | **Flexibility**        | No prior knowledge incorporated       | Can incorporate domain expertise via priors |
 
 
-# Parking garage for unused but potentially useful code in the future:
+# Additional code resources for the future:
 
 ## Viewing the MCMC chains
 
