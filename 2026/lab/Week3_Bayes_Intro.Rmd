@@ -265,8 +265,6 @@ In this case:\
 1. The posterior predictive distribution is slightly **left-skewed**, meaning the model underestimates some higher `kid_score` values.\
 2. The distribution spread suggests that **uncertainty is well captured**, though extreme values are less frequent in simulated predictions compared to actual data.
 
-**Reflection: What would happen if we never used observed data to build a model?**
-
 
 **Comparing Prior and Posterior Predictions**
 
