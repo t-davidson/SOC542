@@ -122,12 +122,11 @@ In the correlation matrix above, each cell shows the strength and direction of t
 
 **Relationships Among Variables:** Correlations between independent variables themselves (not just with the dependent variable) are also important. When variables are omitted, their associations with other variables are absorbed into the error term and bias our results.
 
-**Reflecting on these correlations:**
 
-*1) Which correlations were expected, and which are surprising? Are these results in the same direction as your hypotheses above?*
+**Reflecting on these correlations:** Which correlations were expected, and which are surprising? Are these results in the same direction as your hypotheses above?*
 
 ### Visualizing the Correlation
-Let's look at the relationship between our main suspect (**Inequality**) and our outcome (**Hate Crimes**). If the article is right, the dots should generally trend upward.
+Let's look at the relationship between our main IDV (**Inequality**) and our outcome (**Hate Crimes**). If the article is right, the dots should generally trend upward.
 
 ```{r scatterplot}
 ggplot(df, aes(x = gini_index, y = hatecrimes_fbi)) +
@@ -159,7 +158,7 @@ ggplot(df, aes(x = hatecrimes_fbi)) +
 # Part 1: Simple Linear Regression (Bivariate)
 A simple linear regression looks at the relationship between **one** independent variable (IDV) and **one** dependent variable (DV).
 
-Our question: **Does income inequality (Gini Index) predict hate crime rates?**
+Our question: **Is income inequality (Gini Index) associated with hate crime rates?**
 
 ```{r model1}
 # Task: Run a simple regression
@@ -185,6 +184,7 @@ Our question: **Does inequality still matter once we account for high school edu
 
 ```{r model2}
 # Task: Run a multiple regression
+# Add all our IDVs we chose above.
 model2 <- lm(hatecrimes_fbi ~ gini_index + BLANK, data = df)
 
 # View the results
