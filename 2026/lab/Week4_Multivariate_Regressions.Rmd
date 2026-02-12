@@ -1,0 +1,264 @@
+---
+title: "Introduction to Regression: Hate Crimes and Inequality"
+author: "YJ Chae"
+date: "2026-02-16"
+output: html_document
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = FALSE) # FALSE hides the code but shows the output (if any)
+knitr::opts_chunk$set(message = FALSE) # FALSE suppresses messages in the output document.
+knitr::opts_chunk$set(warning = FALSE) # FALSE suppresses warnings in the output document.
+
+options(scipen=999)  # Set to display small numbers in decimal form
+set.seed(1234) # Optional, for reproducibility
+
+library(tidyverse)
+library(fivethirtyeight)
+library(modelsummary)
+
+if(!require(fivethirtyeight)) install.packages("fivethirtyeight") ## Data come from this package
+
+```
+
+# Introduction
+In this lab, we will explore the relationship between state-level economic factors and hate crimes. We are using data from the `fivethirtyeight` package, which was used in the article: *"Higher Rates of Hate Crimes Are Tied to Income Inequality."*
+
+### About the Dataset
+The data contains socioeconomic indicators for all 50 U.S. states and the District of Columbia. Here are the key variables we will use:
+
+**Dependent Variable (DV)**
+*   **`hatecrimes_fbi`**: The number of hate crimes per 100,000 people. **Note:** The FBI only tracks prosecutable hate crimes, which represent only a small fraction of all hate incidents. (Reflection on this later!)
+
+**Independent Variable (IDV)**
+*   **`gini_index`**: A statistical measure of income inequality. A value of 0 means perfect equality, while 1 means maximum inequality. 
+*   **`hs_degree`**: The proportion of adults in the state with at least a high school education.
+*   **`unemployment`**: The seasonally adjusted unemployment rate for each state.
+*   **`trump_vote`**: The proportion of voters who supported Donald Trump in the 2016 election.
+*   **`non_citizen`**: The proportion of the population that are not U.S. citizens.
+*   **`metro_pop`**: The proportion of the population living in metropolitan areas.
+
+## Load dataset
+```{r load_data}
+data("hate_crimes")
+
+# Select only the variables we need for a simpler view
+df <- hate_crimes %>%
+  select(
+    state,
+    hatecrimes_fbi = avg_hatecrimes_per_100k_fbi, # You can rename while selecting a variable.
+    gini_index,
+    unemployment = share_unemp_seas, 
+    hs_degree = share_pop_hs,
+    trump_vote = share_vote_trump,
+    non_citizen = share_non_citizen,
+    metro_pop = share_pop_metro
+  ) %>%
+  drop_na()
+
+```
+
+### Geographic Distribution of Hate Crimes
+Before we look at the numbers, let's see where hate crimes are most frequently reported on a map.
+
+```{r map}
+# Load map data for the US
+us_states <- map_data("state")
+
+# Prepare our data for mapping (state names must be lowercase to match)
+map_df <- df %>%
+  mutate(state = tolower(state)) %>%
+  right_join(us_states, by = c("state" = "region"))
+
+# Create the map
+ggplot(map_df, aes(x = long, y = lat, group = group, fill = hatecrimes_fbi)) +
+  geom_polygon(color = "white") +
+  scale_fill_viridis_c(option = "magma", name = "Hate Crimes\nper 100k") +
+  theme_void() +
+  labs(
+    title = "Hate Crime Rates Across the United States",
+    subtitle = "Darker/Brighter areas represent higher reported rates"
+  )
+```
+
+# Part 0: Exploring the Data
+Before we run any models, we need to understand our variables.
+
+### Summary Statistics
+This table shows the average (mean) and spread of our data across all states.
+
+```{r descriptives}
+# Create a summary table
+datasummary_skim(df, fmt=3)
+
+```
+
+### Correlation Matrix
+A correlation matrix shows how every interval/ratio variable relates to every other variable. 
+*   **1.0** means a perfect positive relationship.
+*   **-1.0** means a perfect negative relationship.
+*   **0** means no relationship at all.
+
+```{r correlation}
+# Create a correlation table
+# We remove the 'state' column because you can't calculate correlation on text
+df %>% 
+  select(-state) %>% 
+  datasummary_correlation(fmt = 3)
+
+## Or, if you want to use base R function:
+df %>% 
+  select(-state) %>% 
+  cor() %>% 
+  round(3)
+
+```
+
+In the correlation matrix above, each cell shows the strength and direction of the relationship between two variables, offering initial clues about potential influences on hate crime rates.
+
+**Direction of Correlation:** Positive correlations indicate that as one variable increases, so does the other; negative correlations suggest that as one variable increases, the other decreases.
+
+**Strength of Correlation:** How strongly are variables related to each other? Strong correlations (close to -1 or 1) suggest a significant linear relationship, while correlations near 0 indicate little to no linear relationship.
+
+**Relationships Among Variables:** Correlations between independent variables themselves (not just with the dependent variable) are also important. When variables are omitted, their associations with other variables are absorbed into the error term and bias our results.
+
+**Reflecting on these correlations:**
+
+*1) Which correlations were expected, and which are surprising? Are these results in the same direction as your hypotheses above?*
+
+### Visualizing the Correlation
+Let's look at the relationship between our main suspect (**Inequality**) and our outcome (**Hate Crimes**). If the article is right, the dots should generally trend upward.
+
+```{r scatterplot}
+ggplot(df, aes(x = gini_index, y = hatecrimes_fbi)) +
+  geom_point(size = 3, alpha = 0.6, color = "steelblue") +
+  geom_smooth(method = "lm", se = FALSE, color = "darkred") +
+  labs(
+    title = "Income Inequality and Hate Crime Rates by State",
+    subtitle = "The red line shows the best-fit linear relationship",
+    x = "Income Inequality (Gini Index)",
+    y = "FBI Hate Crimes per 100k people"
+  ) +
+  theme_minimal()
+```
+
+### Distribution of Hate Crimes
+What does the distribution of hate crime rate look like? Are there "outlier" states with very high rates?
+
+```{r histogram}
+ggplot(df, aes(x = hatecrimes_fbi)) +
+  geom_histogram(bins = 15, fill = "forestgreen", color = "white") +
+  labs(
+    title = "Distribution of Hate Crime Rates",
+    x = "Hate Crimes per 100k",
+    y = "Number of States"
+  ) +
+  theme_minimal()
+```
+
+# Part 1: Simple Linear Regression (Bivariate)
+A simple linear regression looks at the relationship between **one** independent variable (IDV) and **one** dependent variable (DV).
+
+Our question: **Does income inequality (Gini Index) predict hate crime rates?**
+
+```{r model1}
+# Task: Run a simple regression
+# DV: hatecrimes_fbi
+# IV: gini_index
+model1 <- lm(hatecrimes_fbi ~ BLANK, data = df)
+
+# View the results
+summary(model1)
+
+```
+
+### Questions:
+1. Look at the `gini_index` estimate (Coefficient). Is it positive or negative? What does this mean in plain English?
+2. Look for the p.value for the gini_index. Is it less than 0.05? If so, what does that suggest?
+
+---
+
+# Part 2: Multiple Regression (Multivariate)
+In the real world, many things happen at once. Maybe it's not just inequality; maybe education levels or unemployment also matter. Multiple regression allows us to "control" for these other factors.
+
+Our question: **Does inequality still matter once we account for high school education levels and unemployment?**
+
+```{r model2}
+# Task: Run a multiple regression
+model2 <- lm(hatecrimes_fbi ~ gini_index + BLANK, data = df)
+
+# View the results
+summary(model2)
+```
+
+### Questions:
+3. In this new model, is `gini_index` still a significant predictor?
+4. Look at the `Multiple R-squared` value at the bottom. This tells us the percentage of variation in the DV, hate crime, explained by our IDVs. Is Model 2 better than Model 1? What about `Adjusted R-squared`?
+
+---
+
+# Part 3: Comparison Table
+Finally, let's look at both models side-by-side to see how the effect of inequality changes when we add controls.
+
+```{r comparison}
+models <- list(
+  "Simple Model" = model1,
+  "Multivariate Model" = model2
+)
+
+modelsummary(models, stars = TRUE)
+```
+
+### Rescaling for Interpretation
+You may notice that the regression coefficient for `gini_index` in the tables above is very large. This is because a `1 unit change` in Gini index represents going from perfect equality (0) to maximum inequality (1), which is a massive leap that doesn't happen between states. For other IDVs, which are proportions, one-unit increase also represents going from 0% to 100%.
+
+To make these coefficients more interpretable, we can multiply our variables by 100. Now, a 1 unit change represents a **0.01 increase in Gini coefficient**, and **1% increase in the other IDVs**, which is a much more realistic comparison.
+
+```{r model3}
+# Task: Create rescaled versions of our variables (convert proportions to percentages)
+df <- df %>%
+  mutate(
+    gini_rescaled = gini_index * 100,
+    hs_degree_rescaled = hs_degree * 100,
+    unemployment_rescaled = unemployment * 100,
+    non_citizen_rescaled = non_citizen * 100,
+    metro_pop_rescaled = metro_pop * 100
+  )
+
+# Run the third model with all controls using the rescaled variables
+model3 <- lm(hatecrimes_fbi ~ gini_rescaled + hs_degree_rescaled + unemployment_rescaled + non_citizen_rescaled + metro_pop_rescaled, data = df)
+
+# Final Comparison Table
+models_final <- list(
+  "Simple" = model1,
+  "Multivariate" = model2,
+  "Multivariate (Rescaled)" = model3
+)
+
+# Use coef_map with shared names so that original and rescaled variables 
+# appear on the same rows for direct comparison.
+modelsummary(models_final, 
+             stars = TRUE, 
+             coef_map = c(
+               "gini_index" = "Gini Index",
+               "gini_rescaled" = "Gini Index",
+               "hs_degree" = "High School Degree",
+               "hs_degree_rescaled" = "High School Degree",
+               "unemployment" = "Unemployment Rate",
+               "unemployment_rescaled" = "Unemployment Rate",
+               "non_citizen" = "Non-Citizen",
+               "non_citizen_rescaled" = "Non-Citizen",
+               "metro_pop" = "Metropolitan Pop",
+               "metro_pop_rescaled" = "Metropolitan Pop",
+               "(Intercept)" = "Constant"
+             ))
+```
+
+**Final Reflections:**
+* What does the coefficient for the `gini_rescaled` in the model represent? Report the finding.
+
+* Compare the `gini_index` coefficient in Model 2 to the `gini_rescaled` coefficient in Model 3. How did the rescaling change the number, and why is the rescaled version easier to talk about in a report?
+
+* Based on your analysis, what are the implications for policymakers and researchers in understanding and stopping hate crimes?
+
+* Do you find the conclusions drawn from the FBI data convincing? Why or why not? Consider the limitations of the data sets, potential biases, and the methods employed. Are there any aspects that you believe may have been overlooked or warrant further investigation?*
