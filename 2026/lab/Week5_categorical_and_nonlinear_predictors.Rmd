@@ -89,11 +89,13 @@ By modeling $\ln(Y) = \beta_0 + \beta_1 X_1 + \epsilon$, we are implying that:
 $$Y = e^{\beta_0 + \beta_1 X_1 + \epsilon}$$
 $$Y = e^{\beta_0} \cdot e^{\beta_1 X_1} \cdot e^{\epsilon}$$
 
+<<<<<<< HEAD
 In this exponentiated form, the relationship is clearly multiplicative. Each 1-unit increase in $X_1$ multiplies the expected value of $Y$ by a factor of $e^{\beta_1}$ (See https://library.virginia.edu/data/articles/interpreting-log-transformations-in-a-linear-model for more information).
 
 ## Adding a squared term of IDV
 
 We often use **squared terms** (a **second-order polynomial**) to model relationships whose slopes are not constant. In sociology, this is common for "life-cycle" effects, where an outcome (like income) increases with age but at a diminishing rate, eventually leveling off or declining. (e.g., age and income?)
+
 
 ```{r nonlinear-models}
 # Comparing Linear vs Log vs Polynomial
