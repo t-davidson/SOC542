@@ -1,0 +1,140 @@
+---
+title: "Week 5 - Categorical and Nonlinear Predictors"
+author: "SOC542: Spring 2026"
+date: "2026-02-13"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+options(scipen = 999)
+
+library(tidyverse)
+library(haven)
+library(modelsummary)
+library(rstanarm)
+library(tidybayes)
+
+seed <- 1234
+set.seed(seed)
+```
+
+# Data Preparation: GSS 2022
+
+We will use the General Social Survey (GSS) to investigate how career and demographic variables affect personal income.
+
+```{r data-load-clean}
+# Load and initial cleaning
+gss_raw <- read_dta("DATASETS/GSS/GSS2022.dta")
+
+gss <- gss_raw %>%
+  select(conrinc, hrs1, prestg10, degree, sex, race, age, partyid, wtssnrps) %>%
+  zap_label() %>%
+  mutate(
+    # Clean continuous variables
+    income = as.numeric(conrinc),
+    prestige = as.numeric(prestg10),
+    age = ifelse(age < 0, NA, age),
+    workhrs = case_when(
+      hrs1 == 89 ~ NA_real_, # Remove outliers
+      hrs1 < 0  ~ NA_real_,
+      TRUE      ~ as.numeric(hrs1)
+    ),
+    
+    # Nonlinear & Scaling transformations
+    log_inc = log(income),
+    workexp = age - 18,
+    worksq = (age - 18)^2,
+    
+    # Recode categorical variables as factors
+    degree = factor(degree, levels = 0:4, labels = c("Less_HS", "HS", "Assoc", "Bach", "Grad")),
+    sex = factor(sex, levels = 1:2, labels = c("Male", "Female")),
+    race = factor(race, levels = 1:3, labels = c("White", "Black", "Other")),
+    party = case_when(
+      partyid %in% 0:2 ~ "Democrat",
+      partyid %in% 4:6 ~ "Republican",
+      TRUE             ~ "Independent"
+    ) %>% factor(levels = c("Democrat", "Independent", "Republican")),
+    
+  ) %>%
+  drop_na(income, age, workhrs, prestige, sex, race)
+
+datasummary_balance(~ 1, data = gss, title = "Descriptive Statistics")
+```
+
+# Part 1: Categorical Predictors (Dummies)
+
+When we include a factor in `lm()`, R automatically creates dummy variables and drops the first level as the reference category.
+
+```{r categorical-models}
+# Model with Male, Black, and Democrat as reference groups
+m1 <- lm(log_inc ~ age + workhrs + prestige + sex + race + party, data = gss)
+
+# Changing the reference category using relevel()
+gss_relevel <- gss %>% mutate(sex = relevel(sex, ref = "Female"))
+m2 <- lm(log_inc ~ age + workhrs + prestige + sex + race + party, data = gss_relevel)
+
+modelsummary(list("Ref: Male" = m1, "Ref: Female" = m2), 
+             stars = TRUE, gof_omit = "F|RMSE|Log|IC")
+```
+
+# Part 2: Nonlinearity & Multiplicative Relationships
+
+While logarithms are often used to fix skewed distributions, their more important **theoretical** use is for modeling **multiplicative relationships**. 
+
+In variables like income or population, we often expect effects to be proportional rather than additive. For example, a "1-unit increase" in education shouldn't just add a fixed dollar amount to everyone's salary; instead, it might increase a salary by a certain *percentage*. (Also think of the population example!) Logarithms allow us to model this multiplicative nature using linear regression.
+
+By modeling $\ln(Y) = \beta_0 + \beta_1 X_1 + \epsilon$, we are implying that:
+$$Y = e^{\beta_0 + \beta_1 X_1 + \epsilon}$$
+$$Y = e^{\beta_0} \cdot e^{\beta_1 X_1} \cdot e^{\epsilon}$$
+
+In this exponentiated form, the relationship is clearly multiplicative. Each 1-unit increase in $X_1$ multiplies the expected value of $Y$ by a factor of $e^{\beta_1}$ (or approximately a $\beta_1 \times 100\%$ change).
+
+Similarly, we often use **squared terms** (a **second-order polynomial**) to model relationships that are not constant. In sociology, this is common for "life-cycle" effects, where an outcome (like income) increases with age but at a diminishing rate, eventually leveling off or declining.
+
+```{r nonlinear-models}
+# Comparing Linear vs Log vs Polynomial
+ols_linear <- lm(income ~ workexp + workhrs + sex, data = gss)
+ols_log    <- lm(log_inc ~ workexp + workhrs + sex, data = gss)
+ols_poly   <- lm(log_inc ~ workexp + worksq + workhrs + sex, data = gss)
+
+modelsummary(list("Linear" = ols_linear, "Log" = ols_log, "Polynomial" = ols_poly),
+             stars = TRUE, gof_omit = "F|RMSE|Log|IC", title = "Transformation Comparison")
+```
+
+### Visualizing the Squared Effect
+```{r plot-nonlinear}
+# Extract coefficients for the curve: log(y) = a + b1x + b2x^2
+b <- coef(ols_poly)
+curve_func <- function(x) b["(Intercept)"] + b["workexp"]*x + b["worksq"]*x^2
+
+ggplot(gss, aes(x = workexp, y = log_inc)) +
+  geom_jitter(alpha = 0.1) +
+  stat_function(fun = curve_func, color = "red", linewidth = 1) +
+  labs(title = "Diminishing Returns of Work Experience", x = "Years of Experience", y = "log(Income)") +
+  theme_minimal()
+```
+
+# Part 3: Survey Weights & Bayesian Estimation
+
+Finally, we account for sampling probability using weights and compare our results with a Bayesian approach.
+
+```{r final-comparison}
+# OLS with Weights
+ols_weighted <- lm(log_inc ~ workexp + worksq + prestige + sex + race, 
+                   data = gss, weights = wtssnrps)
+
+# Bayesian with Weights
+bayes_weighted <- stan_glm(log_inc ~ workexp + worksq + prestige + sex + race, 
+                           data = gss, weights = wtssnrps, 
+                           seed = seed, refresh = 0, chains = 1)
+
+modelsummary(list("OLS (Weighted)" = ols_weighted, "Bayes (Weighted)" = bayes_weighted),
+             stars = TRUE, gof_omit = "F|RMSE|Log|IC|alg|pss")
+```
+
+# Exercise
+Specify a model that predicts `log_inc` using `degree`. 
+1. Which degree level is the reference category by default?
+2. Use `relevel()` to make "Grad" the reference category. 
+3. Interpret the coefficient for "Less_HS" in the new model.
