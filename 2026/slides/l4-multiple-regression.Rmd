@@ -133,7 +133,13 @@ $$Wealth_i = \beta_0 + \beta_1Educ + u$$
 
 - Assume a strong, positive relationship between education and wealth (i.e. $\hat{\beta_1}$ is positive)
     - What other factors might be correlated with education *and* predict wealth?
-- Parental socioeconomic status (SES) is correlated with education and predicts wealth. The estimate of the effect of education is *biased* without taking parental SES into account.
+
+
+# Multiple regression
+## Example: Weath and education
+
+- Parental socioeconomic status (SES) is correlated with education and predicts wealth. 
+    - The estimate of the effect of education is thus *biased* without taking parental SES into account.
 
 # Drawing the DAG
 ```{r, echo=FALSE, out.width = "60%"}
