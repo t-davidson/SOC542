@@ -36,9 +36,10 @@ gss <- gss_raw %>%
     prestige = as.numeric(prestg10),
     age = ifelse(age < 0, NA, age),
     workhrs = case_when(
-      hrs1 == 89 ~ NA, # Remove outliers
+      ## To Comment or Not To Comment, 89 hrs a week?
+      hrs1 == 89 ~ NA OR NOT?, 
       hrs1 < 0  ~ NA,
-      TRUE      ~ as.numeric(hrs1)
+      TRUE ~ as.numeric(hrs1) # For all other values
     ),
     
     # Nonlinear & Scaling transformations
@@ -50,8 +51,12 @@ gss <- gss_raw %>%
     # Note: R uses the first level of a factor as the reference category in regressions.
     # You can change this using relevel(factor_variable, ref = "Desired_Reference").
     degree = factor(degree, levels = 0:4, labels = c("Less_HS", "HS", "Assoc", "Bach", "Grad")),
+    
     sex = factor(sex, levels = 1:2, labels = c("Male", "Female")),
+    male = relevel(sex, ref = "Male"),
     female = relevel(sex, ref = "Female"),
+    
+    
     race = factor(race, levels = 1:3, labels = c("White", "Black", "Other")),
     party = case_when(
       partyid %in% 0:2 ~ "Democrat",
@@ -87,6 +92,7 @@ modelsummary(list("Ref: Male" = m1, "Ref: Female" = m2),
                           "partyIndependent" = "partyIndependent",
                           "partyRepublican" = "partyRepublican"),
              gof_omit = "F|RMSE|Log|IC")
+
 ```
 
 # Part 2: Nonlinearity & Multiplicative Relationships
@@ -94,13 +100,13 @@ modelsummary(list("Ref: Male" = m1, "Ref: Female" = m2),
 
 While logarithms are often used to fix skewed distributions, their more important **theoretical** use is for modeling **multiplicative relationships**. 
 
-In variables like income or population, we often expect effects to be proportional rather than additive. For example, a "1-unit increase" in education shouldn't just add a fixed dollar amount to everyone's salary; instead, it might increase a salary by a certain *percentage*. (Also think of the population example!) Logarithms allow us to model this multiplicative nature using linear regression.
+In variables like income or population, we often expect effects to be proportional rather than additive. In other words, we are not interested in "how many dollars more" so much as *"what percentages more."* A "1-unit increase" in education shouldn't just add a fixed dollar amount to everyone's salary; instead, it might increase a salary by a certain *percentage*. (Also think of the population example!) Logarithms allow us to model this multiplicative nature using linear regression.
 
 By modeling $\ln(Y) = \beta_0 + \beta_1 X_1 + \epsilon$, we are implying that:
 $$Y = e^{\beta_0 + \beta_1 X_1 + \epsilon}$$
 $$Y = e^{\beta_0} \cdot e^{\beta_1 X_1} \cdot e^{\epsilon}$$
 
-In this exponentiated form, the relationship is clearly multiplicative. Each 1-unit increase in $X_1$ multiplies the expected value of $Y$ by a factor of $e^{\beta_1}$ (See https://library.virginia.edu/data/articles/interpreting-log-transformations-in-a-linear-model for more information).
+In this exponentiated form, the relationship is clearly multiplicative. Each 1-unit increase in $X_1$ multiplies the expected value of $Y$ by a factor of $e^{\beta_1}$. Calculate percentage point differences by $(e^{\beta_1}-1) * 100$ when $e>0$ or $(1-e^{\beta_1}) * 100$ when $e<0$.
 
 ## Adding a squared term of IDV
 
@@ -122,6 +128,7 @@ modelsummary(list("Linear" = ols_linear, "Log" = ols_log, "Polynomial" = ols_pol
                           "sexFemale" = "sexFemale"),
              gof_omit = "F|RMSE|Log|IC", 
              title = "Transformation Comparison")
+
 ```
 
 ### Visualizing the Squared Effect
@@ -138,9 +145,12 @@ ggplot(gss, aes(x = workexp, y = income)) +
   theme_minimal()
 ```
 
+Given a second-degree polynomial (i.e., quadratic), $ax^2 + bx + c$, the vertex can be found by: $$-\frac{b}{2a}$$. At this x-value, the relationship between the two variables changes.
+
+
 # Part 3: Survey Weights & Bayesian Estimation
 
-Finally, we account for sampling probability using weights and compare our results with a Bayesian approach.
+Finally, we account for sampling probability using weights and compare our results with a Bayesian approach. Please note that using survey weights in fact requires the `survey` package for more sophisticated model specification.
 
 ```{r final-comparison}
 # OLS with Weights
@@ -160,7 +170,7 @@ modelsummary(list("OLS (Weighted)" = ols_weighted, "Bayes (Weighted)" = bayes_we
 ```
 
 # Exercise
-Specify a model that predicts `log_inc` using `degree` and other controls.
+Specify a model that predicts `log_inc` using `degree` and other controls. Include as many controls as you want.
 1. Which degree level is the reference category by default?
 2. Use `relevel()` to make "Grad" the reference category. 
 3. Interpret the coefficient for "Less_HS" in the new model.
