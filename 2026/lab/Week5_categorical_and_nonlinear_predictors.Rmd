@@ -106,7 +106,7 @@ By modeling $\ln(Y) = \beta_0 + \beta_1 X_1 + \epsilon$, we are implying that:
 $$Y = e^{\beta_0 + \beta_1 X_1 + \epsilon}$$
 $$Y = e^{\beta_0} \cdot e^{\beta_1 X_1} \cdot e^{\epsilon}$$
 
-In this exponentiated form, the relationship is clearly multiplicative. Each 1-unit increase in $X_1$ multiplies the expected value of $Y$ by a factor of $e^{\beta_1}$. Calculate percentage point differences by $(e^{\beta_1}-1) * 100$ when $e>0$ or $(1-e^{\beta_1}) * 100$ when $e<0$.
+In this exponentiated form, the relationship is clearly multiplicative. Each 1-unit increase in $X_1$ multiplies the expected value of $Y$ by a factor of $e^{\beta_1}$. Calculate percentage point differences by $(e^{\beta}-1) * 100$ when $\beta>0$ or $(1-e^{\beta}) * 100$ when $\beta<0$.
 
 ## Adding a squared term of IDV
 
