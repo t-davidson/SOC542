@@ -14,10 +14,11 @@ options(scipen=999)  # Set to display small numbers in decimal form
 set.seed(1234) # Optional, for reproducibility
 
 library(tidyverse)
-library(fivethirtyeight)
-library(modelsummary)
 
 if(!require(fivethirtyeight)) install.packages("fivethirtyeight") ## Data come from this package
+library(fivethirtyeight)
+
+library(modelsummary)
 
 ```
 
@@ -169,6 +170,9 @@ model1 <- lm(hatecrimes_fbi ~ BLANK, data = df)
 # View the results
 summary(model1)
 
+# Easily visualize residuals to check assumptions
+plot(model1)
+
 ```
 
 ### Questions:
@@ -189,6 +193,9 @@ model2 <- lm(hatecrimes_fbi ~ gini_index + BLANK, data = df)
 
 # View the results
 summary(model2)
+
+# Let's check assumptions again
+plot(model2)
 ```
 
 ### Questions:
