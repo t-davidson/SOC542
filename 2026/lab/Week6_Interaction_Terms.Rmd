@@ -50,7 +50,7 @@ modelsummary(list("Log-Scale" = m_log, "Exponentiated" = m_log),
              title = "Week 5 Recap: Log-Income Model")
 ```
 
-When your dependent variable is somehow log-transformed, the `exponentiate` argument in modelsummary helps you interpret the coefficients intuitively.
+When your dependent variable is somehow log-transformed, the `exponentiate` argument in `modelsummary` helps you interpret the coefficients intuitively.
 
 ---
 
@@ -131,6 +131,24 @@ modelsummary(list(m3_add,m3_int), estimate = "{estimate}{stars}", fmt = 0, gof_o
 *Your Answer:* 
 
 
+# 5. Visualizing Continuous X Continuous Interactions
+Interactions between two continuous variables can be difficult to interpret from coefficients alone. We can use the `marginaleffects` package to visualize how the "slope" of one variable (e.g., `educ`) changes at different model values of the other (e.g., `workhrs` at 20, 40, and 60 hours).
+
+```{r plot-con-con}
+library(marginaleffects)
+
+# Plotting the interaction from Section 4
+# We use 'condition' to specify which values of workhrs to highlight
+plot_predictions(m3_int, condition = list("educ", "workhrs" = c(20, 40, 60))) +
+  labs(title = "Effect of Education at Different Levels of Work Hours",
+       y = "Predicted Income ($)",
+       x = "Years of Education",
+       color = "Work Hours") +
+  theme_minimal()
+```
+
+
+
 ### Squared Terms as "self-interactions"
 Using this same logic, we can see that the squared terms (polynomials) we used in Week 5 are technically a variable **interacting with itself**.
 
@@ -142,13 +160,4 @@ $$\hat{Y} = \beta_0 + (\beta_1 + \beta_2 \cdot Exp) \cdot Exp$$
 
 The "effect" of experience is $(\beta_1 + \beta_2 \cdot Exp)$. Just like with the female/education interaction, the effect of an extra year of experience depends on the value of another variable—in this case, your current level of experience! This enables modeling of a curvillinear relationship--a quadratic polynomial.
 
-```{r recap-squared}
-gss <- gss %>% mutate(workexp = age - 18, workexp_2 = workexp^2)
-
-# Model from Week 5 context
-m_poly <- lm(income ~ workexp + workexp_2 + female, data = gss)
-
-modelsummary(list("Polynomial Model" = m_poly), 
-             stars = TRUE, gof_omit = ".*",
-             title = "Recap: Squared Terms as Self-Interaction")
-```
+Great job, everyone. Let's keep it up!
