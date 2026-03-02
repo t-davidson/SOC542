@@ -1,0 +1,163 @@
+---
+title: "Week 6 - Interaction Terms"
+author: "YJ Chae"
+date: "03-02-2026"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(tidyverse)
+library(haven)
+library(modelsummary)
+options(scipen = 999)
+```
+
+# Data Preparation
+```{r data}
+# Load and clean data (including log_inc)
+gss_raw <- read_dta("DATASETS/GSS/GSS2022.dta")
+
+gss <- gss_raw %>%
+  select(conrinc, hrs1, wrkslf, degree, sex, race, age, educ) %>%
+  mutate(
+    income = as.numeric(conrinc),
+    log_inc = log(income + 1), # Add 1 to avoid log(0)
+    age = ifelse(age < 0, NA, age),
+    workhrs = ifelse(hrs1 < 0 | hrs1 >= 89, NA, hrs1),
+    educ = ifelse(educ < 0, NA, educ),
+    female = ifelse(sex == 2, 1, 0),
+    self_employed = ifelse(wrkslf == 1, 1, 0),
+    college = ifelse(degree >= 3, 1, 0),
+    race = factor(race, labels = c("White", "Black", "Other")),
+    degree = factor(degree, levels = c(1,0,2,3,4), labels = c("HS", "Less_HS", "Assoc", "Bach", "Grad"))
+  )
+
+```
+
+# 0. Recap: Log-Linear Models
+Before we dive into interactions, let's recap the log-income model from Week 5. When we log-transform the dependent variable, we are interested in multiplicative changes (percentages) rather than additive changes. It's important to understand how to interpret coefficients correctly!
+
+```{r recap-log-model}
+# Week 5 Log Model
+m_log <- lm(log_inc ~ degree + workhrs + female + race, data = gss)
+
+# Comparison Table: Standard vs Exponentiated
+modelsummary(list("Log-Scale" = m_log, "Exponentiated" = m_log),
+             exponentiate = c(FALSE, TRUE),
+             stars = TRUE,
+             gof_omit = ".*",
+             title = "Week 5 Recap: Log-Income Model")
+```
+
+When your dependent variable is somehow log-transformed, the `exponentiate` argument in `modelsummary` helps you interpret the coefficients intuitively.
+
+---
+
+# 1. Understanding Interaction Logic
+An interaction occurs when the effect of one variable **depends on the level of another**.
+
+### The Math of Interaction
+Consider a model where income depends on education ($Edu$) and being female ($Female$):
+$$\hat{Y} = \beta_0 + \beta_1 Edu + \beta_2 Female + \beta_3 Edu \cdot Female$$
+
+To see how the effect of education ($Edu$) changes for women, we factor the equation:
+$$\hat{Y} = \beta_0 + (\beta_1 + \beta_3 Female) Edu + \beta_2 Female$$
+
+*   If $Female = 0$ (Male), the effect of education is simply **$\beta_1$**.
+*   If $Female = 1$ (Female), the effect of education is **$\beta_1 + \beta_3$**.
+
+$\beta_3$ tells us exactly how much the "return on education" changes when you are female.
+
+Finally, when interacting two variables, the coefficient for each main term tells you its effect when the *other* variable equals zero. Let's figure this out again by factoring the terms!
+
+
+# 2. Categorical X Categorical Interactions
+Let's look at how the female disadvantage in income might differ by self-employment status.
+
+```{r categorical-interaction}
+# 1. Additive Model: Effect of being female is assumed constant
+m1_add <- lm(income ~ college + female, data = gss)
+
+# 2. Interaction Model: Effect of being female can vary by college, or... the other way around?
+m1_int <- lm(income ~ college * female, data = gss)
+
+modelsummary(list("Additive" = m1_add, "Interaction" = m1_int),
+             estimate = "{estimate}{stars}",
+             fmt = 0,
+             gof_omit = ".*")
+```
+
+**Question:** In the interaction model, what does the coefficient for `college x female` represent? How about the main terms? Using the factoring logic above, let's find out the total effects of each college education and being female.
+
+**Question 2:** What is the **direction** of the interaction terms? Does `college` affect the coefficient of `female`, or the other way around, or is it bidirectional?
+
+
+*Your Answer:* 
+
+---
+
+# 3. Categorical X Continuous Interactions
+Does the "return" on each additional hour of work differ for those with a college degree?
+
+```{r cat-con-interaction}
+m2_add <- lm(income ~ workhrs + college, data = gss)
+m2_int <- lm(income ~ workhrs * college, data = gss)
+
+modelsummary(list(m2_add,m2_int), estimate = "{estimate}{stars}", fmt = 0, gof_omit = ".*")
+```
+
+**Question:** If the interaction term `workhrs:college` is positive, what does that tell us about the value of an extra hour of work for college graduates vs. non-graduates? 
+
+**Question 2:** In this case, how does a **one unit increase** in work hours differ from one unit increase in `college`?
+
+*Your Answer:* 
+
+---
+
+# 4. Continuous X Continuous Interactions
+Does the effect of years of education on income depend on how many hours you work?
+
+```{r con-con-interaction}
+# Task: Create a model interacting education and work hours
+m3_add <- lm(income ~ educ + workhrs, data = gss)
+m3_int <- lm(income ~ educ * workhrs, data = gss)
+
+modelsummary(list(m3_add,m3_int), estimate = "{estimate}{stars}", fmt = 0, gof_omit = ".*")
+```
+
+**Question:** What does the coefficients for the main terms, `workhrs` and `educ`, mean in this case? Why is the intercept so negative?
+
+*Your Answer:* 
+
+
+# 5. Visualizing Continuous X Continuous Interactions
+Interactions between two continuous variables can be difficult to interpret from coefficients alone. We can use the `marginaleffects` package to visualize how the "slope" of one variable (e.g., `educ`) changes at different model values of the other (e.g., `workhrs` at 20, 40, and 60 hours).
+
+```{r plot-con-con}
+library(marginaleffects)
+
+# Plotting the interaction from Section 4
+# We use 'condition' to specify which values of workhrs to highlight
+plot_predictions(m3_int, condition = list("educ", "workhrs" = c(20, 40, 60))) +
+  labs(title = "Effect of Education at Different Levels of Work Hours",
+       y = "Predicted Income ($)",
+       x = "Years of Education",
+       color = "Work Hours") +
+  theme_minimal()
+```
+
+
+
+### Squared Terms as "self-interactions"
+Using this same logic, we can see that the squared terms (polynomials) we used in Week 5 are technically a variable **interacting with itself**.
+
+Think of the equation for work experience:
+$$\hat{Y} = \beta_0 + \beta_1Exp + \beta_2Exp^2$$
+
+By factoring out $Exp$:
+$$\hat{Y} = \beta_0 + (\beta_1 + \beta_2 \cdot Exp) \cdot Exp$$
+
+The "effect" of experience is $(\beta_1 + \beta_2 \cdot Exp)$. Just like with the female/education interaction, the effect of an extra year of experience depends on the value of another variable—in this case, your current level of experience! This enables modeling of a curvillinear relationship--a quadratic polynomial.
+
+Great job, everyone. Let's keep it up!
