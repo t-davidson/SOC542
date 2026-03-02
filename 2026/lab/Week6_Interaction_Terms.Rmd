@@ -9,6 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 library(tidyverse)
 library(haven)
+library(marginaleffects)
 library(modelsummary)
 options(scipen = 999)
 ```
@@ -82,12 +83,11 @@ m1_add <- lm(income ~ college + female, data = gss)
 # 2. Interaction Model: Effect of being female can vary by college, or... the other way around?
 m1_int <- lm(income ~ college * female, data = gss)
 
-m1_int_a <- lm(income ~ college + female + college:female, data = gss)
-
-modelsummary(list("Additive" = m1_add, "Interaction" = m1_int, "Interaction_Alt" = m1_int_a),
+modelsummary(list("Additive" = m1_add, "Interaction" = m1_int),
              estimate = "{estimate}{stars}",
              fmt = 0,
              gof_omit = ".*")
+
 ```
 
 **Question:** In the interaction model, what does the coefficient for `college x female` represent? How about the main terms? Using the factoring logic above, let's find out the total effects of each college education and being female.
@@ -96,6 +96,18 @@ modelsummary(list("Additive" = m1_add, "Interaction" = m1_int, "Interaction_Alt"
 
 
 *Your Answer:* 
+
+Great. We can calculate the effect size for college-graduate women by hand, but it doesn't give us any p-value, right? We can conduct a hypothesis test whether this coefficient is different from zero using the `marginaleffects` package.
+
+```{r marginaleffects-1}
+avg_comparisons(m1_int, variables = "college", by="female")
+plot_comparisons(m1_int, variables = "college", by="female") +
+  ggtitle("The Effect of College Education by Gender") +
+  theme_minimal()
+
+```
+
+This marginaleffects calculation and plot show the effect of college education on income by gender.
 
 ---
 
@@ -107,6 +119,7 @@ m2_add <- lm(income ~ workhrs + college, data = gss)
 m2_int <- lm(income ~ workhrs * college, data = gss)
 
 modelsummary(list(m2_add,m2_int), estimate = "{estimate}{stars}", fmt = 0, gof_omit = ".*")
+
 ```
 
 **Question:** If the interaction term `workhrs:college` is positive, what does that tell us about the value of an extra hour of work for college graduates vs. non-graduates? 
@@ -114,6 +127,14 @@ modelsummary(list(m2_add,m2_int), estimate = "{estimate}{stars}", fmt = 0, gof_o
 **Question 2:** In this case, how does a **one unit increase** in work hours differ from one unit increase in `college`?
 
 *Your Answer:* 
+
+```{r marginaleffects-2}
+avg_comparisons(m2_int, variables = "workhrs", by="college")
+plot_comparisons(m2_int, variables = "workhrs", by="college") +
+  ggtitle("The Effect of Work Hours by College Education") +
+  theme_minimal()
+
+```
 
 ---
 
@@ -126,29 +147,37 @@ m3_add <- lm(income ~ educ + workhrs, data = gss)
 m3_int <- lm(income ~ educ * workhrs, data = gss)
 
 modelsummary(list(m3_add,m3_int), estimate = "{estimate}{stars}", fmt = 0, gof_omit = ".*")
+
 ```
 
 **Question:** What does the coefficients for the main terms, `workhrs` and `educ`, mean in this case? Why is the intercept so negative?
 
 *Your Answer:* 
 
-
-# 5. Visualizing Continuous X Continuous Interactions
-Interactions between two continuous variables can be difficult to interpret from coefficients alone. We can use the `marginaleffects` package to visualize how the "slope" of one variable (e.g., `educ`) changes at different model values of the other (e.g., `workhrs` at 20, 40, and 60 hours).
-
-```{r plot-con-con}
-library(marginaleffects)
-
-# Plotting the interaction from Section 4
-# We use 'condition' to specify which values of workhrs to highlight
-plot_predictions(m3_int, condition = list("educ", "workhrs" = c(20, 40, 60))) +
-  labs(title = "Effect of Education at Different Levels of Work Hours",
-       y = "Predicted Income ($)",
-       x = "Years of Education",
-       color = "Work Hours") +
+```{r marginaleffects-3}
+avg_comparisons(m3_int, variables = "workhrs", by="educ")
+plot_comparisons(m3_int, variables = "workhrs", by="educ") +
+  ggtitle("The Effect of Work Hours by Years of Education") +
   theme_minimal()
+
 ```
 
+
+# 5. Visualizing Continuous X Continuous Interactions using Bin
+Interactions between two continuous variables can be difficult to interpret from coefficients alone. We can use the `marginaleffects` package to visualize how the "slope" of one variable (e.g., `workhrs`) changes at different model values of the other (e.g., `educ` at 4, 12, and 16 hours).
+
+```{r plot-con-con}
+# Plotting the interaction from Section 4
+# We use 'condition' to specify which values of workhrs to highlight
+plot_predictions(m3_int, condition = list("workhrs", "educ" = c(4, 12, 16))) +
+  labs(title = "Effect of Work Hours at Different Model Values of Years of Education",
+       y = "Predicted Income ($)",
+       x = "Work Hours",
+       color = "Years of Education",
+       fill = "Years of Education",
+       ) +
+  theme_minimal()
+```
 
 
 ### Squared Terms as "self-interactions"
