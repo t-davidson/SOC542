@@ -206,7 +206,7 @@ $$\frac{\Delta Income}{\Delta Black} = \beta_2 + \beta_3 \cdot Female$$
 # Types of interactions
 ## Reformulating the model
 - Block et al. 2023 show how we could specify an equivalent, alternative model:
-- Assuming White Female is the reference category, we could write this as:
+- If White Male is set as the reference category, we could write this as:
 
 $$y = \beta_0 + \gamma_1 BlackFemale + \gamma_2 BlackMale + \gamma_3 WhiteFemale + u$$ 
 
@@ -421,7 +421,7 @@ modelsummary(list(m, m.i), gof_omit=".*",
 $$ME(x_i) = \frac{\Delta y}{\Delta x_i}$$
 
 
-- We can use the `margins` package in R to do this.\footnote{\footnotesize See  \href{https://cran.r-project.org/web/packages/margins/vignettes/TechnicalDetails.pdf}{documentation} for the margins package for further details.}
+- We can do this using the `margins` and `marginaleffects` R packages.\footnote{\footnotesize See  \href{https://cran.r-project.org/web/packages/margins/vignettes/TechnicalDetails.pdf}{documentation} for the margins package for further details.}
 - Bayesian marginal effects can be calculated by sampling from the posterior distribution.
 
 # Marginal effects
