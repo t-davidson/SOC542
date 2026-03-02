@@ -82,7 +82,9 @@ m1_add <- lm(income ~ college + female, data = gss)
 # 2. Interaction Model: Effect of being female can vary by college, or... the other way around?
 m1_int <- lm(income ~ college * female, data = gss)
 
-modelsummary(list("Additive" = m1_add, "Interaction" = m1_int),
+m1_int_a <- lm(income ~ college + female + college:female, data = gss)
+
+modelsummary(list("Additive" = m1_add, "Interaction" = m1_int, "Interaction_Alt" = m1_int_a),
              estimate = "{estimate}{stars}",
              fmt = 0,
              gof_omit = ".*")
