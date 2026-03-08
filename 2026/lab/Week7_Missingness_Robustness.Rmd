@@ -1,0 +1,289 @@
+---
+title: "Week 7 - Handling Missing Data"
+author: "YJ Chae"
+date: "03-09-2026"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(tidyverse)
+library(haven)
+library(modelsummary)
+
+if(!require(naniar)) install.packages("naniar")
+library(naniar)
+
+if(!require(mice)) install.packages("mice")
+library(mice)
+
+if(!require(foreach)) install.packages("foreach")
+library(foreach)
+
+library(car)
+
+set.seed(1234)
+```
+
+# 1. Data Preparation
+
+We'll use the 2022 GSS again. This time, we intentionally **keep missing values** in the data so we can learn how to handle them.
+
+```{r data-prep}
+gss_raw <- read_dta("DATASETS/GSS/GSS2022.dta")
+
+gss <- gss_raw %>%
+  select(conrinc, hrs1, wrkslf, prestg10, degree, sex, race, age, educ) %>%
+  mutate(
+    income = as.numeric(conrinc),
+    logincome = log(income + 1), # Better to use numeric version
+    workhrs = ifelse(hrs1 < 0 | hrs1 >= 89, NA, hrs1),
+    prestige = as.numeric(prestg10),
+    age = ifelse(age < 0, NA, age),
+    agesq = age^2,
+    educ = ifelse(educ < 0, NA, educ),
+    female = ifelse(sex == 2, 1, 0),
+    self_employed = ifelse(wrkslf == 1, 1, 0),
+    race = factor(race, labels = c("White", "Black", "Other"))
+  ) %>%
+  select(-conrinc, -hrs1, -prestg10, -wrkslf, -sex)
+```
+
+---
+
+# 2. Patterns of Missingness
+
+Before modeling, let's check *where* and *how much* data is missing. Understanding the *mechanism* of missingness (MCAR, MAR, or MNAR) is crucial for choosing a strategy.
+
+```{r miss-explore}
+# Summary of missing values by variable
+miss_var_summary(gss)
+
+# Visualization of missingness across variables
+gg_miss_var(gss)
+
+# Upset plot: shows which combinations of variables are jointly missing
+gg_miss_upset(gss)
+```
+
+**Question:** Which variable has the most missing data? Is the missingness likely "Missing At Random", or "Missing Not At Random" (e.g., people with very high or very low incomes refusing to answer)?
+
+*Your Answer:*
+
+---
+
+# 3. Listwise Deletion
+
+### 3a. Complete-Case Analysis
+Drop observations missing on the variables *included in your model*. This is what `lm()` does by default.
+
+This is also called *listwise deletion* where even a single missingness will remove the entire row (i.e., individual).
+
+```{r available-case}
+gss_comp <- gss %>%
+  select(logincome, prestige, self_employed, race, female) %>%
+  drop_na()
+nrow(gss_comp)
+```
+
+### 3c. Comparing the Approaches
+
+```{r missing-models}
+mod_comp <- lm(logincome ~ prestige + self_employed + race + female,
+               data = gss_comp)
+
+modelsummary(list("Complete-Case" = mod_comp),
+             fmt=3,
+             stars = T,
+             gof_omit = "F|RMSE|Log|IC")
+
+```
+
+---
+
+# 4. Simple Imputation (Mean/Median)
+
+Substituting the mean or median is the simplest approach to impute these data. This comes with an assumption that missing occurs randomly, rather than among some specific subpopulations (defined in many different ways). For example, very low- or high-income households may refuse to report their income.
+
+We can simply use the `impute_mean` function in the `naniar` package. Or you can calulate the mean or median yourself and substitute for missing values.
+
+```{r mean-imputation}
+gss <- gss %>%
+  mutate(
+    imp_loginc = impute_mean(logincome),
+    
+    # Try to understand the logic of this line of code.
+    imp_loginc1 = ifelse(is.na(logincome), mean(logincome,na.rm=T), logincome)
+  )
+
+gss %>%
+  dplyr::select(logincome, imp_loginc, imp_loginc1) %>%
+  print()
+
+```
+
+```{r mean-imputation-plot}
+# Compare original vs. imputed distributions
+gss %>%
+  ggplot() +
+  geom_density(aes(x = logincome, color = "Original"), na.rm = TRUE) +
+  geom_density(aes(x = imp_loginc, color = "Mean Imputed")) +
+  theme_minimal() +
+  labs(title = "Log Income Distribution: The Mean Imputation Spike", color = "")
+
+```
+
+```{r mean-imputation-modeling}
+mod_meanimp <- lm(imp_loginc ~ prestige + self_employed + race + female,
+                  data = gss)
+
+modelsummary(list("Complete-Case" = mod_comp,
+                  "Mean-Imputed" = mod_meanimp),
+             fmt=3,
+             stars = T,
+             gof_omit = "F|RMSE|Log|IC")
+
+```
+---
+
+# 5. Multiple Imputation with MICE
+
+Multiple imputation means we're doing (regression) imputation multiple times.
+
+It's a solid approach because we no longer have to settle for just one version of the final imputed variable. We can now make a series of datasets, all with imputed data on the missing values.
+
+If you're curious, more detail on chained equations and imputation can be found here: <https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3074241/#mpr329-sec-0002title>
+
+Below, we use the `mice` command to create five imputed datasets. *In real research, I recommend 10 - 20.*
+The `maxit` option decides on how many iterations it should conduct to achieve mathematical convergence. *I recommend 40.*
+
+
+```{r mice-impute}
+# Create 5 imputed datasets (m = 5) with one iteration (maxit = 1)
+imp <- mice(gss, m = 5, maxit = 1, seed = 08901, printFlag = F)
+
+```
+
+### MICE Diagnostics
+Check whether the imputed values (red) look similar to the observed values (blue). Wildly different distributions may suggest your imputation model is missing key predictors.
+
+**Note on binary variables:** You may notice that binary variables like `female` or `self_employed` look dispersed in these plots rather than spiking strictly at 0 and 1. This is  an artifact of the **smoothing function** used by the density plot, rather than an issue with the imputation itself. Internally, MICE ensures these variables maintain their binary structure.
+
+```{r mice-diag}
+densityplot(imp, layout = c(3,3))
+
+```
+
+### Visualizing Why MICE Works.
+MICE preserves the variance and "noise" of the original data rather than creating an artificial spike at the mean.
+
+```{r mice-vs-mean}
+# Extract the first imputed dataset from the MICE object
+gss_mice1 <- mice::complete(imp, 1)
+
+gss %>%
+  ggplot() +
+  geom_density(aes(x = logincome, color = "Original"), na.rm = TRUE, size = 1) +
+  geom_density(aes(x = imp_loginc, color = "Mean Imputed"), size = 1) +
+  geom_density(data = gss_mice1, aes(x = logincome, color = "MICE Imputed (m=1)"), linetype = "dashed", size = 1) +
+  theme_minimal() +
+  labs(title = "Comparing Imputation Methods",
+       subtitle = "MICE preserves the distribution better than mean imputation",
+       color = "Method")
+```
+
+### Modeling and Pooling
+
+**Multiple Imputation, Then Deletion:** While we *include* the dependent variable in the imputation process (so it can help predict missingness in the independent variables), we usually *exclude* those specific imputed cases from the final model to avoid analyzing purely synthetic outcome data.
+
+A more intuitive way to handle this is to filter the `mids` object directly using `subset()`.
+
+```{r mice-model}
+# 1. Filter the mids object to exclude cases where the DV was originally missing
+imp_sub <- filter(imp, !is.na(logincome))
+
+# 2. Run the model and pool
+imp_model <- with(imp_sub, lm(logincome ~ prestige + self_employed + race + female))
+imp_pooled <- pool(imp_model)
+summary(imp_pooled)
+
+```
+
+### Manual Modeling and Pooling
+
+Sometimes the `with()` and `pool()` functions do not support specific model types. In those cases, you must manually iterate through the imputed datasets.
+
+Below is a three-step manual process:
+1. Filter the `mids` object to apply Multiple Imputation, Then Deletion.
+2. Extract all imputed datasets into a list using `mice::complete`.
+3. Run the model across that list using a `for` loop.
+
+```{r manual-pooling}
+# 1. Exclude original NAs in the dependent variable)
+imp_mid <- filter(imp, !is.na(logincome))
+
+# 2. Extract all m imputed datasets into a list
+# Setting action = "all" returns a list of data frames
+imp_list <- mice::complete(imp_mid, action = "all")
+
+# 3. Iterate through the list using a for loop to run the models
+# Let's look into how this foreach loop works!
+models = foreach(imp_d = imp_list) %do%
+  lm(logincome ~ prestige + self_employed + race + female, 
+                               data = imp_d)
+
+# 4. Final Pooling
+imp_pooled_manual <- pool(models)
+summary(imp_pooled_manual)
+```
+
+---
+
+# 6. Comparing All Approaches
+
+```{r full-comparison}
+all_models <- list(
+  "Complete-Case" = mod_comp,
+  "Mean Imputed" = mod_meanimp,
+  "MICE (M=5)" = imp_pooled,
+  "MICE (M=5) Manual" = imp_pooled_manual
+)
+
+modelsummary(all_models,
+             estimate = "{estimate}{stars}",
+             statistic = "({std.error})",
+             gof_omit = "RMSE|F",
+             title = "Comparison of Missing Data Methods")
+
+modelplot(all_models, coef_omit = "Interc") +
+  geom_vline(xintercept = 0, linetype = "dotted", linewidth = 1, alpha = 0.5)
+```
+
+---
+
+# 7. Multicollinearity (VIF)
+
+Predictors shouldn't be too correlated. Variance Inflation Factor (VIF) $>5$ or $10$ indicates that standard errors may be inflated due to multicollinearity.
+
+```{r vif-check}
+# Our complete-case model looks safe
+vif(mod_comp)
+
+```
+
+### When is High VIF Acceptable?
+High VIF is **expected** and generally acceptable when using polynomial terms (like age and age-squared) or interaction terms, because they are mathematically dependent. 
+
+```{r vif-high}
+mod_vif_test <- lm(logincome ~ prestige + educ + age + agesq, data = gss)
+
+vif(mod_vif_test)
+```
+
+---
+
+# Summary
+
+Use the `naniar` package to visualize missing patterns, such as `gg_miss_var`.
+Use the `mice` package to impute missing values. Use `complete()` and `pool()` functions for modeling.
+Use the `vif()` function in `car` to detect multicollinear variables, e.g., $VIF > 5$.
