@@ -1,0 +1,216 @@
+---
+title: "Week 8 - Regression with a Binary Outcome"
+author: "YJ Chae"
+date: "03-23-2026"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(tidyverse)
+library(haven)
+library(modelsummary)
+library(rstanarm)
+library(broom.mixed)
+library(DescTools)
+library(marginaleffects)
+
+set.seed(1234)
+```
+
+# 1. Data Preparation
+
+We'll investigate factors associated with support for marijuana legalization using the 2022 GSS.
+
+```{r data-prep}
+gss_raw <- read_dta("DATASETS/GSS/GSS2022.dta")
+
+gss <- gss_raw %>%
+  select(grassnv, polviews, sex, race, age, educ, wtssnrps) %>%
+  mutate(
+    # Target: 1 = Legal, 0 = Not Legal
+    legal_grass = case_when(
+      grassnv == 1 ~ 1,
+      grassnv == 2 ~ 0,
+      TRUE ~ NA
+    ),
+    conservatism = polviews, # 1 (Lib) to 7 (Cons)
+    age = ifelse(age > 88, NA, age),
+    female = ifelse(sex == 2, 1, 0),
+    race = factor(race, labels = c("White", "Black", "Other"))
+  ) %>%
+  drop_na(legal_grass, conservatism, age, female, race)
+```
+
+---
+
+# 2. Linear Probability Model (LPM)
+
+The LPM is a standard OLS regression on a binary outcome. It estimates the change in the **probability** of the outcome.
+
+```{r lpm}
+mod_lpm <- lm(legal_grass ~ conservatism + age + female + race, 
+              data = gss)
+
+# The main issue: predicted probabilities can exceed [0, 1]
+p_lpm <- predict(mod_lpm)
+summary(p_lpm)
+```
+
+---
+
+# 3. Logistic Regression (Logit)
+
+In OLS, we model the outcome $Y$ directly, meaning that we assume the dependent variable ranges from $-\infty$ to $\infty$ while the true range is [0, 1]. Instead, we must model the **probability** $p$ that $Y=1$. To ensure our predictions stay between 0 and 1, we use a *link function*.
+
+### The Mathematics of Logit
+
+The relationship between probability ($p$), odds, and log-odds (logit) is the foundation of this model:
+
+1.  **Probability ($p$):** The likelihood of the event occurring (ranging from 0 to 1).
+2.  **Odds:** The ratio of the probability of the event occurring to that not occurring:
+    $$\text{Odds} = \frac{p}{1-p}$$
+3.  **Log-odds (Logit):** The natural logarithm of the odds. This transforms the 0–1 probability into an unbounded line $(-\infty, \infty)$, which we can then model linearly:
+    $$\text{logit}(p) = \ln\left(\frac{p}{1-p}\right) = \beta_0 + \beta_1 X_1 + \dots + \beta_k X_k$$
+    
+4.  **The Logistic Function:** To get back to a probability from our linear equation, we use the inverse-logit (logistic) function. The logistic function is:
+$$\text{Logistic}{(x)} = \frac{1}{1 + e^{-x}}$$.
+
+That looks unfamiliar, but if we input our dependent variable, $$\text{Logistic}{(\text{logit(p)})} = p$$.
+
+Therefore, $$p = \text{Logistic}{(\text{logit}{(p)})} = \text{Logistic}\left(\ln\left(\frac{p}{1-p}\right)\right) = \frac{1}{1 + e^{-\ln\left(\frac{p}{1-p}\right)}} = \frac{1}{1 + e^{-(\beta_0 + \sum \beta_i X_i)}}$$
+
+**Key Insight:** While the relationship between $X$ and the **logit** is linear and unbounded, the relationship between $X$ and the **probability** is S-shaped and bounded between 0 and 1. This ensures our predictions never fall below 0 or rise above 1.
+
+Before getting into the actual estimation process, let's think about what it means to explain a social concept with an equation. Do you think this works, or not? Why?
+While a mathematical equation might seem too rigid for the complexity of social life, it serves as a measurement of the quantity of interest. By reducing a phenomenon (e.g., support for legalization) into a set of coefficients, we aren't claiming to capture every nuance of human experience. Instead, we are testing whether we can detect a meaningful pattern within individual variation. 
+
+
+### 3a. Estimation
+We use `glm()` with `family = "binomial"`.
+
+```{r logit}
+mod_logit <- glm(legal_grass ~ conservatism + age + female + race, 
+                 family = binomial(link = "logit"), # You can simply use family = binomial().
+                 data = gss)
+
+summary(mod_logit)
+
+```
+
+```{r logit-modelsummary}
+# Comparisons
+modelsummary(list("LPM (OLS)" = mod_lpm, "Logit (MLE)" = mod_logit),
+             stars = TRUE, 
+             gof_omit = "Log|IC|F|RMSE")
+
+```
+
+### 3b. Interpretation: Odds Ratios
+Logit coefficients are in "log-odds." To make them intuitive, we exponentiate them into **Odds Ratios (OR)**.
+
+*   $OR > 1$: Increase in odds
+*   $OR < 1$: Decrease in odds
+
+Note this boilerplate language to interpret ORs: "One-unit increase in conservatism is associated with 44.4% decrease (i.e., 1-0.556) in the odds of support for legalization.
+
+We can also compare the linear line of log-odds vs. the S-curve (p). Let's use our blackboard.
+
+```{r odds-ratios}
+modelsummary(
+  list("LPM (OLS)" = mod_lpm, "Logit (Log-Odds)" = mod_logit, "Logit (ORs)" = mod_logit),
+  exponentiate = c(F,F,T), # Note: DO not exponentiate the first two models, and exponentiate the third one.
+  statistic = "conf.int", 
+  stars = TRUE, 
+  gof_omit = "Log|IC|F|RMSE",
+  title = "Models with a binary outcome")
+
+```
+
+### 3c. Marginal Effects (Average Marginal Effects)
+
+While odds ratios (ORs) are helpful, they have a few known issues, which we won't discuss here. Also, social scientists often prefer to discuss the effect of a variable in terms of **probability points** (similar to the LPM). Average Marginal Effects (AME) provide the average change in the predicted probability across all observations in the sample.
+
+```{r marginal-effects}
+# Average Marginal Effects (AME)
+# We use get_slopes to get the underlying data for modelsummary
+mod_logit_ame <- avg_comparisons(mod_logit)
+
+# Compare AME from Logit to the LPM coefficients
+# Note: we pass the AME object itself to ensure modelsummary shows probabilities, not log-odds
+modelsummary(
+  list("LPM (OLS)" = mod_lpm, "Logit (Log-Odds)" = mod_logit,
+       "Logit (ORs)" = mod_logit, "Logit (AMEs)" = mod_logit_ame),
+  exponentiate = c(F,F,T,F),
+  statistic = "conf.int", 
+  stars = T)
+
+```
+
+We can also visualize how the predicted probability changes across specific variables (Predicted Marginal Means).
+
+```{r marginal-plots}
+# Predicted probability across the range of conservatism
+plot_predictions(mod_logit, condition = "conservatism") +
+  theme_minimal() +
+  labs(title = "Effect of Conservatism on Support for Legalization",
+       y = "Predicted Probability", x = "Conservatism (1-7)")
+
+# Predicted probability by race and sex
+plot_predictions(mod_logit, condition = c("race", "female")) +
+  theme_minimal() +
+  labs(title = "Predicted Probability by Race and Gender",
+       y = "Predicted Probability")
+```
+
+---
+
+# 4. Model Evaluation
+
+### 4a. Predicted Probabilities
+Unlike the LPM, Logit predictions are bounded.
+
+```{r logit-pred}
+gss$pred_logit <- predict(mod_logit, type = "response")
+
+ggplot(gss, aes(x = pred_logit)) +
+  geom_histogram(bins = 50, fill = "steelblue", color = "white") +
+  labs(title = "Distribution of Predicted Probabilities (Logit)",
+       x = "Probability of Supporting Legalization") +
+  theme_minimal()
+
+```
+
+### 4b. Pseudo R-Squared
+Since OLS $R^2$ doesn't exist for Logit, we use "pseudo" $R^2$ measures. A common standard is McFadden's $R^2$.
+
+```{r pseudo-r2}
+# Using DescTools for multiple pseudo-R2 metrics
+DescTools::PseudoR2(mod_logit, which = c("McFadden", "CoxSnell", "Nagelkerke"))
+
+```
+
+---
+
+# 5. Bayesian Binary Regression
+
+Finally, we estimate the model using Bayesian methods for more robust uncertainty estimates.
+
+```{r bayes-logit}
+mod_bayes <- stan_glm(legal_grass ~ conservatism + age + female + race, 
+                      family = binomial(link = "logit"), 
+                      data = gss,
+                      refresh = 0, seed = 1234)
+
+# Posterior Predictive Check
+pp_check(mod_bayes) +
+  labs(title = "Bayesian Posterior Predictive Check")
+```
+
+---
+
+# Summary for regression with a binary outcome:
+1. Use **Logit** (`glm`) for empirically rigorous binary modeling.
+2. Interpret Logit using **Odds Ratios** (`exponentiate = TRUE` in `modelsummary` package).
+3. To interpret coefficients intuitively, estimate average marginal effects (AMEs) using `marginaleffects` package.
+4. Evaluate performance using **Log-Likelihood** and **Pseudo R^2**.
