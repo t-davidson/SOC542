@@ -136,14 +136,8 @@ While odds ratios (ORs) are helpful, they have a few known issues, which we won'
 # We use get_slopes to get the underlying data for modelsummary
 mod_logit_ame <- avg_comparisons(mod_logit)
 
-# Compare AME from Logit to the LPM coefficients
-# Note: we pass the AME object itself to ensure modelsummary shows probabilities, not log-odds
-modelsummary(
-  list("LPM (OLS)" = mod_lpm, "Logit (Log-Odds)" = mod_logit,
-       "Logit (ORs)" = mod_logit, "Logit (AMEs)" = mod_logit_ame),
-  exponentiate = c(F,F,T,F),
-  statistic = "conf.int", 
-  stars = T)
+# Modelsummary shows probabilities, not log-odds
+mod_logit_ame
 
 ```
 
