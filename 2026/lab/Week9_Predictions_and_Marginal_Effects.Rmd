@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk_set(echo = TRUE, warning = FALSE, message = FALSE, options(scipen = 10))
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, options(scipen = 10))
 
 library(tidyverse)
 library(haven)
@@ -16,7 +16,7 @@ library(modelsummary)
 set.seed(1234)
 
 # Load data once for all examples
-gss <- read_dta("../DATASETS/GSS/GSS2022.dta") %>%
+gss <- read_dta("DATASETS/GSS/GSS2022.dta") %>%
   transmute(
     income = as.numeric(conrinc),
     age = ifelse(age < 0, NA, age),
@@ -40,22 +40,25 @@ Predictions tell us the "absolute" expected value of our outcome for specific ca
 ### `predictions()`
 Useful for "What If" scenarios at specific points.
 ```{r predictions}
-mod_linear <- lm(income ~ educ + sex + race, data = gss)
+mod_linear <- lm(income ~ educ * sex + race, data = gss)
 
 # Predicted income for every individual in the dataset
 predictions(mod_linear)
 
-# Predicted income for a Female with 16 years of education (at means of other variables)
-predictions(mod_linear, newdata = datagrid(educ = 16, sex = "Female"))
+# Predicted income for Males and Females with 16 years of education (at means of other variables)
+predictions(mod_linear, newdata = datagrid(educ = 16, sex = c("Male","Female")))
 ```
 
 ### `avg_predictions()`
 Calculates the average predicted value across your entire sample (or specific groups).
 ```{r avg_predictions}
-mod_logit <- glm(unemp ~ age + educ + sex, data = gss, family = binomial)
+mod_logit <- glm(unemp ~ educ * sex + race, data = gss, family = binomial)
 
 # Average predicted probability of unemployment for all individuals in the sample.
 avg_predictions(mod_logit)
+
+# Using View() function helps read this massive table.
+# View(avg_predictions(mod_logit))
 
 # Average predicted probability of unemployment for Male vs. Female respondents in the sample.
 avg_predictions(mod_logit, variables = "sex")
@@ -66,17 +69,23 @@ avg_predictions(mod_logit, variables = "sex")
 ## 2. Comparisons
 Comparisons show us the "difference" between two levels or groups (e.g., Contrast).
 
-If the `predictions` function family pertains to predicted Y, this `comparisons` family focuses on the intuitive interpretation of your beta coefficients.
+If the `predictions` function family pertains to **predicted Y for each individual**, this `comparisons` family focuses on **the intuitive interpretation of your beta coefficient for each variable**.
 
 ### `comparisons()`
 Calculating specific differences between categories or values.
 ```{r comparisons}
 
-# Difference in predicted income between Male and Female, with modal values for all other variables.
-comparisons(mod_linear, variables = "sex")
+# Difference in predicted income for all variables.
+comparisons(mod_linear)
+
+# Using View() function helps read this massive table.
+# View(comparisons(mod_linear))
 
 # Difference in predicted income between Male and Female at 18 years of education
 comparisons(mod_linear, variables = "sex", newdata = datagrid(educ = 18))
+
+# We can also provide multiple educ values.
+comparisons(mod_linear, variables = "sex", newdata = datagrid(educ = c(12, 16, 20)))
 ```
 
 ### `avg_comparisons()`
@@ -97,8 +106,8 @@ The instantaneous effect at a specific point (useful for nonlinear models).
 ```{r slopes}
 mod_nonlinear <- lm(income ~ age + I(age^2), data = gss)
 
-# The "Return on Age" at 25 vs 65 (slope of the curve)
-slopes(mod_nonlinear, variables = "age", newdata = datagrid(age = c(25, 65)))
+# The "Return on Age" at 25, 35, 45, 55, and 65 (slope of the curve)
+slopes(mod_nonlinear, variables = "age", newdata = datagrid(age = c(25, 35, 45, 55, 65)))
 ```
 
 ### `avg_slopes()`
@@ -117,21 +126,25 @@ Visualizing these results is the most effective way to communicate your findings
 ```{r plot_predictions}
 
 plot_predictions(mod_linear, condition = c("educ", "sex")) +
-  theme_minimal() + labs(title = "Predicted Income Trend")
+  theme_minimal() +
+  labs(title = "Predicted Income")
 ```
 
 ### `plot_comparisons()`
 ```{r plot_comparisons}
 
 plot_comparisons(mod_logit, variables = "sex", condition = "educ") +
-  theme_minimal() + labs(title = "Gender Gap in Unemployment by Education")
+  geom_hline(aes(yintercept = 0), lty="dashed") +
+  theme_minimal() +
+  labs(title = "Gender Gap in Unemployment by Education")
 ```
 
 ### `plot_slopes()`
 ```{r plot_slopes}
 
 plot_slopes(mod_nonlinear, variables = "age", condition = "age") +
-  theme_minimal() + labs(title = "How the 'Effect' of Age Changes Over Time")
+  theme_minimal() +
+  labs(title = "The Effect of Age Over Time")
 ```
 
 ---
@@ -150,6 +163,7 @@ mod_lab <- lm(income ~ educ * sex + race, data = gss)
 ### **1. Prediction (Y-hat)**
 What is the absolute predicted income for a **Female** with a PhD (20 years of education)?
 ```{r lab-prediction}
+
 # Use predictions() to find the value for a specific case
 predictions(mod_lab, newdata = datagrid(educ = **BLANK**,
                                         sex = **BLANK**))
@@ -161,6 +175,7 @@ Using `avg_comparisons()`, what is the **average gender gap** in income across y
 
 # Use avg_comparisons() to find the average difference (Female - Male)
 avg_comparisons(mod_lab, variables = **BLANK**)
+
 ```
 
 ### **3. Slope (The "Return" on Education)**
@@ -169,6 +184,7 @@ How much does the **"Return on Education"** (the slope) differ for a Male vs. a 
 
 # Use slopes() to calculate the marginal effect of education by sex
 slopes(mod_lab, variables = **BLANK**, by = **BLANK**)
+
 ```
 
 ### **4. Visualization **
@@ -181,4 +197,5 @@ plot_predictions(mod_lab, condition = c("educ", "sex")) +
        x = "Years of Education",
        y = "Predicted Income ($)") +
   theme_minimal()
+
 ```
