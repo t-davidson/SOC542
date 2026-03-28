@@ -1,7 +1,7 @@
 ---
-title: "SOC542 Week 9: Predictions and Marginal Effects"
+title: "Week 9 - Predictions and Marginal Effects"
 author: "YJ Chae"
-date: "Spring 2026"
+date: "03-30-2026"
 output: html_document
 ---
 
@@ -54,10 +54,10 @@ Calculates the average predicted value across your entire sample (or specific gr
 ```{r avg_predictions}
 mod_logit <- glm(unemp ~ age + educ + sex, data = gss, family = binomial)
 
-# Average predicted probability of unemployment at the modal values.
+# Average predicted probability of unemployment for all individuals in the sample.
 avg_predictions(mod_logit)
 
-# Average predicted probability of unemployment for Males vs. Females, using modal values for other variables.
+# Average predicted probability of unemployment for Male vs. Female respondents in the sample.
 avg_predictions(mod_logit, variables = "sex")
 ```
 
