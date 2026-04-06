@@ -1,0 +1,188 @@
+---
+title: "Week 10 - Count Outcomes"
+author: "YJ Chae"
+date: "2026-04-06"
+output:
+  html_document: default
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(tidyverse)
+library(modelsummary)
+library(marginaleffects)
+library(MASS)
+library(pscl)
+library(haven)
+library(rstanarm)
+library(brms)
+library(broom.mixed)
+
+```
+
+# 1. Introduction
+This lab explores count outcomes using the number of children (`childs`) as our primary dependent variable. We compare Poisson, Negative Binomial, Zero-Inflated, and Bayesian approaches.
+
+# 2. Data Preparation (GSS 2022)
+```{r data}
+gss_raw <- read_dta("DATASETS/GSS/GSS2022.dta")
+
+gss <- gss_raw %>%
+  transmute( 
+    childs = ifelse(childs < 0, NA, as.numeric(childs)),
+    age = ifelse(age < 0, NA, as.numeric(age)),
+    educ = ifelse(educ < 0, NA, as.numeric(educ)),
+    sex = factor(sex, levels = c(1, 2), labels = c("Male", "Female")),
+    marital = factor(marital, levels = 1:5, labels = c("Married", "Widowed", "Divorced", "Separated", "Never Married"))
+  ) %>%
+  drop_na()
+
+```
+
+Let's first take a look at the distribution of the number of children in GSS 2022.
+
+```{r vis}
+ggplot(gss, aes(x = childs)) +
+  geom_bar(fill = "steelblue", color = "white") +
+  theme_minimal() +
+  labs(title = "Distribution of Number of Children",
+       subtitle = "Source: GSS 2022",
+       x = "Number of Children",
+       y = "Frequency")
+
+```
+
+# 3. Poisson Regression
+The Poisson distribution is used for modeling the number of times an event occurs in a fixed interval. The probability of observing a count $y$ is:
+
+$$P(Y=y) = \frac{e^{-\mu} \mu^y}{y!}$$
+
+where $\mu$ is the expected count (the rate). In Poisson regression, we model the natural log of this rate:
+
+$$\ln(\mu) = \beta_0 + \beta_1X_1 + \dots + \beta_kX_k$$
+
+Exponentiating the coefficients ($e^\beta$) gives **Incident Rate Ratios (IRR)**, which tell us how the rate changes for a one-unit increase in $X$. Poisson assumes Mean = Variance.
+
+```{r poisson}
+m_poi <- glm(childs ~ age + educ + sex + marital,
+             data = gss,
+             family = "poisson")
+
+modelsummary(list("Log-Count" = m_poi, "IRR" = m_poi),
+             exponentiate = c(FALSE, TRUE),
+             stars = TRUE)
+```
+
+### 3.1 Overdispersion Check
+```{r poi_check}
+paste("Deviance/DF Ratio:", round(m_poi$deviance / m_poi$df.residual, 2))
+
+```
+
+# 4. Negative Binomial Regression
+The Negative Binomial distribution is an extension of the Poisson that allows for **overdispersion** (Variance > Mean). We use this when the Poisson's assumption of Mean = Variance is violated, often indicated by a Deviance/DF ratio > 1.
+
+
+```{r negbin}
+m_nb <- glm.nb(childs ~ age + educ + sex + marital, data = gss)
+
+modelsummary(list("Poisson" = m_poi, "NegBin" = m_nb),
+             exponentiate = TRUE,
+             metrics = c("AIC","BIC"))
+```
+
+# 5. Zero-Inflated Poisson (ZIP)
+Zero-inflated models are used when there are "extra" zeros beyond what a standard count distribution would predict. The ZIP model combines a **logit model** (to predict the probability of being a structural zero, $\pi$) and a **Poisson model** (to predict the count, $\mu$):
+
+
+```{r zip}
+# Note the pipe (|), separating two sets of coefficients:
+# Formula: DV ~ IDV for count | IDV for zero
+
+m_zip <- zeroinfl(childs ~ age + educ + sex | age + educ + sex,
+                  data = gss,
+                  dist = "poisson")
+summary(m_zip)
+
+modelsummary(m_zip, exponentiate = T, stars = T)
+
+```
+
+# 6. Bayesian Count Models
+Bayesian models allow for robust uncertainty estimation and posterior predictive checks.
+
+```{r bayes}
+m_stan_poi <- stan_glm(childs ~ age + educ + sex, data = gss,
+                       family = "poisson",
+                       refresh = 0,
+                       seed = 1234)
+
+m_stan_nb <- stan_glm(childs ~ age + educ + sex,
+                      data = gss,
+                      family = "neg_binomial_2",
+                      refresh = 0,
+                      seed = 1234)
+
+## To use modelsummary with Bayes NB models
+{
+  tidied_neg = tidy(m_stan_nb, conf.int = T)
+  glance_neg = glance(m_stan_nb)
+  msummary_out = list(tidy = tidied_neg,
+                      glance = glance_neg) 
+  class(msummary_out) = 'modelsummary_list'
+}
+
+modelsummary(list("Bayes Poisson" = m_stan_poi, "Bayes NegBin" = msummary_out),
+             statistic = "conf.int",
+             exponentiate = TRUE)
+
+```
+
+### 6.1 Posterior Predictive Checks
+```{r pp_check}
+pp_check(m_stan_poi) + ggtitle("Posterior Check: Children (Poisson)")
+pp_check(m_stan_nb) + ggtitle("Posterior Check: Children (NegBin)")
+
+```
+
+# 7. Model Comparison: Predicted vs. Actual Distributions
+To see how well our models handle the distribution (especially the zeros), we can compare the predicted outcomes from each model against the actual sample distribution.
+
+```{r comparison_plot}
+# 1. Generate Predicted Counts (Expected Values) for each observation
+# We use posterior_epred for Bayesian models to get the expected value
+gss_comp <- gss %>%
+  mutate(
+    Actual = childs,
+    Poisson = predict(m_poi, type = "response"),
+    NegBin = predict(m_nb, type = "response"),
+    ZIP = predict(m_zip, type = "response"),
+    Bayes_Poisson = colMeans(posterior_epred(m_stan_poi)),
+    Bayes_NegBin = colMeans(posterior_epred(m_stan_nb))
+  )
+
+# 2. Reshape to long format for ggplot
+plot_data <- gss_comp %>%
+  pivot_longer(
+    cols = c(Actual, Poisson, NegBin, ZIP, Bayes_Poisson, Bayes_NegBin),
+    names_to = "Model",
+    values_to = "Value"
+  )
+
+# 3. Density Plot Comparison
+ggplot(plot_data, aes(x = Value, fill = Model, color = Model)) +
+  geom_density(alpha = 0.1) +
+  theme_minimal() +
+  scale_x_continuous(limits = c(0, 8), breaks = 0:8) +
+  labs(title = "Distribution Comparison: Actual vs. Predicted Counts",
+       subtitle = "Including Frequentist and Bayesian Estimates",
+       x = "Number of Children (Expected Value)",
+       y = "Density")
+
+```
+
+
+# 8. Summary
+1. **Poisson**: Baseline model for count data.
+2. **Negative Binomial**: Handles overdispersion (Variance > Mean). If not sure, use this model!
+3. **Zero-Inflated**: Handles excess zeros via a logit + Poisson.
+4. **Bayesian**: Robust uncertainty estimation. Use `pp_check` and see posterior predictive distributions.
