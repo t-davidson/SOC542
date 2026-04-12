@@ -1,0 +1,226 @@
+---
+title: "Week 11 - Ordered and Multinomial Outcomes"
+author: "YJ Chae"
+date: "2026-04-13"
+output: 
+  pdf_document:
+    toc: true
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+library(tidyverse)
+library(modelsummary)
+library(marginaleffects) 
+library(performance)
+library(nnet) # For Multinomial Models
+library(MASS) # For Ordinal Models (careful with dplyr::select conflicts)
+library(brms) # Bayesian modeling
+
+seed <- 12345
+set.seed(seed)
+```
+
+# Introduction
+
+In this lab, we analyze perceptions of women's equality using the Pew Research Center's 2020 survey marking the 100th Anniversary of the 19th Amendment. We focus on two types of categorical dependent variables:
+
+1.  **Ordered (Ordinal) Outcome**: `EQRIGHTS2` - Perceptions of progress in women's rights (Too Far < About Right < Not Far Enough).
+2.  **Unordered (Multinomial) Outcome**: `ADVANCE3` - The most important milestone in advancing women's rights (Voting, BC Pill, Equal Pay, FMLA).
+
+# Data Management
+
+We'll load the dataset and prepare our variables. Note that we are using `marginaleffects` for interpretation, so keeping our factors well-labeled is crucial.
+
+```{r data-loading}
+# Load using haven for SPSS files
+pewraw <- haven::read_sav("DATASETS/Mar20_19th_Amendment_cleaned dataset.sav")
+
+pewamend <- pewraw %>% 
+  dplyr::select( ## Note we use dplyr::select due to conflict with MASS::select
+    EQRIGHTS2, ADVANCE3,
+    age = ppage, 
+    educ = ppeducat,
+    race = ppethm,
+    gender = ppgender,
+    marital = ppmarit,
+    employ = ppwork,
+    party = PARTY,
+    ideo = IDEO,
+    weight
+  ) %>% 
+  mutate(
+    # Ordered DV: Too Far < About Right < Not Far Enough
+    rightsprog = ordered(EQRIGHTS2,
+                        levels = c(1, 3, 2),
+                        labels = c("Too Far", "About Right", "Not Far Enough")),
+    
+    # Unordered DV
+    milestone = factor(ADVANCE3,
+                       levels = c(1:4),
+                       labels = c("Voting", "BC Pill", "Equal Pay", "FMLA")),
+    
+    # Predictors
+    female = ifelse(gender == 2, 1, 0),
+    race = factor(case_when(
+      race == 1 ~ "White",
+      race == 2 ~ "Black", 
+      race == 4 ~ "Hispanic",
+      race == 3 ~ "Other", 
+      race == 5 ~ "Other",
+      TRUE ~ "Other"
+    ), levels = c("White","Black","Hispanic","Other")),
+    educ = factor(educ, levels = c(1:4),
+                  labels = c("<HS", "High School", "Some College", "College+")),
+    party = factor(case_when(
+      party == 1 ~ "Republican",
+      party == 3 ~ "Independent",
+      party == 2 ~ "Democrat",
+      party == 4 ~ "Other"
+    ), levels = c("Republican","Independent","Democrat","Other")),
+    ideo_num = as.numeric(ideo), # Keep numeric for some trends
+    ideo = factor(ideo, levels = c(1:5),
+                  labels = c("Very Cons", "Cons", "Mod", "Lib", "Very Lib"))
+  ) %>% 
+  drop_na(rightsprog, milestone, female, race, age, ideo) # Listwise deletion
+```
+
+# Ordinal Logistic Regression
+
+When the categories of our DV have a natural rank but no fixed interval between them, we use ordinal logistic regression.
+
+### Cumulative Logit Models
+
+Ordinal logistic regression (specifically the "Proportional Odds" model we use here) is an extension of the binary logistic regression we already know. Instead of one "success/failure" split, the model looks at $k-1$ splits (where $k$ is the number of categories). 
+
+For each split ($j$), the probability of being in or below that category is calculated using the logistic function:
+$$P(y \le j) = \frac{1}{1 + e^{-(\alpha_j - X\beta)}}$$
+
+**Key differences to binary logistic regression:**
+*   **Intercept ($\alpha_j$):** This is the **cutpoint**. Each split has its own intercept.
+*   **Coefficients ($\beta$):** There is only one $\beta$ for each variable. This is the **Proportional Odds Assumption**—we assume the effect of a variable is the same for every split.
+
+
+## Model Fitting
+We use `polr` from the `MASS` package.
+
+```{r ologit-model}
+# Proportional Odds Model
+m_ord <- polr(rightsprog ~ female + race + age + ideo,
+                    data = pewamend, Hess = TRUE)
+
+modelsummary(list("Log-odds" = m_ord, "Odds Ratios" = m_ord),
+             exponentiate = c(FALSE, TRUE),
+             stars = TRUE,
+             title = "Ordinal Logit: Progress on Women's Rights")
+
+```
+
+The coefficients in the "Log-odds" column represent the change in the log-odds of being in a higher category of the outcome for a one-unit increase in the predictor. For example, the coefficient for `female` suggests that, compared to males, females have higher log-odds of thinking that women's rights progress has not gone far enough. 
+
+In the "Odds Ratios" (OR) column, we have exponentiated these coefficients ($e^\beta$). An OR > 1 indicates that an increase in the predictor is associated with higher odds of being in a higher category of the outcome, while an OR < 1 indicates lower odds.
+
+The "Intercepts" at the bottom of the table (e.g., `Too Far|About Right` and `About Right|Not Far Enough`) represent the estimated **cutpoints** on the latent continuous scale. These thresholds determine the boundaries between the ordinal categories. Specifically, they represent the log-odds of being in or below a certain category when all predictors are at zero. 
+
+When we exponentiate these intercepts, they represent the cumulative odds of being in that category or below vs. the higher categories. For example, the exponentiated intercept for `Too Far|About Right` is the odds of responding "Too Far" versus "About Right" or "Not Far Enough", assuming all other predictors are zero. 
+
+## Marginal Effects
+Raw coefficients in ordinal logit are in log-odds. A better way is to look at **Predicted Probabilities** for each category.
+
+```{r ologit-viz}
+# Let's see the baseline probability for each category when all predictors are zero
+avg_predictions(m_ord, type = "probs")
+
+# What does this probability look like across gender?
+avg_predictions(m_ord, variables = "female", type = "probs")
+
+# What is the "effect" of gender on the probability?
+avg_comparisons(m_ord, variables = "female", type = "probs")
+
+```
+
+# Multinomial Logistic Regression
+
+When categories are unordered (nominal), we use multinomial logistic regression. 
+
+## Model Fitting
+We use `nnet::multinom`. The default baseline for `milestone` is "Voting".
+
+```{r mlogit-model}
+m_multi <- nnet::multinom(milestone ~ female + race + age + ideo,
+                         data = pewamend, Hess=T, trace = FALSE)
+
+modelsummary(list("Log-Odds" = m_multi, "Odds Ratios" = m_multi),
+             exponentiate = c(F,T),
+             stars=T,
+             shape = term ~ response,
+             title = "Multinomial Logit: Most Important Milestone (Ref: Voting)")
+```
+
+## Marginal effects
+How does ideology affect the choice of each category? We can calculate its marginal effects as follows:
+
+```{r mlogit-viz}
+# Plot predictions across ideo for different milestones
+plot_predictions(m_multi, condition = "ideo", type = "probs") +
+  facet_wrap(~group) +
+  labs(title = "Probability of Selecting Milestone by Ideology",
+       y = "Probability", x = "Ideology") +
+  theme_light()
+```
+
+# Bayesian Approach
+
+Bayesian models allow us to incorporate uncertainty and priors more naturally. We use the `brms` package for both ordinal and multinomial models because of its flexibility and robust syntax.
+
+## Bayesian Ordinal Model
+We use the `cumulative` family with a `logit` link to replicate the ordinal logistic regression in a Bayesian framework.
+
+```{r bayes-ord, results='hide'}
+# Bayesian Ordinal Logistic Regression
+m_ord_bayes <- brm(
+  rightsprog ~ female + race + age + ideo,
+  data = pewamend,
+  family = cumulative(link = "logit"),
+  prior = set_prior("normal(0, 5)", class = "b"), # A weakly informative prior
+  seed = seed, 
+  chains = 1, 
+  refresh = 0
+)
+```
+
+```{r bayes-ord-viz}
+# Posterior predictive check: how well does the model replicate the original data?
+pp_check(m_ord_bayes) +
+  labs(title = "Brms Ordinal: Posterior Predictive Check")
+
+```
+
+## Bayesian Multinomial Model
+For unordered categories, we use the `categorical` family. 
+
+```{r bayes-multi, results='hide'}
+m_multi_bayes <- brm(
+  milestone ~ female + age + ideo,
+  data = pewamend,
+  family = categorical(link = "logit"),
+  seed = seed, 
+  chains = 1, 
+  refresh = 0
+)
+```
+
+```{r bayes-multi-viz}
+# Posterior predictive check
+pp_check(m_multi_bayes) +
+  labs(title = "Brms Multinomial: Posterior Predictive Check")
+
+```
+
+
+# Summary of Modern Workflow
+1.  **Ordinal**: Use `polr` + `marginaleffects` for ordinal outcomes.
+2.  **Multinomial**: Use `multinom` + `marginaleffects` to handle nominal categorical outcomes.
+3.  **Visualization**: Show predicted probability plots for ordinal and multinomial logistic regression models.
