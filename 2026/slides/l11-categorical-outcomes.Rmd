@@ -137,7 +137,7 @@ $$\lambda_k = \beta_{0k} + \beta_{1k}x_1 + ... + \beta_{mk}x_m$$
 $$P(y = k|X) = \text{softmax}_K(\lambda_k) = \frac{e^{\lambda_k}}{\sum_{i \in K}e^{\lambda_i}}$$
 
 # Multinomial logistic regression
-- Due to the constraints on the system, one category will always produce the following equation:
+- Because the probabilities across categories must sum to one, one category will always produce the following equation:
 
 $$\lambda_r = \beta_{0r} + \beta_{1r}x_1 + ... + \beta_{mr}x_m = 0 + 0x_1 + ... + 0x_m = 0 $$
 
@@ -200,13 +200,12 @@ modelsummary(m1, stars = c("*"=0.05, "**"=0.01, "***" = 0.001),
 - Each column is an equation for a specified outcome category compared to the *baseline* (Never married).
 - For example, the first column represents the following equation:
 
-$$log(\frac{y = \text{married}}{ y = \text{never married}}) = \beta_{10} + \beta_{11}Age + \beta_{12}Sex  + \beta_{13}Income + \beta_{14}Educ$$
+$$log(\frac{P(y = \text{married})}{P(y = \text{never married})}) = \beta_{10} + \beta_{11}Age + \beta_{12}Sex  + \beta_{13}Income + \beta_{14}Educ$$
 
 # Multinomial logistic regression
 ## Interpretation
 - $\beta_{11}$ indicates that a one-year increase in age is associated with a .092 change in the log odds of being married relative to never married.
-- Like standard logistic regression $e^{\beta_{11}}$ can be interpreted as an odds ratio.
-    - In this case, it is the \textbf{relative risk ratio} of being married vs. never married.
+- Unlike standard logistic regression, where $e^{\beta}$ is an odds ratio, $e^{\beta_{11}}$ in a multinomial model is a \textbf{relative risk ratio}: the multiplicative change in $P(y = \text{married})/P(y = \text{never married})$ for a one-unit increase in the predictor.
  
 # Multinomial logistic regression
 ## Predictions  
@@ -251,7 +250,7 @@ probs %>% head(5) %>% rowSums() %>% as.numeric()
 
 # Multinomial logistic regression
 ## Limitations
-- Larger samples required compared to more simple models, particularly when categories are imbalanced
+- Larger samples required compared to simpler models, particularly when categories are imbalanced
 - Difficult to evaluate model fit
 - Unstable if some variables perfectly predict category membership or have no overlap with certain categories.
 
@@ -296,7 +295,7 @@ props$log.cm.odds %>% round(3) %>% print()
 
 # Ordinal logistic regression
 ## Estimation
-- Each cutpoint represents the log-cumulative-odds that $y_i$ is less than or equal to some value $k$. These are analogous to *group-level intercepts*.
+- Each cutpoint represents the log-cumulative-odds that $y_i$ is less than or equal to some value $k$. These are analogous to *category-specific intercepts*.
 
 $$log(\frac{P(y_i \leq k)}{1- P(y_i \leq k)}) = \alpha_k$$
 
@@ -316,10 +315,12 @@ $$p_{\text{good}} = P(y_i = \text{good}) = P(y_i \leq \text{good}) - P(y_i \leq 
 
 # Ordinal logistic regression
 ## Estimation 
-- Given this $K-1$ length vector of intercepts, $\alpha_{k \in K-1}$, we can use a linear model to predict the log-cumulative-odds that $y_i = k$ given a matrix of predictors $X$:
+- Given this $K-1$ length vector of intercepts, $\alpha_{k \in K-1}$, we can use a linear model to predict the log-cumulative-odds that $y_i \leq k$ given a matrix of predictors $X$:
 
 $$\phi_i = \beta X_{i}$$
 $$log(\frac{P(y_i \leq k)}{1 - P(y_i \leq k)}) = \alpha_k - \phi_i$$
+
+- Note: because $\phi_i$ is *subtracted*, a positive coefficient indicates that the predictor shifts the distribution toward higher outcome categories (e.g. toward poorer health). Some software and textbooks use the opposite sign convention.
 
 # Ordinal logistic regression
 ## Estimation
@@ -336,15 +337,16 @@ m2 <- polr(health ~ age + I(log(realrinc)) + educ + sex + race,
 The argument `Hess = TRUE` ensures the Hessian matrix is stored. This is necessary for subsequent model evaluation.
 
 
-# Ordinal logistic regression\footnote{\tiny Significance tests are not provided as standard in ordinal regression output from \texttt{polr} so no stars are displayed here.}
+# Ordinal logistic regression
 ```{r health-polr-out, echo = FALSE, mysize=TRUE, size='\\footnotesize'}
-modelsummary(list("Log odds" = m2, "Odds ratios" = m2), output = "latex", exponentiate = c(F, T), coef_omit = "Excellent*|Good*|Fair*", gof_omit = "RMSE|BIC|edf")
+modelsummary(list("Log odds" = m2, "Odds ratios" = m2), output = "kableExtra", exponentiate = c(F, T), coef_omit = "Excellent*|Good*|Fair*", gof_omit = "RMSE|BIC|edf", note = "Significance tests not provided by polr; no stars displayed.") %>% kableExtra::kable_styling(font_size = 8)
 ```
 
 # Ordinal logistic regression
 ## Predictions
 ```{r polr-preds, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
-preds2 <- predict(m2, gss %>% drop_na(health, age, sex, race, realrinc, educ))
+preds2 <- predict(m2, gss %>% drop_na(health, age, sex,
+                                      race, realrinc, educ))
 preds2 %>% head(20)
 ```
 
@@ -409,7 +411,7 @@ print(cuts)
 
 # Ordinal logistic regression
 ## Cutpoints
-We can obtain the probability associated with each cutpoint by using the inverse logit function, $\frac{e^x}{1 + e^x}$. 
+We can obtain the cumulative probability at each cutpoint by using the inverse logit function, $\frac{e^x}{1 + e^x}$. 
 ```{r cuts-convert, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
 inv.logit <- function(x) {
     return(exp(x) / (1 + exp(x)))
@@ -421,7 +423,7 @@ cut.probs %>% round(3) %>% print()
 
 # Ordinal logistic regression
 ## Latent variables
-One way to understand the model is to extract a *latent variable* representing the predicted position of each outcome on the cumulative probability scale without subtracting the intercepts. We can then observe where each observation falls between the cutpoints.
+The ordinal model implies a *latent variable* underlying the observed categories. We can approximate each observation's position on the cumulative probability scale by applying the inverse logit to the linear predictor ($\phi_i$), without subtracting the cutpoints. We can then observe where each observation falls between the cutpoints.
 ```{r cuts-inv, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
 z <- m2$lp  %>% inv.logit()
 z %>% head(10) %>% round(3)
@@ -454,13 +456,13 @@ p + theme_minimal() + labs(y = "density", x = "z") + xlim(0,1) + geom_vline(xint
 # Ordinal logistic regression
 ## Limitations
 - Similar to multinomial logistic regression
-    - Larger samples required compared to more simple models
+    - Larger samples required compared to simpler models
     - Difficult to evaluate model fit
     - Unstable if some variables perfectly predict category membership or have no overlap with certain categories
     
 # Ordinal logistic regression
 ## Proportional odds assumption
-- Assumes the relationship between the predictors and each pair of outcomes is the same (hence one set of coefficients).
+- Assumes the effect of each predictor on the log-odds of being at or below any given category is the same regardless of where the outcome is split (hence one set of coefficients).
 - Additional tests are required to verify this is met.\footnote{\tiny See the \href{https://stats.oarc.ucla.edu/r/dae/ordinal-logistic-regression/}{UCLA stats blog} for details.}
 
 # Categorical outcomes
