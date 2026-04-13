@@ -200,18 +200,23 @@ modelsummary(m1, stars = c("*"=0.05, "**"=0.01, "***" = 0.001),
 - Each column is an equation for a specified outcome category compared to the *baseline* (Never married).
 - For example, the first column represents the following equation:
 
-$$log(\frac{P(y = \text{married})}{P(y = \text{never married})}) = \beta_{10} + \beta_{11}Age + \beta_{12}Sex  + \beta_{13}Income + \beta_{14}Educ$$
+$$log(\frac{P(y = \text{married})}{P(y = \text{never married})})$$
+
+$$ = \beta_{10} + \beta_{11}Age + \beta_{12}Sex  + \beta_{13}Income + \beta_{14}Educ$$
 
 # Multinomial logistic regression
 ## Interpretation
 - $\beta_{11}$ indicates that a one-year increase in age is associated with a .092 change in the log odds of being married relative to never married.
-- Unlike standard logistic regression, where $e^{\beta}$ is an odds ratio, $e^{\beta_{11}}$ in a multinomial model is a \textbf{relative risk ratio}: the multiplicative change in $P(y = \text{married})/P(y = \text{never married})$ for a one-unit increase in the predictor.
+- Unlike standard logistic regression, where $e^{\beta}$ is an odds ratio, $e^{\beta}$ in a multinomial model is a \textbf{relative risk ratio}: $e^{\beta_{11}} = 1.096$ is the multiplicative change in $P(y = \text{married})/P(y = \text{never married})$ for a one-unit increase in age.
+    - The probability of being married *relative to never married* increases by 9.6% each year
  
 # Multinomial logistic regression
 ## Predictions  
 The `predict` function returns a factor variable containing the highest probability category for each observation.
 ```{r mlr-preds, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
-preds <- predict(m1, gss %>% drop_na(age, sex, realrinc, educ, marital))
+preds <- predict(m1, gss %>% 
+                     drop_na(age, sex, realrinc, educ, marital)
+                 )
 preds %>% head(20)
 ```
 
@@ -231,11 +236,12 @@ ggplot(data.frame(preds), aes(x=preds, fill = preds)) + geom_bar() + theme_minim
 ## Predictions
 - The model predicts almost all people as never married or married. 
 - It rarely predicts widowed or divorced and did not predict any people to be separated.
-- Data imbalances make never/married the most likely categories; additional variables may help to predict other categories.
+- Data imbalances make never/married the most likely categories.
+    - Additional variables would likely help to improve accuracy for other categories.
 
 # Multinomial logistic regression
 ## Predictions  
-Setting `type = "probs"` returns a matrix of probabilities for each observation. Each element indicates $P(y_i = k)$.
+Setting `type = "probs"` returns a matrix of predicted probabilities for each observation. Each element indicates $P(y_i = k)$.
 ```{r mlr-probs, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
 probs <- predict(m1, type = "probs", gss %>% drop_na())
 probs %>% round(3) %>% head(5)
@@ -250,8 +256,8 @@ probs %>% head(5) %>% rowSums() %>% as.numeric()
 
 # Multinomial logistic regression
 ## Limitations
-- Larger samples required compared to simpler models, particularly when categories are imbalanced
-- Difficult to evaluate model fit
+- Larger samples required compared to simpler models, particularly when categories are imbalanced.
+- Difficult to evaluate model fit.
 - Unstable if some variables perfectly predict category membership or have no overlap with certain categories.
 
 # Ordinal logistic regression
@@ -347,7 +353,7 @@ modelsummary(list("Log odds" = m2, "Odds ratios" = m2), output = "kableExtra", e
 ```{r polr-preds, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
 preds2 <- predict(m2, gss %>% drop_na(health, age, sex,
                                       race, realrinc, educ))
-preds2 %>% head(20)
+preds2 %>% head(10)
 ```
 
 # Ordinal logistic regression
@@ -365,7 +371,8 @@ ggplot(data.frame(preds2), aes(x=preds2, fill = preds2)) + geom_bar() + theme_mi
 ```{r polr-probs, echo = TRUE, mysize=TRUE, size='\\footnotesize'}
 probs2 <- predict(m2, type = "probs",
                   gss %>% 
-                      drop_na(health, age, sex, race, realrinc, educ))
+                      drop_na(health, age, sex, 
+                              race, realrinc, educ))
 probs2 %>% round(3) %>% head(5)
 ```
 
@@ -456,9 +463,9 @@ p + theme_minimal() + labs(y = "density", x = "z") + xlim(0,1) + geom_vline(xint
 # Ordinal logistic regression
 ## Limitations
 - Similar to multinomial logistic regression
-    - Larger samples required compared to simpler models
-    - Difficult to evaluate model fit
-    - Unstable if some variables perfectly predict category membership or have no overlap with certain categories
+    - Larger samples required compared to simpler models.
+    - Difficult to evaluate model fit.
+    - Unstable if some variables perfectly predict category membership or have no overlap with certain categories.
     
 # Ordinal logistic regression
 ## Proportional odds assumption
@@ -467,22 +474,22 @@ p + theme_minimal() + labs(y = "density", x = "z") + xlim(0,1) + geom_vline(xint
 
 # Categorical outcomes
 ## Frequentist and Bayesian approaches
-- Due to the complexity of the models, many frequentist approaches require additional testing and analysis to diagnose issues and assess model fit
+- Due to the complexity of the models, many frequentist approaches require additional testing and analysis to diagnose issues and assess model fit.
 - In contrast, we can use the same tools to evaluate Bayesian models:
     - Trace plots and MCMC diagnostics for estimation issues
     - LOO-CV and ELPD for fit
     - PSIS diagnostics for outliers
     - Posterior predictive checks for predictions and fit
-- Either way, these models are more cumbersome to work with than other single-equation GLMs
+- Either way, these models are more cumbersome to work with than other single-equation GLMs.
 
 # Summary
-- Categorical outcomes can be modeled using specialized types of generalized linear models
+- Categorical outcomes can be modeled using specialized types of generalized linear models.
 - Unordered categories
     - Multinomial logistic regression
 - Ordered categories
     - Ordinal logistic regression
     - OLS if many categories and equal intervals
-- These models are complex and more difficult to fit and interpret than previous models we have covered
+- These models are complex and more difficult to fit and interpret than previous models we have covered.
 
 # Next week
 - Grouped and nested data
